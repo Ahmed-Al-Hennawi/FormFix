@@ -1,0 +1,40 @@
+# ==========================================================================
+# FormFix AI - Streamlit configuration
+#
+# The goal here is to get Streamlit out of the way: dark surfaces that match
+# the "Cyber Pulse" palette, no toolbar, no sidebar, and static file serving
+# so the athlete photographs and the research paper are fetched (and cached)
+# by the browser instead of being re-sent on every rerun.
+# ==========================================================================
+
+[theme]
+base = "dark"
+
+# Electric Cyan - the FormFix accent
+primaryColor = "#00F0FF"
+
+# Deep Space Blue - the page background
+backgroundColor = "#0B132B"
+
+# Graphite - cards, inputs, widget surfaces
+secondaryBackgroundColor = "#1C2541"
+
+textColor = "#FFFFFF"
+
+font = "sans serif"
+
+[server]
+# Serves streamlit_app/static/ at app/static/... - used by utils/assets.py
+enableStaticServing = true
+headless = true
+
+[browser]
+gatherUsageStats = false
+
+[client]
+# Kept on while this is a prototype - flip to "none" for a public demo.
+showErrorDetails = "full"
+toolbarMode = "minimal"
+
+[runner]
+magicEnabled = false
