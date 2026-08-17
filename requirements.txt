@@ -1,0 +1,13 @@
+# ==========================================================================
+# FormFix AI - Streamlit application
+# ==========================================================================
+
+# --- required to run the application as it stands ---------------------------
+streamlit>=1.32
+
+# --- required once the computer-vision backend in utils/analysis.py is
+#     implemented. Uncomment them then; they are not imported anywhere yet,
+#     so installing them now is optional.
+# opencv-python>=4.9
+# mediapipe>=0.10.9
+# numpy>=1.26
