@@ -3,7 +3,8 @@
 # ==========================================================================
 
 # --- required to run the application as it stands ---------------------------
-streamlit>=1.32
+# 1.36+ for st.navigation (the / and /analyse pages).
+streamlit>=1.36
 
 # --- required once the computer-vision backend in utils/analysis.py is
 #     implemented. Uncomment them then; they are not imported anywhere yet,

@@ -11,6 +11,7 @@ from utils.assets import asset_url
 from utils.exercise_data import SQUAT
 from utils.helpers import masked_lines, strip
 from utils.pose import render_pose
+from utils.routing import analyse_url
 from utils.styling import html
 
 HEADLINE = (
@@ -39,7 +40,7 @@ def render() -> None:
                   <h1 class="hero__title">{masked_lines(HEADLINE, animate="")}</h1>
                   <p class="hero__sub reveal">{SUBTITLE}</p>
                   <div class="hero__cta reveal">
-                    <a href="#ff-analyse" class="btn btn--primary" data-scroll-to="ff-analyse">
+                    <a href="{analyse_url()}" class="btn btn--primary" target="_self">
                       Analyse Your Form <span class="btn__arrow">&rarr;</span>
                     </a>
                     <a href="#ff-how" class="btn btn--ghost" data-scroll-to="ff-how">See How It Works</a>

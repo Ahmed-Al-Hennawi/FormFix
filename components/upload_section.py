@@ -1,9 +1,15 @@
 """
 Video upload / analysis section.
 
-This is the one section that has no direct counterpart in the original
-HTML/CSS/JS prototype - there, "Analyse Your Form" simply scrolled down to the
-exercise explorer. It is added here because it is the reason for moving to
+.. note::
+
+   Superseded by the dedicated /analyse page (``components/analyse_page.py``
+   and ``components/analysis_results.py``). This module is no longer rendered
+   on the homepage - the "Analyse Form" call to action links to that page
+   instead. It is kept intact for reference and because nothing needed to be
+   deleted in order to add the new page.
+
+The reason for moving to
 Streamlit: it is where the OpenCV / MediaPipe pipeline will be plugged in.
 
 Everything visible is styled to belong to the existing FormFix design - the

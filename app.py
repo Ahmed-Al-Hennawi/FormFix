@@ -2,9 +2,7 @@
 FormFix AI - Streamlit application
 ==================================
 
-A Python/Streamlit rebuild of the FormFix AI prototype website. The original
-HTML/CSS/JavaScript version lives one folder up and is left completely
-untouched; this application reproduces its design, content and behaviour.
+A Python/Streamlit prototype website. 
 
 Run it with::
 
@@ -13,14 +11,20 @@ Run it with::
 Structure
 ---------
 
-    app.py              this file - page config, then one call per section
-    components/         one module per section of the page
-    utils/              paths, assets, styling, pose renderer, exercise data,
-                        and the placeholder analysis pipeline
-    styles/main.css     the full stylesheet, ported from the prototype
+    app.py              this file - page config, then the page router
+    views/              one module per page:
+                          home.py     /          the marketing site
+                          analyse.py  /analyse   upload + analysis studio
+    components/         one module per section / feature
+    utils/              paths, routing, assets, styling, pose renderer,
+                        exercise data, and the placeholder analysis pipeline
+    styles/main.css     the full stylesheet
+    styles/analyse.css  additions used by the /analyse page only
     scripts/main.js     the small behaviour layer (scroll progress, reveals,
                         exercise explorer, smooth navigation)
-    static/assets/      copies of the original images, logo and research paper
+    scripts/analyse.js  the /analyse page behaviour (reference lightbox,
+                        score count-up)
+    static/assets/      images, logo, research paper, reference clips
     .streamlit/         theme + server configuration
 """
 
@@ -37,16 +41,20 @@ APP_DIR = Path(__file__).resolve().parent
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
-from utils.assets import LOGO_MARK, asset_path, missing_assets  # noqa: E402
-from utils.styling import inject_behaviour, inject_styles  # noqa: E402
-import components  # noqa: E402
+from utils.assets import LOGO_MARK, asset_path  # noqa: E402
+from utils.routing import ANALYSE_PATH, HOME_PATH  # noqa: E402
+from utils.styling import inject_styles  # noqa: E402
+import views  # noqa: E402
+
+HOME_TITLE = "FormFix AI - See your form. Understand the mistake."
+ANALYSE_TITLE = "Analyse Your Form - FormFix AI"
 
 
 def configure_page() -> None:
     """Wide, dark, no sidebar - the app should read as a product website."""
     icon = asset_path(LOGO_MARK)
     st.set_page_config(
-        page_title="FormFix AI - See your form. Understand the mistake.",
+        page_title=HOME_TITLE,
         page_icon=str(icon) if icon else ":material/fitness_center:",
         layout="wide",
         initial_sidebar_state="collapsed",
@@ -59,48 +67,32 @@ def configure_page() -> None:
     )
 
 
-def warn_about_missing_assets() -> None:
+def build_navigation():
     """
-    A quiet, non-fatal note if an image could not be found on disk.
+    The two pages of the application.
 
-    Rendered at the very bottom of the page so it can never interfere with the
-    design; missing assets fall back to a transparent pixel rather than a
-    broken-image icon.
+    ``position="hidden"`` keeps Streamlit's own navigation out of the way -
+    the site provides its own (the floating pill nav on the homepage, the
+    "Back Home" button on the analysis page).
     """
-    missing = missing_assets()
-    if missing:
-        with st.container(key="ff_asset_warning"):
-            st.warning(
-                "Some assets could not be found and are rendering as blanks: "
-                + ", ".join(missing)
-                + ". Copy them into `streamlit_app/static/assets/`."
-            )
+    pages = [
+        st.Page(views.home.render, title=HOME_TITLE, url_path=HOME_PATH, default=True),
+        st.Page(views.analyse.render, title=ANALYSE_TITLE, url_path=ANALYSE_PATH),
+    ]
+    try:
+        return st.navigation(pages, position="hidden")
+    except TypeError:  # pragma: no cover - older Streamlit without "hidden"
+        return st.navigation(pages)
 
 
 def main() -> None:
     configure_page()
+
+    # One stylesheet for the whole application; the analysis page adds its own
+    # on top of this one.
     inject_styles()
 
-    # Fixed layers first - they get relocated to <body> by scripts/main.js.
-    components.background.render()
-    components.navbar.render()
-
-    # The page, in the order of the original prototype.
-    components.hero.render()                 # 1  Hero
-    components.problem.render()              # 2  The problem
-    components.how_it_works.render()         # 3  How it works
-    components.exercise_section.render()     # 4  Exercise explorer
-    components.explainable.render()          # 5  Explainable AI
-    components.results_section.render_example()  # 6  Example analysis
-    components.upload_section.render()       # -  Video upload / analysis
-    components.technology.render()           # 7  Technology
-    components.research.render()             # 7b Academic foundation
-    components.outro.render()                # 8  Final CTA + footer
-
-    warn_about_missing_assets()
-
-    # Behaviour last, so everything it enhances is already in the DOM.
-    inject_behaviour()
+    build_navigation().run()
 
 
 main()

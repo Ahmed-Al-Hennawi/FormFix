@@ -42,7 +42,10 @@ header[data-testid="stHeader"],
 [data-testid="stAppDeployButton"],
 #MainMenu,
 .stApp > footer,
-[data-testid="stAppViewContainer"] > footer {
+[data-testid="stAppViewContainer"] > footer,
+/* The app declares its own navigation in app.py (st.navigation, hidden), so
+   Streamlit's page list never renders. Belt and braces for older versions. */
+[data-testid="stSidebarNav"] {
   display: none !important;
   height: 0 !important;
   visibility: hidden !important;

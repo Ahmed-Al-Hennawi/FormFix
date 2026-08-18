@@ -8,12 +8,16 @@ Behaviour ported from the original prototype and implemented in ``main.js``:
 * smooth scrolling to sections, with an offset so the pill never covers a heading
 * active section indication via IntersectionObserver
 * a responsive overlay menu below 900px
+
+The "Analyse Form" call to action is the one link that leaves the page: it
+opens ``/analyse``, the dedicated upload and analysis experience.
 """
 
 from __future__ import annotations
 
 from utils.assets import LOGO_MARK, asset_url
 from utils.helpers import strip
+from utils.routing import analyse_url
 from utils.styling import html
 
 #: (label, section id) - identical to the original prototype's nav.
@@ -47,7 +51,7 @@ def render() -> None:
                 </a>
                 <ul class="nav__links">{links}</ul>
                 <div class="nav__actions">
-                  <a href="#ff-analyse" class="btn btn--nav" data-scroll-to="ff-analyse">Analyse Form</a>
+                  <a href="{analyse_url()}" class="btn btn--nav" target="_self">Analyse Form</a>
                   <button class="nav__toggle" aria-expanded="false" aria-controls="mobile-menu" aria-label="Open menu">
                     <span></span><span></span>
                   </button>
@@ -55,7 +59,7 @@ def render() -> None:
               </nav>
               <div class="mobile-menu" id="mobile-menu" hidden>
                 {mobile_links}
-                <a href="#ff-analyse" class="mobile-menu__cta" data-scroll-to="ff-analyse">Analyse Form</a>
+                <a href="{analyse_url()}" class="mobile-menu__cta" target="_self">Analyse Form</a>
               </div>
             </header>
             """
