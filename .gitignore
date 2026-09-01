@@ -5,3 +5,31 @@ __pycache__/
 venv/
 .env
 .DS_Store
+
+# Analysis artefacts (evaluation exports; regenerated per run)
+analysis_results/
+
+# The MediaPipe model is fetched with scripts/download_pose_model.py
+static/assets/models/*.task
+
+# Local development clips
+_dev_test_clips/
+test_videos/
+
+# The original HEVC exports of the reference clips. The versions the app
+# serves are H.264 (browsers other than Safari will not play HEVC); these are
+# kept locally as the masters, not shipped.
+static/assets/videos/_source_hevc/
+
+# Labelled evaluation recordings and the harness output. The manifest
+# template and the instructions are tracked; the clips and the results a run
+# produces are not.
+evaluation/*.mp4
+evaluation/*.mov
+evaluation/labels.csv
+evaluation/results.csv
+evaluation/error_matrix.csv
+evaluation/summary.md
+
+.pytest_cache/
+.ruff_cache/
