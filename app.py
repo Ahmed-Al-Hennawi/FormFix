@@ -2,7 +2,7 @@
 FormFix AI - Streamlit application
 ==================================
 
-A Python/Streamlit prototype website. 
+A Python/Streamlit prototype website.
 
 Run it with::
 
@@ -41,10 +41,10 @@ APP_DIR = Path(__file__).resolve().parent
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
 
+import views  # noqa: E402
 from utils.assets import LOGO_MARK, asset_path  # noqa: E402
 from utils.routing import ANALYSE_PATH, HOME_PATH  # noqa: E402
 from utils.styling import inject_styles  # noqa: E402
-import views  # noqa: E402
 
 HOME_TITLE = "FormFix AI - See your form. Understand the mistake."
 ANALYSE_TITLE = "Analyse Your Form - FormFix AI"
