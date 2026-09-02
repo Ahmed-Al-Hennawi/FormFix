@@ -1,10 +1,6 @@
 """
 The FormFix AI homepage.
 
-Exactly the sections of the original single-page site, in the original order.
-The only change is that the upload / analysis experience is no longer one of
-them: it has its own page now (``views/analyse.py``), and the "Analyse Form"
-call to action links there.
 """
 
 from __future__ import annotations
@@ -40,15 +36,16 @@ def render() -> None:
     components.navbar.render()
 
     # The page, in the order of the original prototype.
-    components.hero.render()                 # 1  Hero
-    components.problem.render()              # 2  The problem
-    components.how_it_works.render()         # 3  How it works
-    components.exercise_section.render()     # 4  Exercise explorer
-    components.explainable.render()          # 5  Explainable AI
+    components.hero.render()  # 1  Hero
+    components.about.render()  # 1b What this is / who it is for
+    components.problem.render()  # 2  The problem
+    components.how_it_works.render()  # 3  How it works
+    components.exercise_section.render()  # 4  Exercise explorer
+    components.explainable.render()  # 5  Explainable AI
     components.results_section.render_example()  # 6  Example analysis
-    components.technology.render()           # 7  Technology
-    components.research.render()             # 7b Academic foundation
-    components.outro.render()                # 8  Final CTA + footer
+    components.technology.render()  # 7  Technology
+    components.research.render()  # 7b Academic foundation
+    components.outro.render()  # 8  Final CTA + footer
 
     _warn_about_missing_assets()
 

@@ -1,7 +1,7 @@
 """
 Pages.
 
-    home      the marketing site, unchanged
+    home      the marketing site
     analyse   the upload / analysis studio
 
 Both are registered in ``app.py`` with ``st.navigation``:
