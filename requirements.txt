@@ -2,13 +2,46 @@
 # FormFix AI - Streamlit application
 # ==========================================================================
 
-# --- required to run the application as it stands ---------------------------
+# --- application -----------------------------------------------------------
 # 1.36+ for st.navigation (the / and /analyse pages).
-streamlit>=1.36
+#
+# The upper bound is deliberate. The behaviour layer (utils/styling.py) installs
+# scripts/main.js and scripts/analyse.js through `st.components.v1.html`, which
+# Streamlit has deprecated - and `st.iframe`, its replacement, takes a URL
+# rather than inline markup, so it is not a drop-in. Without a ceiling a fresh
+# deploy would install a Streamlit that has dropped the API, and the reference
+# lightbox, the scroll reveals and the score count-up would silently stop
+# working. Raise the bound once the injection is ported.
+streamlit>=1.36,<1.63
 
-# --- required once the computer-vision backend in utils/analysis.py is
-#     implemented. Uncomment them then; they are not imported anywhere yet,
-#     so installing them now is optional.
-# opencv-python>=4.9
-# mediapipe>=0.10.9
-# numpy>=1.26
+# --- computer-vision backend (Squat analyser) ------------------------------
+# macOS: 0.10.14 is the LAST MediaPipe build published for macOS, and it is a
+# native binary compiled against NumPy 1.x - running it with NumPy 2 crashes
+# the process ("Python quit unexpectedly") during landmark detection. The
+# whole macOS stack is therefore pinned to the NumPy-1 ABI it was built for.
+# Linux (deployment/CI) keeps the modern stack.
+mediapipe==0.10.14; sys_platform == "darwin"
+numpy==1.26.4; sys_platform == "darwin"
+opencv-python==4.10.0.84; sys_platform == "darwin"
+opencv-contrib-python==4.10.0.84; sys_platform == "darwin"
+jax==0.4.30; sys_platform == "darwin"
+jaxlib==0.4.30; sys_platform == "darwin"
+
+mediapipe>=0.10.14; sys_platform != "darwin"
+numpy>=1.26; sys_platform != "darwin"
+opencv-python>=4.9; sys_platform != "darwin"
+
+# --- development -----------------------------------------------------------
+# pytest, ruff and black are used for testing/linting; keep them if you want
+# to run the test-suite locally:
+pytest>=8.0
+ruff>=0.4
+black>=24.0
+
+# NOTE: the annotated result video is converted to browser-playable H.264
+# with FFmpeg, which is a system binary, not a pip package. Install it with
+# `brew install ffmpeg` (macOS) or your platform's package manager. Without
+# it the app still works, but the annotated clip may not play in a browser.
+#
+# NOTE: the MediaPipe Pose Landmarker model file is also required - run
+# `python scripts/download_pose_model.py` once (see README).
