@@ -1,0 +1,14 @@
+# System packages installed by Streamlit Community Cloud (apt) before pip runs.
+#
+# libgl1 / libglib2.0-0
+#   OpenCV's Python wheel links against libGL and glib. They are present on a
+#   normal desktop but not in the deployment image, and without them
+#   `import cv2` fails - which makes the app fall back to its labelled sample
+#   output instead of analysing anything.
+#
+# ffmpeg
+#   Converts the annotated clip to H.264 so it plays in the browser (see the
+#   note at the bottom of requirements.txt).
+libgl1
+libglib2.0-0
+ffmpeg
