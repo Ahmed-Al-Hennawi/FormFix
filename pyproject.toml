@@ -1,0 +1,18 @@
+# ==========================================================================
+# FormFix - tooling configuration
+#
+# Black and Ruff have to agree on the line length, or `black .` reformats the
+# whole project against Ruff's own setting on every run. Ruff keeps its rule
+# selection in ruff.toml; the length lives in both files and must match.
+# ==========================================================================
+
+[tool.black]
+line-length = 104
+target-version = ["py311"]
+extend-exclude = '''
+/(
+    \.venv
+  | \.pytest_cache
+  | \.ruff_cache
+)/
+'''
