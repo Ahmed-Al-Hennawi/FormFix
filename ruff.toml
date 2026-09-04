@@ -1,0 +1,21 @@
+# FormFix - lint configuration.
+# An explicit, conventional rule set: errors, pyflakes, warnings, import
+# order, bugbear, pyupgrade and simplify. Stylistic nit rules (RUF/PLR
+# micro-optimisations) are deliberately not enabled - clarity over churn.
+line-length = 104
+target-version = "py311"
+
+[lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM"]
+ignore = [
+    "E501",   # long lines in markup-building components are intentional
+    "SIM117", # nested `with` blocks read better for container+expander UI
+    "UP022",  # explicit stdout/stderr PIPE mirrors the timeout handling
+    "UP042",  # str-Enums are deliberate: .value strings flow into JSON/UI
+]
+
+[lint.per-file-ignores]
+# Path bootstrap before imports is required in entry points and scripts.
+"app.py" = ["E402"]
+"scripts/*.py" = ["E402"]
+"tests/conftest.py" = ["E402"]
