@@ -1,5 +1,5 @@
 # ==========================================================================
-# FormFix AI - Streamlit application
+# FormFix - Streamlit application
 # ==========================================================================
 
 # --- application -----------------------------------------------------------
@@ -36,7 +36,11 @@ opencv-python>=4.9; sys_platform != "darwin"
 # to run the test-suite locally:
 pytest>=8.0
 ruff>=0.4
-black>=24.0
+# Black is pinned to an exact version, not a floor. Its formatting changes
+# between releases (line-hugging rules moved in the 25.x series), so a range
+# means `black --check .` passes on one machine and fails on another over code
+# nobody touched. One version keeps that check meaningful.
+black==26.5.1
 
 # NOTE: the annotated result video is converted to browser-playable H.264
 # with FFmpeg, which is a system binary, not a pip package. Install it with
