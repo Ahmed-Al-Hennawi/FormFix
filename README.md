@@ -701,6 +701,32 @@ FormFix visual language rather than generic pose-estimation dots:
 
 ---
 
+## Deployment
+
+The app is deployed on Streamlit Community Cloud from the `main` branch of the
+GitHub mirror, with `app.py` as the entry point and Python 3.11.
+
+`packages.txt` lists the apt packages the deployment image installs before pip
+runs. It deliberately contains nothing but bare package names:
+
+* `libgl1` and `libglib2.0-0` - OpenCV's Python wheel links against libGL and
+  glib. They are present on a normal desktop but not in the deployment image,
+  and without them `import cv2` fails, which makes the app fall back to its
+  labelled sample output instead of analysing anything.
+* `ffmpeg` - converts the annotated clip to H.264 so it plays in the browser.
+  It is a system binary, not a pip package.
+
+Do not add comments to `packages.txt`. Community Cloud feeds the file to
+`apt-get` through `xargs`, which does not strip `#` lines and treats
+apostrophes and stray `/` characters as syntax - a commented file fails the
+build with `xargs: unmatched single quote` and `E: Unsupported file /`.
+`requirements.txt` is read by pip and does support comments.
+
+The MediaPipe model is not in the repository; `analysis.pose_detector.fetch_model`
+downloads it on first start-up, so a fresh deploy needs no extra step.
+
+---
+
 ## Notes
 
 * Requires Streamlit 1.36 or newer: `st.container(key=…)` scopes the widget
