@@ -1,5 +1,5 @@
 /* ==========================================================================
-   FormFix AI - Streamlit stylesheet
+   FormFix - Streamlit stylesheet
    Direct port of the original prototype stylesheet.
    Palette: "Cyber Pulse" - dark, restrained, cyan + lime as controlled accents
 
@@ -15,7 +15,7 @@
      8.  Problem
      9.  How it works
      10. Exercise explorer
-     11. Explainable AI
+     11. Explainable Feedback
      12. Example analysis (report)
      13. Technology
      14. Research
@@ -179,11 +179,9 @@ html, body, .stApp {
 .ff-page p { margin: 0; }
 .ff-page h1, .ff-page h2, .ff-page h3 { margin: 0; padding: 0; font-weight: inherit; }
 
-/* Streamlit styles bare elements (p, h1-h6, ul, li, a) at class-level
-   specificity, which would otherwise beat a plain class selector. Every rule
-   in this file that targets one of those elements directly is therefore
-   written element-qualified - p.eyebrow, h2.display, a.btn, ul.nav__links -
-   so it wins on source order. Links need the same treatment. */
+/* Streamlit styles bare elements at class-level specificity, which would beat
+   a plain class selector, so rules here are written element-qualified
+   (p.eyebrow, h2.display, a.btn) to win on source order. */
 .ff-page a,
 .nav-wrap a,
 .mobile-menu a {
@@ -331,7 +329,12 @@ h1.display--md, h2.display--md, .display--md { font-size: clamp(2.1rem, 4.6vw, 3
 .line-mask { display: block; overflow: hidden; }
 .line-mask .line { display: inline-block; will-change: transform; }
 
-/* ---------- Buttons ---------- */
+/* ---------- Buttons ----------
+   The modifiers below are element-qualified for the same reason as the rest
+   of this file (see the note near the top): a bare `.btn--primary` loses to
+   `.ff-page a { color: inherit }`, which is (0,1,1). Unqualified, the primary
+   call to action rendered as white text on Electric Cyan - about 1.6:1
+   contrast, effectively unreadable. */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -354,7 +357,7 @@ h1.display--md, h2.display--md, .display--md { font-size: clamp(2.1rem, 4.6vw, 3
 
 .btn__arrow { display: inline-block; transition: transform 0.35s var(--ease-out); }
 
-.btn--primary {
+a.btn--primary, .btn--primary {
   background: var(--cyan);
   color: #04212b;
   box-shadow: 0 0 0 rgba(0, 240, 255, 0);
@@ -368,7 +371,7 @@ h1.display--md, h2.display--md, .display--md { font-size: clamp(2.1rem, 4.6vw, 3
 
 .btn--primary:hover .btn__arrow { transform: translateX(4px); }
 
-.btn--ghost {
+a.btn--ghost, .btn--ghost {
   border-color: var(--hairline-strong);
   color: var(--ink-90);
 }
@@ -381,7 +384,7 @@ h1.display--md, h2.display--md, .display--md { font-size: clamp(2.1rem, 4.6vw, 3
 
 .btn--lg { font-size: 1.05rem; padding: 1.05em 2.1em; }
 
-.btn--nav {
+a.btn--nav, .btn--nav {
   background: rgba(0, 240, 255, 0.12);
   border-color: rgba(0, 240, 255, 0.35);
   color: var(--cyan);
@@ -448,7 +451,7 @@ h1.display--md, h2.display--md, .display--md { font-size: clamp(2.1rem, 4.6vw, 3
   .nav-wrap.is-open .nav { background: rgba(9, 16, 37, 0.94); }
 }
 
-.nav__brand { display: flex; align-items: center; gap: 0.55rem; }
+a.nav__brand, .nav__brand { display: flex; align-items: center; gap: 0.55rem; }
 
 .nav__mark { width: 44px; height: auto; }
 
@@ -458,17 +461,6 @@ h1.display--md, h2.display--md, .display--md { font-size: clamp(2.1rem, 4.6vw, 3
   font-size: 0.95rem;
   letter-spacing: 0.16em;
   color: var(--white);
-}
-
-.nav__ai {
-  margin-left: 0.45em;
-  font-size: 0.62rem;
-  letter-spacing: 0.1em;
-  color: var(--cyan);
-  border: 1px solid rgba(0, 240, 255, 0.5);
-  border-radius: 4px;
-  padding: 0.1em 0.35em;
-  vertical-align: 2px;
 }
 
 ul.nav__links, .nav__links { display: flex; gap: clamp(0.6rem, 1.6vw, 1.6rem); list-style: none; margin: 0; padding: 0; }
@@ -580,7 +572,10 @@ a.mobile-menu__cta, .mobile-menu__cta { color: var(--cyan); border: 1px solid rg
   width: min(1320px, 94vw);
   margin-inline: auto;
   display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(380px, 1.05fr);
+  /* The copy column takes the larger share: the headline is three deliberate
+     lines that must never wrap (see below), so it needs the width more than
+     the figure does. */
+  grid-template-columns: minmax(320px, 1.2fr) minmax(360px, 0.85fr);
   align-items: center;
   gap: clamp(1rem, 4vw, 4rem);
 }
@@ -593,6 +588,23 @@ h1.hero__title, .hero__title {
   letter-spacing: -0.02em;
   color: var(--white);
   margin-bottom: 1.6rem;
+}
+
+/* Three lines, three rows - always.
+
+   The headline is revealed one line at a time, so a wrapped line breaks both
+   the rhythm and the animation. Viewport units can't prevent that: the column
+   caps at 1320px while `3.5vw` keeps climbing. Sizing the type from the column
+   instead (`6.1cqw`) is the largest size at which the longest line still fits.
+   Below 900px the hero is a single column and wrapping is fine. */
+@media (min-width: 901px) {
+  .hero__copy { container-type: inline-size; }
+
+  .hero__title .line { white-space: nowrap; }
+
+  @supports (font-size: 1cqw) {
+    h1.hero__title, .hero__title { font-size: min(clamp(2.2rem, 3.5vw, 3.5rem), 6.1cqw); }
+  }
 }
 
 .hero__title em {
@@ -786,7 +798,7 @@ figure.hero__figure {
 /* --- the joint currently under analysis --- */
 .pn--key .pn__ring {
   stroke: rgba(57, 255, 20, 0.95);
-  stroke-width: 1.5;
+  stroke-width: 1.2;
   fill: rgba(11, 19, 43, 0.5);
   filter: drop-shadow(0 0 4px rgba(57, 255, 20, 0.45));
 }
@@ -948,6 +960,201 @@ a.hero__scroll-hint, .hero__scroll-hint {
 @keyframes scrollPulse {
   0%, 100% { transform: scaleY(0.6); transform-origin: top; opacity: 0.4; }
   50% { transform: scaleY(1); opacity: 1; }
+}
+
+
+/* ==========================================================================
+   7b - What this is (orientation block)
+   ==========================================================================
+   Sits directly under the hero. A statement on the left, two scannable
+   panels on the right: the "what it does not do" half is a list by nature,
+   and a reader deciding whether a tool is for them scans rather than reads.
+   Deliberately quieter than a full section, hence the tighter rhythm. */
+.section--tight { padding: clamp(64px, 8vw, 116px) 0; }
+
+.about__grid {
+  display: grid;
+  grid-template-columns: 1.05fr 1fr;
+  gap: clamp(2rem, 5vw, 4.5rem);
+  align-items: start;
+}
+
+h2.about__title, .about__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.7rem, 3.2vw, 2.6rem);
+  font-weight: 700;
+  line-height: 1.16;
+  letter-spacing: -0.018em;
+  color: var(--white);
+  max-width: 19ch;
+}
+
+/* Same emphasis the hero headline uses, so the two read as one voice. */
+.about__title em { font-style: normal; color: var(--cyan); }
+
+/* A short bar of the brand gradient - the same ramp as the scroll progress
+   indicator. It gives the column a beat between the claim and the detail. */
+.about__rule {
+  display: block;
+  width: 56px;
+  height: 2px;
+  border-radius: 2px;
+  margin-top: clamp(1.3rem, 2.6vw, 1.8rem);
+  background: linear-gradient(90deg, var(--cyan) 0%, #17F5A8 55%, var(--lime) 100%);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.28);
+}
+
+p.about__text, .about__text {
+  color: var(--ink-60);
+  font-size: 1.02rem;
+  line-height: 1.68;
+  max-width: 52ch;
+  margin-top: clamp(1.2rem, 2.4vw, 1.6rem);
+}
+
+/* The pills need a reason to be there, or they read as stray buttons. */
+p.about__chips-label, .about__chips-label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-40);
+  margin-top: clamp(1.6rem, 3vw, 2.2rem);
+  margin-bottom: 0.85rem;
+}
+
+/* The three movements, as pills - faster to take in than a clause. */
+ul.about__chips, .about__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.about__chips li {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-90);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  padding: 0.5em 1em;
+  background: rgba(28, 37, 65, 0.4);
+}
+
+/* Closes the column, and earns its place: both halves are literally true of
+   the build, so this is scope information rather than decoration. */
+p.about__aside, .about__aside {
+  position: relative;
+  padding-left: 1.15rem;
+  color: var(--ink-40);
+  font-size: 0.88rem;
+  line-height: 1.6;
+  max-width: 44ch;
+  margin-top: clamp(1.7rem, 3.2vw, 2.4rem);
+}
+
+/* Absolute, not inline, so a second line hangs under the first rather than
+   tucking back under the dot. */
+.about__aside::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0.58em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lime);
+  box-shadow: 0 0 8px rgba(57, 255, 20, 0.55);
+}
+
+.about__panels {
+  display: grid;
+  gap: clamp(0.9rem, 2vw, 1.3rem);
+}
+
+.about__panel {
+  border: 1px solid var(--hairline);
+  border-radius: var(--radius);
+  background: rgba(28, 37, 65, 0.4);
+  padding: clamp(1.4rem, 2.8vw, 1.9rem);
+}
+
+/* The two panels are not equals. "Built for you if" is the one that answers
+   the reader's actual question, so it carries the lime the rest of the page
+   uses for a positive verdict; the exclusions sit back in neutral hairline. */
+.about__panel--yes {
+  border-color: rgba(57, 255, 20, 0.22);
+  background:
+    linear-gradient(180deg, rgba(57, 255, 20, 0.06) 0%, rgba(28, 37, 65, 0.4) 62%);
+}
+
+p.about__panel-title, .about__panel-title {
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--ink-40);
+  padding-bottom: 0.9rem;
+  margin-bottom: 1.1rem;
+  border-bottom: 1px solid var(--hairline);
+}
+
+.about__panel--yes .about__panel-title {
+  color: var(--lime);
+  border-bottom-color: rgba(57, 255, 20, 0.18);
+}
+
+ul.about__list, .about__list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.about__list li {
+  position: relative;
+  padding-left: 2.3rem;
+  color: var(--ink-60);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+/* The marker is a badge rather than a bare glyph: it holds the line's left
+   edge steady when an item wraps, and gives the two panels one geometry. */
+.about__list li::before {
+  position: absolute;
+  left: 0;
+  top: -0.05em;
+  width: 1.45rem;
+  height: 1.45rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono);
+  font-size: 0.74rem;
+  line-height: 1;
+}
+
+.about__list--yes li { color: var(--ink-90); }
+
+.about__list--yes li::before {
+  content: "\2713";
+  color: var(--lime);
+  background: var(--lime-soft);
+  border: 1px solid rgba(57, 255, 20, 0.24);
+}
+
+.about__list--no li::before {
+  content: "\2013";
+  color: var(--ink-40);
+  background: rgba(255, 255, 255, 0.035);
+  border: 1px solid var(--hairline);
 }
 
 
@@ -1316,13 +1523,13 @@ button.explorer__preview, .explorer__preview {
 
 
 /* ==========================================================================
-   11 - Explainable AI
+   11 - Explainable Feedback
    ========================================================================== */
 p.explain__lede, .explain__lede { color: var(--ink-60); max-width: 56ch; margin-bottom: clamp(2.4rem, 5vw, 4rem); }
 
 .explain__contrast {
   display: grid;
-  grid-template-columns: 1fr 1.35fr;
+  grid-template-columns: minmax(0, 1fr);
   gap: clamp(1rem, 2.4vw, 2rem);
   margin-bottom: clamp(2.4rem, 5vw, 4rem);
 }
@@ -1343,23 +1550,73 @@ p.verdict__caption, .verdict__caption {
   margin-bottom: 1.1rem;
 }
 
-p.verdict__blackbox-msg, .verdict__blackbox-msg {
-  font-family: var(--font-display);
-  font-size: clamp(1.3rem, 2vw, 1.7rem);
-  font-weight: 600;
-  color: var(--ink-40);
-}
-
-.verdict__blackbox-msg span { color: var(--warn); margin-right: 0.4em; }
-
 .verdict--formfix { border-color: rgba(57, 255, 20, 0.25); background: rgba(57, 255, 20, 0.045); }
+
+/* The FormFix card mirrors the real correction card on the analysis page:
+   title, what happened, why it matters, what to try. Keeping the two in step
+   means this section previews the product rather than advertising it. */
+p.verdict__title, .verdict__title {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lime);
+  margin-bottom: 0.7rem;
+}
 
 p.verdict__formfix-msg, .verdict__formfix-msg {
   font-family: var(--font-display);
-  font-size: clamp(1.3rem, 2vw, 1.7rem);
+  font-size: clamp(1.15rem, 1.7vw, 1.45rem);
   font-weight: 600;
   color: var(--white);
   line-height: 1.35;
+}
+
+p.verdict__why, .verdict__why {
+  color: var(--ink-60);
+  font-size: 0.96rem;
+  line-height: 1.6;
+  margin-top: 0.7rem;
+}
+
+p.verdict__fix, .verdict__fix {
+  color: var(--ink-90);
+  font-size: 0.96rem;
+  line-height: 1.6;
+  margin-top: 0.9rem;
+}
+
+.verdict__fix-tag {
+  display: inline-block;
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lime);
+  background: var(--lime-soft);
+  border-radius: 999px;
+  padding: 0.24em 0.7em;
+  margin-right: 0.6em;
+  transform: translateY(-1px);
+}
+
+/* The trace heading - the three nodes below are more technical than the rest
+   of the page, so they are introduced rather than dropped on the reader. */
+.explain__trace-head { margin-bottom: clamp(1.6rem, 3vw, 2.4rem); }
+
+h3.explain__trace-title, .explain__trace-title {
+  font-family: var(--font-display);
+  font-size: clamp(1.15rem, 2vw, 1.5rem);
+  font-weight: 600;
+  color: var(--white);
+  margin-bottom: 0.6rem;
+}
+
+p.explain__trace-lede, .explain__trace-lede {
+  color: var(--ink-60);
+  font-size: 0.98rem;
+  line-height: 1.6;
+  max-width: 56ch;
 }
 
 /* pipeline */
@@ -1417,6 +1674,14 @@ p.verdict__formfix-msg, .verdict__formfix-msg {
   top: -3px;
   border: 3.5px solid transparent;
   border-left-color: var(--cyan);
+}
+
+p.explain__footnote, .explain__footnote {
+  color: var(--ink-40);
+  font-size: 0.86rem;
+  line-height: 1.6;
+  max-width: 66ch;
+  margin-top: clamp(1.6rem, 3vw, 2.4rem);
 }
 
 
@@ -1616,7 +1881,7 @@ p.research__lede, .research__lede {
   margin-bottom: 2.2rem;
 }
 
-.btn--paper {
+a.btn--paper, .btn--paper {
   background: var(--lime);
   color: #06230a;
   box-shadow: 0 0 34px rgba(57, 255, 20, 0.30);
@@ -1821,6 +2086,11 @@ p.analyse__lede, .analyse__lede { color: var(--ink-60); max-width: 56ch; margin-
 .st-key-ff_analyse [data-testid="stBaseButton-secondary"],
 .st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button,
 .st-key-ff_analyse [data-testid="stFileUploader"] button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  line-height: 1 !important;
   font-family: var(--font-display) !important;
   font-weight: 600 !important;
   font-size: 0.9rem !important;
@@ -1831,6 +2101,23 @@ p.analyse__lede, .analyse__lede { color: var(--ink-60); max-width: 56ch; margin-
   padding: 0.6em 1.5em !important;
   transition: border-color 0.35s var(--ease-out), box-shadow 0.35s var(--ease-out),
               background-color 0.35s var(--ease-out), transform 0.35s var(--ease-out);
+}
+
+/* Same label-centring fix as /analyse: Streamlit's markdown wrapper inside a
+   button carries a paragraph margin, which lifts the label off the pill's
+   optical centre. */
+.st-key-ff_analyse .stButton button > *,
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button > *,
+.st-key-ff_analyse [data-testid="stFileUploader"] button > *,
+.st-key-ff_analyse .stButton button p,
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button p,
+.st-key-ff_analyse [data-testid="stFileUploader"] button p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 .st-key-ff_analyse .stButton button:hover,
@@ -1860,10 +2147,15 @@ p.analyse__lede, .analyse__lede { color: var(--ink-60); max-width: 56ch; margin-
 
 /* keep the browse button's icon and label apart even before the icon font
    has loaded */
-.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button > div {
+/* Centre the label on both axes - see the matching note in analyse.css. */
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button > div,
+.st-key-ff_analyse [data-testid="stFileUploader"] button > div {
   display: flex;
   align-items: center;
+  justify-content: center;
+  width: 100%;
   gap: 0.5rem;
+  line-height: 1;
 }
 
 /* --- video player --- */
@@ -2231,9 +2523,9 @@ html.ff-motion .hero__scroll-hint { animation: fadeIn 0.6s ease 1.3s backwards; 
   .hud--tl { top: 6%; left: 0; }
   .hud--mr { right: 0; }
 
+  .about__grid { grid-template-columns: 1fr; }
   .problem__grid { grid-template-columns: 1fr; }
 
-  .explain__contrast { grid-template-columns: 1fr; }
 
   .pipeline { grid-template-columns: 1fr; gap: 0.4rem; }
 

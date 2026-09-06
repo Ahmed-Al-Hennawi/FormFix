@@ -1,5 +1,5 @@
 /* ==========================================================================
-   FormFix AI - Streamlit behaviour layer
+   FormFix - Streamlit behaviour layer
 
    This is the deliberately small amount of JavaScript the design needs. It is
    injected into the Streamlit document by utils/styling.py and replaces the

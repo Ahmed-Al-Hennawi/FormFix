@@ -1,5 +1,5 @@
 /* ==========================================================================
-   FormFix AI - /analyse page behaviour
+   FormFix - /analyse page behaviour
 
    Loaded after main.js, on the analysis page only. Three small jobs:
 

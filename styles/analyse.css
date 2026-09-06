@@ -1,5 +1,5 @@
 /* ==========================================================================
-   FormFix AI - /analyse page stylesheet
+   FormFix - /analyse page stylesheet
    Loaded on top of main.css, on the analysis page only, so nothing here can
    affect the homepage. Same "Cyber Pulse" system: Electric Cyan for the
    working state, Neon Lime for success, Deep Space Blue surfaces.
@@ -40,6 +40,19 @@
   --ax-surface: linear-gradient(180deg, rgba(28, 37, 65, 0.62), rgba(28, 37, 65, 0.30));
   --ax-shadow: 0 30px 80px rgba(0, 0, 0, 0.34);
   --ax-width: min(1240px, 92vw);
+
+  /* One spacing scale for the whole results column: panel, card and row step
+     down predictably instead of each block carrying its own padding, which
+     read as cramped on a phone. Every block below uses these three values. */
+  --ax-pad-panel: clamp(1.15rem, 2.4vw, 1.75rem);
+  --ax-pad-card: clamp(1rem, 1.9vw, 1.3rem);
+  --ax-pad-row: clamp(0.7rem, 1.3vw, 0.85rem);
+  --ax-gap-rows: clamp(0.45rem, 1vw, 0.6rem);
+  --ax-gap-cards: clamp(0.7rem, 1.4vw, 0.95rem);
+
+  /* Width of the severity edge on a correction, a repetition and a detection
+     card, so all three line up. */
+  --ax-stripe: 3px;
 }
 
 /* Every full-width block on the page shares one measure. */
@@ -123,7 +136,6 @@ a.ax-brand, .ax-brand {
 
 a.ax-brand:hover { color: var(--white); }
 .ax-brand img { width: 30px; height: auto; opacity: 0.9; }
-.ax-brand__ai { color: var(--cyan); margin-left: 0.25em; }
 
 
 /* ==========================================================================
@@ -300,7 +312,7 @@ p.ax-head__lede, .ax-head__lede {
   background: var(--ax-surface);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
-  padding: clamp(1.2rem, 2.4vw, 1.9rem);
+  padding: var(--ax-pad-panel);
   box-shadow: var(--ax-shadow);
 }
 
@@ -337,35 +349,70 @@ h2.ax-panel__heading, .ax-panel__heading {
   letter-spacing: -0.01em;
 }
 
+/* Formats, accepted length, "one set per clip". Long enough to wrap on a
+   phone, so the tracking is eased off and it is allowed its own line rather
+   than being squeezed against the heading. */
 .ax-panel__note {
   margin-left: auto;
   font-family: var(--font-mono);
   font-size: 0.6rem;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.1em;
+  line-height: 1.5;
   text-transform: uppercase;
   color: var(--ink-40);
+}
+
+@media (max-width: 640px) {
+  .ax-panel__note { margin-left: 0; flex-basis: 100%; }
 }
 
 h3.ax-panel__title, .ax-panel__title {
   display: flex;
-  align-items: baseline;
-  gap: 0.7rem;
+  /* centre, not baseline: the count is a small mono pill next to a large
+     display face, and sitting it on the text baseline dropped it visibly
+     below the heading. */
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
   font-family: var(--font-display);
   font-weight: 700;
   font-size: clamp(1rem, 1.7vw, 1.18rem);
+  line-height: 1.25;
   color: var(--white);
-  margin-bottom: 1rem;
+  margin-bottom: clamp(0.85rem, 1.7vw, 1.15rem);
 }
 
 h3.ax-panel__title--sm, .ax-panel__title--sm { font-size: 0.98rem; color: var(--ink-90); }
 
+/* Streamlit re-wraps a heading's children in an extra <span>, which makes our
+   own spans grandchildren rather than flex items, so the heading's `gap` never
+   reached them. `display: contents` drops the wrapper out of the box tree; it
+   is a no-op when Streamlit hasn't added one. */
+h3.ax-panel__title > span:not(.ax-count):not([data-testid]),
+h4.ax-ex__title > span:not(.ax-ex__minor):not([data-testid]),
+h4.ax-fix__title > span:not([data-testid]) {
+  display: contents;
+}
+
+/* The count beside a section heading - "3 things", "6 checks", "3 reps".
+   A small Electric Cyan pill, so it reads as part of the heading rather than
+   as the grey outline the page uses for disabled states. */
 .ax-count {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.42em 0.72em;
+  border: 1px solid rgba(0, 240, 255, 0.24);
+  border-radius: 999px;
+  background: rgba(0, 240, 255, 0.07);
+  white-space: nowrap;
   font-family: var(--font-mono);
   font-size: 0.6rem;
-  font-weight: 400;
-  letter-spacing: 0.16em;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  line-height: 1;
   text-transform: uppercase;
-  color: var(--ink-40);
+  font-variant-numeric: tabular-nums;
+  color: var(--cyan);
 }
 
 p.ax-hint, .ax-hint {
@@ -375,6 +422,21 @@ p.ax-hint, .ax-hint {
   text-transform: uppercase;
   color: var(--ink-40);
   text-align: center;
+}
+
+/* The privacy note under the uploader. Same slot as .ax-hint but set as a
+   sentence, not a spec line - the uppercase mono treatment above is for
+   "DRAG & DROP - .MP4". */
+p.ax-hint--privacy, .ax-hint--privacy {
+  font-family: inherit;
+  font-size: 0.78rem;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink-50, var(--ink-40));
+  margin-top: 0.35rem;
+  max-width: 46ch;
+  margin-inline: auto;
+  line-height: 1.5;
 }
 
 p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
@@ -559,6 +621,11 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 .st-key-ff_ax_upload .stButton button,
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button,
 .st-key-ff_ax_upload [data-testid="stFileUploader"] button {
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  line-height: 1 !important;
   font-family: var(--font-display) !important;
   font-weight: 600 !important;
   font-size: 0.9rem !important;
@@ -566,14 +633,39 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
   border: 1px solid var(--hairline-strong) !important;
   background: rgba(255, 255, 255, 0.04) !important;
   color: var(--ink-90) !important;
-  padding: 0.7em 1.5em !important;
+  /* rem, not em: the button's own font-size is zeroed below to kill a stray
+     icon ligature, and em would resolve against that zero and collapse the
+     padding to nothing. */
+  padding: 0 1.6rem !important;
   min-height: 46px;
+  /* Height comes from min-height, not from vertical padding, so the label is
+     centred by flex rather than by two paddings that have to stay in step. */
   transition:
     border-color 0.35s var(--ease-out),
     box-shadow 0.35s var(--ease-out),
     background-color 0.35s var(--ease-out),
     color 0.35s var(--ease-out),
     transform 0.35s var(--ease-out);
+}
+
+/* Flatten Streamlit's markdown wrapper inside a button: it carries a
+   paragraph margin of its own, which fights the button's flex centring. */
+.st-key-ff_ax_upload .stButton button > *,
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button > *,
+.st-key-ff_ax_upload [data-testid="stFileUploader"] button > *,
+.st-key-ff_ax_upload .stButton button [data-testid="stMarkdownContainer"],
+.st-key-ff_ax_upload [data-testid="stFileUploader"] button [data-testid="stMarkdownContainer"],
+.st-key-ff_ax_upload .stButton button p,
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button p,
+.st-key-ff_ax_upload [data-testid="stFileUploader"] button p {
+  margin: 0 !important;
+  padding: 0 !important;
+  line-height: 1 !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  text-align: center !important;
+  gap: 0 !important;
 }
 
 .st-key-ff_ax_upload .stButton button:hover,
@@ -603,10 +695,21 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 .st-key-ff_ax_upload button:disabled,
 .st-key-ff_ax_upload button[disabled] { opacity: 0.45 !important; transform: none !important; }
 
-.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button > div {
+/* Centre the label on both axes. Streamlit wraps the button's text in a
+   full-width flex row, so without justify-content the label sits at its left
+   edge and the hidden Material icon leaves the gap behind. */
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button > div,
+.st-key-ff_ax_upload [data-testid="stFileUploader"] button > div {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
+  justify-content: center;
+  width: 100%;
+  /* No gap. The row was written for an icon + label pair, but the icon is
+     hidden below, and a gap beside a hidden item still occupies the row -
+     which centred the pair rather than the word, leaving the label sitting
+     visibly right of the pill's centre. */
+  gap: 0 !important;
+  line-height: 1;
 }
 
 /* --- video preview --- */
@@ -698,34 +801,35 @@ p.ax-wait__body, .ax-wait__body {
   margin-bottom: 1.4rem;
 }
 
-.ax-preview { display: flex; flex-direction: column; gap: 0.7rem; }
+ul.ax-preview, .ax-preview { display: flex; flex-direction: column; gap: 0.75rem; }
 
-.ax-preview__row {
+li.ax-preview__row, .ax-preview__row {
   display: flex;
   align-items: flex-start;
-  gap: 0.7rem;
-  padding: 0.75rem 0.9rem;
-  border-radius: 14px;
+  gap: 0.95rem;
+  padding: 1.05rem 1.2rem;
+  border-radius: 16px;
   border: 1px solid var(--hairline);
   background: rgba(11, 19, 43, 0.35);
   color: var(--ink-40);
-  font-size: 0.86rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
 }
 
-.ax-preview__row strong {
+li.ax-preview__row strong, .ax-preview__row strong {
   display: block;
   font-family: var(--font-display);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 0.94rem;
   color: var(--ink-60);
-  margin-bottom: 0.1rem;
+  margin-bottom: 0.3rem;
 }
 
 .ax-preview__dot {
   flex-shrink: 0;
-  width: 7px;
-  height: 7px;
-  margin-top: 0.45rem;
+  width: 8px;
+  height: 8px;
+  margin-top: 0.55rem;
   border-radius: 50%;
   background: var(--ink-25);
 }
@@ -808,9 +912,9 @@ p.ax-scan__hud, .ax-scan__hud {
 }
 
 /* live stage list */
-.ax-run { display: flex; flex-direction: column; gap: 0.45rem; }
+ul.ax-run, .ax-run { display: flex; flex-direction: column; gap: 0.45rem; }
 
-.ax-run__step {
+li.ax-run__step, .ax-run__step {
   display: flex;
   align-items: center;
   gap: 0.7rem;
@@ -956,6 +1060,25 @@ p.ax-score__verdict, .ax-score__verdict {
   margin: 0.25rem 0 0.15rem;
 }
 
+p.ax-score__verdict-lg, .ax-score__verdict-lg {
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: clamp(1.5rem, 2.8vw, 2rem);
+  line-height: 1.1;
+  color: var(--ring);
+  letter-spacing: -0.01em;
+}
+
+/* The one sentence under the verdict. Body-sized and light, because it is
+   meant to be read - the mono facts line underneath is the reference data. */
+p.ax-score__headline, .ax-score__headline {
+  font-size: clamp(0.95rem, 1.5vw, 1.02rem);
+  line-height: 1.5;
+  color: var(--ink-90);
+  max-width: 46ch;
+  margin: 0.15rem 0 0.35rem;
+}
+
 p.ax-score__facts, .ax-score__facts {
   font-family: var(--font-mono);
   font-size: 0.64rem;
@@ -969,58 +1092,116 @@ p.ax-score__facts, .ax-score__facts {
 
 /* ==========================================================================
    L - Feedback
+
+   NOTE on the `li.ax-fix, .ax-fix` selector shape used throughout this
+   section. Streamlit styles bare elements (p, li, ul, ol, h1-h6, a) from its
+   own runtime stylesheet at class-level specificity - `.st-emotion-cache-x li`
+   beats a plain `.ax-fix`, whatever the source order. A row written as
+   `.ax-fix { padding: ... }` therefore renders with Streamlit's padding and
+   not its own, which is exactly what happened here: every list row on this
+   page was drawing at 0 padding while the stylesheet said otherwise.
+   Element-qualifying the selector restores the intended specificity. main.css
+   documents the same rule for the homepage.
    ========================================================================== */
 /* --- what you did well --- */
 .ax-panel--wins { border-color: rgba(57, 255, 20, 0.2); }
 
-.ax-wins { display: flex; flex-direction: column; gap: 0.55rem; }
+ul.ax-wins, .ax-wins { display: flex; flex-direction: column; gap: var(--ax-gap-rows); }
 
-.ax-win {
+li.ax-win, .ax-win {
   display: flex;
   align-items: center;
   gap: 0.7rem;
-  padding: 0.65rem 0.85rem;
+  padding: var(--ax-pad-row) calc(var(--ax-pad-row) + 0.15rem);
   border-radius: 12px;
   background: rgba(57, 255, 20, 0.05);
   border: 1px solid rgba(57, 255, 20, 0.14);
   font-size: 0.92rem;
+  line-height: 1.45;
   color: var(--ink-90);
 }
 
 .ax-icon { width: 16px; height: 16px; flex-shrink: 0; color: var(--lime); }
 
 /* --- what to improve --- */
-.ax-fixes { display: flex; flex-direction: column; gap: 0.75rem; }
+ol.ax-fixes, .ax-fixes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--ax-gap-cards);
+  counter-reset: ax-fix;
+}
 
-.ax-fix {
+li.ax-fix, .ax-fix {
   --sev: var(--cyan);
+  --sev-soft: rgba(0, 240, 255, 0.10);
+  --sev-line: rgba(0, 240, 255, 0.32);
+  position: relative;
+  overflow: hidden;
   border-radius: 14px;
   border: 1px solid var(--hairline);
-  border-left: 3px solid var(--sev);
   background: rgba(11, 19, 43, 0.4);
-  padding: 1rem 1.1rem;
+  padding: var(--ax-pad-card);
+  padding-left: calc(var(--ax-pad-card) + var(--ax-stripe));
   transition: border-color 0.35s var(--ease-out), background-color 0.35s var(--ease-out);
+}
+
+/* The severity edge. As a `border-left` it followed the card's radius and
+   curled away from the corners; clipped by the card's own `overflow: hidden`
+   it sits flush instead. */
+li.ax-fix::before, .ax-fix::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--ax-stripe);
+  background: var(--sev);
 }
 
 .ax-fix:hover { background: rgba(11, 19, 43, 0.62); }
 
-.ax-fix--minor     { --sev: rgba(0, 240, 255, 0.55); }
-.ax-fix--moderate  { --sev: var(--moderate); }
-.ax-fix--important { --sev: var(--poor); }
+li.ax-fix--minor, .ax-fix--minor {
+  --sev: rgba(0, 240, 255, 0.55);
+  --sev-soft: rgba(0, 240, 255, 0.10);
+  --sev-line: rgba(0, 240, 255, 0.32);
+}
+
+li.ax-fix--moderate, .ax-fix--moderate {
+  --sev: var(--moderate);
+  --sev-soft: var(--moderate-soft);
+  --sev-line: rgba(240, 168, 60, 0.36);
+}
+
+li.ax-fix--important, .ax-fix--important {
+  --sev: var(--poor);
+  --sev-soft: var(--poor-soft);
+  --sev-line: rgba(255, 90, 118, 0.36);
+}
 
 .ax-fix__head {
   display: flex;
   align-items: center;
   gap: 0.65rem;
   flex-wrap: wrap;
-  margin-bottom: 0.55rem;
+  margin-bottom: 0.7rem;
 }
 
+/* The correction's position in the list, as a small severity-tinted chip so
+   it aligns with the title instead of hanging under it in grey. */
 .ax-fix__num {
+  display: inline-grid;
+  place-items: center;
+  min-width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 9px;
+  border: 1px solid var(--sev-line);
+  background: var(--sev-soft);
   font-family: var(--font-mono);
-  font-size: 0.66rem;
-  letter-spacing: 0.12em;
-  color: var(--ink-40);
+  font-size: 0.64rem;
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+  color: var(--sev);
 }
 
 h4.ax-fix__title, .ax-fix__title {
@@ -1031,31 +1212,40 @@ h4.ax-fix__title, .ax-fix__title {
   margin: 0;
 }
 
-.ax-sev {
-  margin-left: auto;
-  font-family: var(--font-mono);
-  font-size: 0.56rem;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  border-radius: 999px;
-  padding: 0.4em 0.8em;
-  border: 1px solid currentColor;
-}
-
-.ax-sev--minor     { color: rgba(0, 240, 255, 0.75); }
-.ax-sev--moderate  { color: var(--moderate); }
-.ax-sev--important { color: var(--poor); }
-
 p.ax-fix__issue, .ax-fix__issue {
-  color: var(--ink-60);
-  font-size: 0.92rem;
-  margin-bottom: 0.7rem;
+  color: var(--white);
+  font-size: 0.95rem;
+  line-height: 1.55;
+  margin-bottom: 0.4rem;
 }
+
+/* Why it matters - one quiet line, and only when the finding has one. The
+   gap below it belongs to "Try this", which owns the divider; setting it in
+   both places stacked two full gaps on top of each other. */
+p.ax-fix__why, .ax-fix__why {
+  color: var(--ink-60);
+  font-size: 0.88rem;
+  line-height: 1.5;
+  margin-bottom: 0;
+}
+
+p.ax-fixes__more, .ax-fixes__more {
+  margin-top: var(--ax-pad-card);
+  font-family: var(--font-mono);
+  font-size: 0.64rem;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-40);
+}
+
+.ax-panel--clear { border-color: rgba(57, 255, 20, 0.2); }
 
 p.ax-fix__how, .ax-fix__how {
   font-size: 0.92rem;
+  line-height: 1.55;
   color: var(--ink-90);
-  padding-top: 0.7rem;
+  margin-top: var(--ax-pad-card);
+  padding-top: var(--ax-pad-card);
   border-top: 1px solid var(--hairline);
 }
 
@@ -1066,33 +1256,43 @@ p.ax-fix__how, .ax-fix__how {
   letter-spacing: 0.2em;
   text-transform: uppercase;
   color: var(--lime);
-  margin-bottom: 0.3rem;
+  margin-bottom: 0.45rem;
 }
 
-/* --- measured checks --- */
-.ax-checks { display: flex; flex-direction: column; gap: 0.5rem; }
+/* --- measured checks ---
+   Sits on the first screen next to "what you did well", so its rows use the
+   same padding, radius and hairline as those rows. */
+ul.ax-checks, .ax-checks { display: flex; flex-direction: column; gap: var(--ax-gap-rows); }
 
-.ax-check {
+li.ax-check, .ax-check {
   display: grid;
-  grid-template-columns: minmax(96px, 1.1fr) minmax(60px, 2fr) auto;
+  grid-template-columns: minmax(7.5rem, 1fr) minmax(4rem, 1.35fr) auto;
   align-items: center;
-  gap: 0.8rem;
-  font-size: 0.85rem;
-  color: var(--ink-60);
+  gap: 0.9rem;
+  padding: var(--ax-pad-row) calc(var(--ax-pad-row) + 0.15rem);
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  background: rgba(11, 19, 43, 0.32);
+  font-size: 0.88rem;
+  color: var(--ink-90);
 }
 
-.ax-check__label { display: flex; flex-direction: column; }
+.ax-check__label { display: flex; flex-direction: column; gap: 0.15rem; }
 
+/* "4 of 6 reps · high reliability" was 0.58rem in --ink-25, which is below
+   the point where it can be read at all on a phone. It is evidence, so it
+   has to be legible. */
 .ax-check__detail {
   font-family: var(--font-mono);
-  font-size: 0.58rem;
-  letter-spacing: 0.1em;
-  color: var(--ink-25);
+  font-size: 0.62rem;
+  letter-spacing: 0.08em;
+  line-height: 1.3;
+  color: var(--ink-40);
 }
 
 .ax-check__meter {
   display: block;
-  height: 4px;
+  height: 6px;
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.07);
   overflow: hidden;
@@ -1120,8 +1320,8 @@ p.ax-fix__how, .ax-fix__how {
 
 .ax-check__value {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: var(--ink-40);
+  font-size: 0.78rem;
+  color: var(--ink-60);
   font-variant-numeric: tabular-nums;
 }
 
@@ -1359,10 +1559,20 @@ p.ax-modal__meta, .ax-modal__meta {
 }
 
 @media (max-width: 640px) {
-  :root { --ax-width: 94vw; }
+  :root {
+    --ax-width: 94vw;
+
+    /* Three levels of padding - panel, card, row - compound inside 390px and
+       squeeze the text column to nothing. Stepping the scale down here buys
+       back readable line lengths; every block picks it up. */
+    --ax-pad-panel: 1.05rem;
+    --ax-pad-card: 0.95rem;
+    --ax-pad-row: 0.7rem;
+    --ax-gap-cards: 0.75rem;
+  }
 
   .ax-topbar { padding-top: 16px; }
-  .ax-brand span:not(.ax-brand__ai) { display: none; }
+  .ax-brand span { display: none; }
 
   .ax-track {
     grid-template-columns: auto minmax(14px, 1fr) auto minmax(14px, 1fr) auto;
@@ -1390,15 +1600,22 @@ p.ax-modal__meta, .ax-modal__meta {
   .ax-score__ring-wrap { width: 104px; }
   .ax-score__num { font-size: 1.9rem; }
 
-  .ax-check {
+  /* The meter drops to its own row under the label and value, so the label
+     keeps a readable width instead of being crushed into a third of 390px. */
+  li.ax-check, .ax-check {
     grid-template-columns: 1fr auto;
-    gap: 0.3rem 0.6rem;
+    gap: 0.45rem 0.7rem;
   }
 
   .ax-check__meter { grid-column: 1 / -1; order: 3; }
 
-  .ax-fix__head { gap: 0.5rem; }
-  .ax-sev { margin-left: 0; }
+  .ax-fix__head { gap: 0.55rem; }
+
+  /* A long section name plus its count pill will not fit on one line at this
+     width; the heading already wraps, this keeps the pill readable when it
+     does. */
+  h3.ax-panel__title, .ax-panel__title { font-size: 1.02rem; }
+  .ax-count { font-size: 0.58rem; letter-spacing: 0.1em; }
 
   button.ax-ref { flex-direction: column; align-items: stretch; }
   .ax-ref__thumb { width: 100%; aspect-ratio: 16 / 9; }
@@ -1443,4 +1660,514 @@ p.ax-modal__meta, .ax-modal__meta {
   .ax-link--live::after { animation: none; transform: none; opacity: 0.5; }
   .ax-scan__line { animation: none; top: 48%; }
   .ax-modal__still .scanline { display: none; }
+}
+
+/* ==========================================================================
+   N - Real analysis additions
+   The validation-failure panel, the annotated-video section and the
+   analysis-details expander. These reuse the existing tokens - no new
+   palette is introduced.
+   ========================================================================== */
+
+/* --- validation failure --- */
+.ax-panel--invalid { border-color: rgba(240, 168, 60, 0.35); }
+
+h3.ax-invalid__title {
+  font-family: var(--font-display);
+  font-size: clamp(1.15rem, 2.2vw, 1.45rem);
+  margin: 0.35rem 0 0.6rem;
+}
+
+p.ax-invalid__body { color: var(--ink-60); font-size: 0.96rem; margin-bottom: 0.9rem; }
+
+.ax-retry {
+  border: 1px solid var(--hairline);
+  border-radius: 12px;
+  background: rgba(11, 19, 43, 0.5);
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.9rem;
+}
+
+p.ax-retry__label {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-bottom: 0.45rem;
+}
+
+ul.ax-retry__tips { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; }
+
+li.ax-retry__tip { font-size: 0.9rem; color: var(--ink-60); padding-left: 1.1rem; position: relative; }
+li.ax-retry__tip::before { content: "\2022"; position: absolute; left: 0.2rem; color: var(--warn); }
+
+p.ax-invalid__note { font-size: 0.84rem; color: var(--ink-40); }
+
+/* --- annotated video --- */
+.ax-panel--video { margin-bottom: 0.6rem; }
+p.ax-video-note { color: var(--ink-60); font-size: 0.9rem; }
+
+.st-key-ff_ax_annotated [data-testid="stVideo"] video,
+.st-key-ff_ax_annotated video {
+  border-radius: calc(var(--radius) + 4px);
+  border: 1px solid var(--hairline);
+  background: #000;
+  max-height: 560px;
+}
+
+.st-key-ff_ax_annotated { margin-bottom: clamp(0.9rem, 1.8vw, 1.3rem); }
+
+/* --- technical details expander -----------------------------------------
+   Streamlit's own summary row puts a Material icon ligature next to the
+   label; when that icon font has not loaded it prints as raw text on top of
+   the label ("keyboard_arrow_right"). The icon is hidden and replaced with a
+   plain CSS chevron, and the row is laid out as a proper "open this for the
+   full detail" affordance rather than a tiny mono caption. */
+.st-key-ff_ax_tech [data-testid="stExpander"] {
+  border-radius: calc(var(--radius) + 4px);
+  border: 1px solid rgba(0, 240, 255, 0.22);
+  background: rgba(28, 37, 65, 0.28);
+  overflow: hidden;
+}
+
+.st-key-ff_ax_tech [data-testid="stExpander"] summary {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem 1.2rem;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.98rem;
+  letter-spacing: 0;
+  text-transform: none;
+  line-height: 1.4;
+  transition: background-color 0.3s var(--ease-out);
+}
+
+.st-key-ff_ax_tech [data-testid="stExpander"] summary:hover {
+  background: rgba(0, 240, 255, 0.06);
+}
+
+/* the native toggle icon (and its ligature text) never renders */
+.st-key-ff_ax_tech [data-testid="stExpander"] summary svg,
+.st-key-ff_ax_tech [data-testid="stExpander"] summary [data-testid="stIconMaterial"],
+.st-key-ff_ax_tech [data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
+  display: none !important;
+}
+
+/* our own chevron, on the right, rotating when the panel opens */
+.st-key-ff_ax_tech [data-testid="stExpander"] summary::after {
+  content: "";
+  margin-left: auto;
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--cyan);
+  border-bottom: 2px solid var(--cyan);
+  transform: rotate(45deg) translate(-2px, -2px);
+  transition: transform 0.3s var(--ease-out);
+}
+
+.st-key-ff_ax_tech [data-testid="stExpander"] details[open] summary::after,
+.st-key-ff_ax_tech [data-testid="stExpander"] summary[aria-expanded="true"]::after {
+  transform: rotate(-135deg) translate(-2px, -2px);
+}
+
+.st-key-ff_ax_tech [data-testid="stExpander"] summary p,
+.st-key-ff_ax_tech [data-testid="stExpander"] summary span {
+  font-family: inherit;
+  font-size: inherit;
+  letter-spacing: inherit;
+  text-transform: none;
+}
+
+.st-key-ff_ax_tech [data-testid="stExpanderDetails"] { padding: 0.4rem 1.2rem 1.2rem; }
+
+.st-key-ff_ax_tech { margin-bottom: clamp(0.9rem, 1.8vw, 1.3rem); }
+
+/* --- uploader: no duplicated file row ------------------------------------
+   Streamlit's file uploader renders its own chip for the uploaded file
+   (name, size, delete cross). The page already shows the FormFix
+   confirmation card and its own "Remove video" button, so the native chip
+   duplicated both - hide it. */
+.st-key-ff_ax_upload [data-testid="stFileUploaderFile"],
+.st-key-ff_ax_upload [data-testid="stFileUploaderDeleteBtn"],
+.st-key-ff_ax_upload .uploadedFiles,
+.st-key-ff_ax_upload [data-testid="stFileUploaderFileName"] {
+  display: none !important;
+}
+
+/* Hide the duplicated Material icon ligature ("upload") inside the browse
+   button, leaving only the white text label. */
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button [data-testid="stIconMaterial"],
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button [data-testid="stIconMaterial"],
+/* Streamlit has moved this icon between a testid span, a bare Material
+   ligature and an inline SVG across releases. Match all three, so an upgrade
+   cannot quietly put the ligature back and shunt the label sideways again. */
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button svg,
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button svg,
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button [class*="material"],
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button [class*="material"],
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button [data-testid*="Icon"],
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button [data-testid*="Icon"] {
+  display: none !important;
+}
+
+/* The named selectors above only cover the markup shapes Streamlit has used
+   so far, and a release that renames the icon puts it straight back: measured
+   on the rendered button, the leading icon was still occupying 48px, which
+   centred "icon + label" and left the word 24px right of the pill's centre.
+   Anything before the label is decoration - the button says what it does -
+   so hide every child except the last one, whichever level it sits at. That
+   holds regardless of what the icon element is called. */
+.st-key-ff_ax_upload [data-testid="stFileUploader"] button > *:not(:last-child),
+.st-key-ff_ax_upload [data-testid="stFileUploader"] button > div > *:not(:last-child),
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button > *:not(:last-child),
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button > div > *:not(:last-child),
+.st-key-ff_analyse [data-testid="stFileUploader"] button > *:not(:last-child),
+.st-key-ff_analyse [data-testid="stFileUploader"] button > div > *:not(:last-child),
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button > *:not(:last-child),
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button > div > *:not(:last-child) {
+  display: none !important;
+}
+
+/* Shrink the button to its label, then centre the button itself.
+   Sizing the pill to the word rather than to the row means nothing invisible
+   beside the label can push it off centre: whatever the width ends up being,
+   the pill is that width and sits in the middle of the drop zone.
+   font-size: 0 on the button kills a stray icon ligature that is a bare text
+   node rather than an element (which no selector can hide); the label lives
+   in Streamlit's markdown wrapper, so restoring the size on descendants
+   brings the word back and nothing else. */
+.st-key-ff_ax_upload [data-testid="stFileUploader"] button,
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button,
+.st-key-ff_analyse [data-testid="stFileUploader"] button,
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button {
+  width: fit-content !important;
+  min-width: 8.5rem !important;
+  padding: 0 1.9rem !important;
+  min-height: 46px !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  font-size: 0 !important;
+  gap: 0 !important;
+}
+
+.st-key-ff_ax_upload [data-testid="stFileUploader"] button *,
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button *,
+.st-key-ff_analyse [data-testid="stFileUploader"] button *,
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button * {
+  font-size: 0.9rem !important;
+  width: auto !important;
+  gap: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  white-space: nowrap !important;
+}
+
+/* Belt and braces: no pseudo-element can reintroduce the same offset. */
+.st-key-ff_ax_upload [data-testid="stFileUploader"] button::before,
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button::before,
+.st-key-ff_analyse [data-testid="stFileUploader"] button::before,
+.st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button::before {
+  content: none !important;
+}
+
+
+/* ==========================================================================
+   R - Per-repetition results and "not assessed"
+   Added when the squat analyser began reporting each repetition separately.
+   Everything here reuses the existing Cyber Pulse tokens - no new palette,
+   no new typography - so the results column keeps one visual language.
+   ========================================================================== */
+
+ul.ax-reps, .ax-reps { display: flex; flex-direction: column; gap: var(--ax-gap-rows); }
+
+li.ax-rep, .ax-rep {
+  --sev: rgba(0, 240, 255, 0.45);
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 0.75rem;
+  padding: var(--ax-pad-row) calc(var(--ax-pad-row) + 0.15rem);
+  padding-left: calc(var(--ax-pad-row) + var(--ax-stripe));
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  background: rgba(11, 19, 43, 0.42);
+}
+
+/* Same clipped severity edge as a correction card, so the two lists read as
+   one family rather than two different ideas of a coloured border. */
+li.ax-rep::before, .ax-rep::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--ax-stripe);
+  background: var(--sev);
+}
+
+li.ax-rep--pass, .ax-rep--pass { --sev: var(--lime); }
+li.ax-rep--warning, .ax-rep--warning { --sev: var(--moderate); }
+li.ax-rep--fail, .ax-rep--fail { --sev: var(--poor); }
+li.ax-rep--not_evaluable, .ax-rep--not_evaluable { --sev: var(--hairline-strong); }
+
+.ax-rep__num {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-40);
+  padding-top: 0.15rem;
+}
+
+.ax-rep__body { display: flex; flex-direction: column; gap: 0.25rem; }
+
+.ax-rep__headline { font-size: 0.94rem; color: var(--white); }
+
+p.ax-rep__meta, .ax-rep__meta {
+  font-size: 0.78rem;
+  color: var(--ink-60);
+}
+
+.ax-rep__meta--muted { color: var(--ink-40); }
+
+.ax-rep__tag {
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sev);
+  white-space: nowrap;
+  padding-top: 0.2rem;
+}
+
+ul.ax-na, .ax-na { display: flex; flex-direction: column; gap: var(--ax-gap-rows); }
+
+li.ax-na__row, .ax-na__row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: var(--ax-pad-row) calc(var(--ax-pad-row) + 0.15rem);
+  border-radius: 12px;
+  border: 1px dashed var(--hairline-strong);
+  background: rgba(11, 19, 43, 0.3);
+}
+
+.ax-na__title { font-size: 0.9rem; line-height: 1.4; color: var(--ink-90); }
+.ax-na__reason { font-size: 0.82rem; line-height: 1.5; color: var(--ink-60); }
+
+/* On a phone the "REP 01" column held a third of the width for two words and
+   left the body wrapping in what was left. The label and the timestamp become
+   one header line instead, and the verdict gets the full width underneath. */
+@media (max-width: 560px) {
+  li.ax-rep, .ax-rep {
+    grid-template-columns: 1fr auto;
+    align-items: baseline;
+    gap: 0.35rem 0.75rem;
+  }
+
+  .ax-rep__num { grid-area: 1 / 1; padding-top: 0; }
+  .ax-rep__tag { grid-area: 1 / 2; padding-top: 0; }
+  .ax-rep__body { grid-area: 2 / 1 / auto / -1; }
+}
+
+/* ---------------------------------------------------------------------------
+   Recording guidance
+   Shown above the uploader, per exercise. Deliberately quiet - it is guidance,
+   not a warning - but the camera view is emphasised in Electric Cyan because
+   it is the one thing that most affects whether the analysis can run at all.
+   --------------------------------------------------------------------------- */
+
+.ax-guide {
+  margin: 1rem 0 1.3rem;
+  padding: 1.15rem 1.3rem 1.2rem;
+  border: 1px solid rgba(0, 240, 255, 0.16);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(28, 37, 65, 0.55), rgba(11, 19, 43, 0.35));
+}
+
+/* "How to record" on the left, the camera view on the right. Both are short
+   uppercase phrases, and at 320px they were each wrapping to two lines beside
+   each other; `wrap` lets the view drop onto its own line intact instead. */
+p.ax-guide__head, .ax-guide__head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.75rem;
+  margin: 0 0 0.9rem;
+  padding-bottom: 0.7rem;
+  border-bottom: 1px solid rgba(0, 240, 255, 0.12);
+}
+
+.ax-guide__label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.ax-guide__view {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--cyan, #00f0ff);
+}
+
+ul.ax-guide__tips, .ax-guide__tips {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 0.6rem;
+}
+
+li.ax-guide__tip, .ax-guide__tip {
+  position: relative;
+  padding-left: 1.5rem;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.78);
+}
+
+li.ax-guide__tip::before, .ax-guide__tip::before {
+  content: "";
+  position: absolute;
+  left: 0.15rem;
+  top: 0.62em;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lime, #39ff14);
+  opacity: 0.85;
+}
+
+
+/* ==========================================================================
+   S - Analysis details ("How did FormFix detect this?")
+   The explainability layer. It lives inside the expander, so it is allowed
+   to be denser than the first screen - but it still uses the same tokens,
+   the same radii and the same type scale as everything else.
+   ========================================================================== */
+
+p.ax-details__lede, .ax-details__lede {
+  color: var(--ink-60);
+  font-size: 0.9rem;
+  line-height: 1.55;
+  margin: 0 0 0.9rem;
+  max-width: 62ch;
+}
+
+.ax-details { display: flex; flex-direction: column; gap: clamp(0.7rem, 1.6vw, 1rem); }
+
+.ax-details .ax-panel { margin-bottom: 0; }
+
+.ax-exs { display: flex; flex-direction: column; gap: var(--ax-gap-rows); }
+
+.ax-ex {
+  --sev: rgba(0, 240, 255, 0.5);
+  position: relative;
+  overflow: hidden;
+  border-radius: 12px;
+  border: 1px solid var(--hairline);
+  background: rgba(11, 19, 43, 0.42);
+  padding: var(--ax-pad-card);
+  padding-left: calc(var(--ax-pad-card) + var(--ax-stripe));
+}
+
+.ax-ex::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--ax-stripe);
+  background: var(--sev);
+}
+
+.ax-ex--minor     { --sev: rgba(0, 240, 255, 0.5); }
+.ax-ex--moderate  { --sev: var(--moderate); }
+.ax-ex--important { --sev: var(--poor); }
+
+h4.ax-ex__title, .ax-ex__title {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  flex-wrap: wrap;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 0.96rem;
+  color: var(--white);
+  margin: 0 0 0.55rem;
+}
+
+.ax-ex__minor {
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--ink-40);
+  border: 1px solid var(--hairline-strong);
+  border-radius: 999px;
+  padding: 0.35em 0.7em;
+}
+
+/* landmark -> measurement -> phase -> rule -> evidence, one line each. */
+p.ax-ex__line, .ax-ex__line {
+  font-size: 0.88rem;
+  line-height: 1.55;
+  color: var(--ink-90);
+  margin-bottom: 0.35rem;
+}
+
+.ax-ex__tag {
+  display: inline-block;
+  min-width: 5.4em;
+  font-family: var(--font-mono);
+  font-size: 0.56rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--cyan);
+  margin-right: 0.5rem;
+}
+
+ul.ax-ex__evidence, .ax-ex__evidence {
+  list-style: none;
+  margin: 0.55rem 0;
+  padding: 0.55rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid var(--hairline);
+  background: rgba(11, 19, 43, 0.55);
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  font-family: var(--font-mono);
+  font-size: 0.76rem;
+  color: var(--ink-60);
+}
+
+p.ax-ex__settings, .ax-ex__settings,
+p.ax-ex__rule, .ax-ex__rule {
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  line-height: 1.6;
+  color: var(--ink-40);
+  overflow-wrap: anywhere;
+}
+
+p.ax-ex__rule, .ax-ex__rule { color: var(--ink-25); }
+
+/* The expander's own label carries the invitation, so it gets a little more
+   presence than a default Streamlit summary row. */
+.st-key-ff_ax_tech [data-testid="stExpander"] summary,
+.st-key-ff_ax_tech [data-testid="stExpander"] summary * {
+  color: var(--cyan);
+}
+
+@media (max-width: 640px) {
+  .ax-ex { padding: 0.75rem 0.8rem; }
+  .ax-ex__tag { display: block; min-width: 0; margin-bottom: 0.1rem; }
+  .ax-score__headline { max-width: none; }
 }
