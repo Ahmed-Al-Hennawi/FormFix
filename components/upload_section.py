@@ -1,25 +1,9 @@
 """
-Video upload / analysis section.
+The old in-page upload section, superseded by the /analyse page. Nothing
+renders it any more.
 
-.. note::
-
-   Superseded by the dedicated /analyse page (``components/analyse_page.py``
-   and ``components/analysis_results.py``). This module is no longer rendered
-   on the homepage - the "Analyse Form" call to action links to that page
-   instead. It is kept intact for reference and because nothing needed to be
-   deleted in order to add the new page.
-
-The reason for moving to
-Streamlit: it is where the OpenCV / MediaPipe pipeline will be plugged in.
-
-Everything visible is styled to belong to the existing FormFix design - the
-section heading, the pipeline strip and the results card are custom markup, and
-the Streamlit widgets inside ``st.container(key="ff_analyse")`` are restyled by
-section 15 of ``styles/main.css`` so the uploader reads as a FormFix drop zone
-rather than a default Streamlit control.
-
-No analysis is faked. :func:`utils.analysis.process_uploaded_video` currently
-returns ``None``, and the results panel says so plainly.
+The Streamlit widgets inside st.container(key="ff_analyse") are restyled by
+section 15 of styles/main.css so the uploader reads as a FormFix drop zone.
 """
 
 from __future__ import annotations
@@ -27,9 +11,10 @@ from __future__ import annotations
 import streamlit as st
 
 from utils.analysis import SUPPORTED_VIDEO_TYPES, process_uploaded_video
-from utils.exercise_data import EXERCISES, BY_ID
+from utils.exercise_data import BY_ID, EXERCISES
 from utils.helpers import strip
 from utils.styling import html
+
 from . import results_section
 
 PIPELINE_STRIP = (
@@ -43,10 +28,8 @@ PIPELINE_STRIP = (
 
 
 def _head() -> None:
-    strip_html = '<i>&rarr;</i>'.join(f"<span>{item}</span>" for item in PIPELINE_STRIP)
-    html(
-        strip(
-            f"""
+    strip_html = "<i>&rarr;</i>".join(f"<span>{item}</span>" for item in PIPELINE_STRIP)
+    html(strip(f"""
             <div class="ff-page">
             <section class="analyse section" id="ff-analyse">
               <div class="container container--narrow analyse__head">
@@ -55,16 +38,14 @@ def _head() -> None:
                   Upload a set.<br />Get an explanation.
                 </h2>
                 <p class="analyse__lede" data-animate="fade-up">
-                  Pick the movement, drop in a short clip, and FormFix AI will track your
+                  Pick the movement, drop in a short clip, and FormFix will track your
                   body through the lift and explain what it sees.
                 </p>
                 <div class="analyse__pipe" data-animate="fade-up">{strip_html}</div>
               </div>
             </section>
             </div>
-            """
-        )
-    )
+            """))
 
 
 def render() -> None:
@@ -112,5 +93,5 @@ def render() -> None:
         if st.session_state.get("ff_has_run"):
             results_section.render_result(st.session_state.get("ff_result"))
 
-    # Trailing spacer so the next section keeps the site's vertical rhythm.
+    # Spacer so the next section keeps the site's vertical rhythm.
     html('<div class="ff-page"><div style="height: clamp(96px, 12vw, 176px)"></div></div>')

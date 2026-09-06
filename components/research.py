@@ -25,7 +25,7 @@ ITEMS: tuple[tuple[str, str], ...] = (
         "standard smartphone video using MediaPipe Pose.<br />"
         "<strong>Kinematic Evaluation:</strong> Measures joint angles against "
         "biomechanical rules.<br />"
-        "<strong>Explainable AI (XAI):</strong> Converts raw kinematic data into "
+        "<strong>Explainable Feedback:</strong> Converts raw kinematic data into "
         "plain-English feedback.",
     ),
     (
@@ -38,19 +38,14 @@ ITEMS: tuple[tuple[str, str], ...] = (
 
 
 def render() -> None:
-    items = "".join(
-        f"""
+    items = "".join(f"""
         <div class="research__item" data-animate="fade-up">
           <h3 class="research__item-title">{title}</h3>
           <p>{body}</p>
         </div>
-        """
-        for title, body in ITEMS
-    )
+        """ for title, body in ITEMS)
 
-    html(
-        strip(
-            f"""
+    html(strip(f"""
             <div class="ff-page">
             <section class="research section" id="ff-research">
               <div class="container">
@@ -62,7 +57,7 @@ def render() -> None:
                     Grounded in Explainable Computer Vision and Human Pose Estimation Research
                   </p>
                   <p class="research__lede">
-                    FormFix AI was developed as a university research project investigating how
+                    FormFix was developed as a university research project investigating how
                     computer vision can provide accessible, explainable movement feedback for
                     beginner gym users. Read the full paper to explore the underlying algorithms,
                     rule-based biomechanical checks, and user evaluation results.
@@ -73,7 +68,7 @@ def render() -> None:
                   </a>
                   <div class="research__grid">{items}</div>
                   <p class="research__citation" data-animate="fade-up">
-                    FormFix AI (2026). An Explainable Computer Vision System for Exercise Form
+                    FormFix (2026). An Explainable Computer Vision System for Exercise Form
                     Assessment and Corrective Feedback. Computer Science Undergraduate Thesis /
                     Final Year Project.
                   </p>
@@ -81,6 +76,4 @@ def render() -> None:
               </div>
             </section>
             </div>
-            """
-        )
-    )
+            """))

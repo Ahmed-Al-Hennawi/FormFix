@@ -12,9 +12,7 @@ HEADLINE = (
 
 
 def render() -> None:
-    html(
-        strip(
-            f"""
+    html(strip(f"""
             <div class="ff-page">
             <section class="problem section" id="ff-problem">
               <div class="container container--narrow">
@@ -29,13 +27,11 @@ def render() -> None:
                   <p class="problem__text" data-animate="fade-up">
                     A coach would catch them. Not everyone has one - and asking a stranger
                     mid-workout is harder than it sounds.
-                    <span class="text-accent">FormFix AI bridges that gap:</span>
+                    <span class="text-accent">FormFix bridges that gap:</span>
                     it watches your movement the way a coach would, and tells you what it sees.
                   </p>
                 </div>
               </div>
             </section>
             </div>
-            """
-        )
-    )
+            """))

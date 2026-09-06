@@ -1,9 +1,8 @@
 """
-Section 5 - Explainable AI.
-
-The black-box verdict set against the FormFix explanation, followed by the
-traceability pipeline: what the system saw, the rule it triggered, the feedback
-you read.
+Section 5 - explainable feedback: the explanation card, then the trace behind
+it. The worked example is quoted from the squat's real depth rule rather than
+invented - the three card lines are its own wording, and 115 degrees is the
+actual DEPTH_KNEE_ANGLE_WARN.
 """
 
 from __future__ import annotations
@@ -11,29 +10,29 @@ from __future__ import annotations
 from utils.helpers import strip
 from utils.styling import html
 
-#: (step label, body, modifier class)
-PIPELINE: tuple[tuple[str, str, str], ...] = (
+# (step label, body, modifier class)
+TRACE: tuple[tuple[str, str, str], ...] = (
     (
-        "DETECTED MOVEMENT",
-        "Knee x-position crosses inside the toe line during frames 41-63.",
+        "WHAT IT SAW",
+        "On 2 of your 6 reps, your knees stopped bending at 118&deg;.",
         "",
     ),
     (
-        "RULE TRIGGERED",
-        "<code>knee_tracking</code> - medial knee drift exceeded threshold.",
+        "WHAT IT CHECKED",
+        "The <code>depth</code> check looks for 115&deg; or lower. 118&deg; is short of it.",
         "",
     ),
     (
-        "FEEDBACK",
-        '"Keep your knees tracking over your toes as you descend."',
+        "WHAT IT SAID",
+        '"You stop a little high on 2 of your 6 reps."',
         "out",
     ),
 )
 
 
-def _pipeline() -> str:
+def _trace() -> str:
     parts = []
-    for index, (step, body, modifier) in enumerate(PIPELINE):
+    for index, (step, body, modifier) in enumerate(TRACE):
         if index:
             parts.append('<div class="pipeline__connector" aria-hidden="true"></div>')
         node_class = "pipeline__node pipeline__node--out" if modifier == "out" else "pipeline__node"
@@ -48,35 +47,42 @@ def _pipeline() -> str:
 
 
 def render() -> None:
-    html(
-        strip(
-            f"""
+    html(strip(f"""
             <div class="ff-page">
             <section class="explain section" id="ff-explainable">
-              <div class="container">
-                <p class="eyebrow" data-animate="fade-up">Explainable AI</p>
+              <div class="container container--narrow">
+                <p class="eyebrow" data-animate="fade-up">Explainable Feedback</p>
                 <h2 class="display display--md" data-animate="fade-up">
-                  Not a score.<br />An explanation.
+                  More than a score.<br />An explanation.
                 </h2>
                 <p class="explain__lede" data-animate="fade-up">
-                  FormFix AI doesn't simply grade your exercise. Every result can be traced from
-                  what the system saw, to the rule it triggered, to the feedback you read.
+                  FormFix doesn't just hand you a grade. Every correction says what happened,
+                  why it matters and what to try instead. Here is one from the session reported
+                  further down this page.
                 </p>
                 <div class="explain__contrast">
-                  <div class="verdict verdict--blackbox" data-animate="fade-up">
-                    <p class="verdict__caption">What a black box tells you</p>
-                    <p class="verdict__blackbox-msg"><span aria-hidden="true">&#10005;</span> Incorrect exercise.</p>
-                  </div>
                   <div class="verdict verdict--formfix" data-animate="fade-up">
-                    <p class="verdict__caption">What FormFix AI tells you</p>
-                    <p class="verdict__formfix-msg">"Your knees moved inward during the descent.
-                      Try keeping them aligned with your toes."</p>
+                    <p class="verdict__caption">What FormFix tells you</p>
+                    <p class="verdict__title">Squat depth</p>
+                    <p class="verdict__formfix-msg">You stop a little high on 2 of your 6 reps.</p>
+                    <p class="verdict__why">Squatting lower works your legs through their full range.</p>
+                    <p class="verdict__fix"><span class="verdict__fix-tag">Try this</span>Lower until your
+                      hips reach about knee height, keeping your whole foot planted.</p>
                   </div>
                 </div>
-                <div class="pipeline" data-animate="pipeline">{_pipeline()}</div>
+                <div class="explain__trace-head" data-animate="fade-up">
+                  <h3 class="explain__trace-title">The rule behind that message</h3>
+                  <p class="explain__trace-lede">
+                    None of it is guesswork. You can follow any correction back through the three
+                    steps that produced it.
+                  </p>
+                </div>
+                <div class="pipeline" data-animate="pipeline">{_trace()}</div>
+                <p class="explain__footnote" data-animate="fade-up">
+                  That 115&deg; is a starting value, not a fixed truth. FormFix prints the number
+                  behind every correction, so you can always see what it was measured against.
+                </p>
               </div>
             </section>
             </div>
-            """
-        )
-    )
+            """))

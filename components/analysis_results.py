@@ -1,29 +1,25 @@
 """
-The results view of the /analyse page.
+The results view of the /analyse page, all driven by one AnalysisResult so the
+same markup renders a real run and the labelled sample.
 
-Everything here is driven by a single :class:`~utils.analysis.AnalysisResult`,
-so the same markup renders a real pose-estimation run and the sample analysis
-the prototype currently shows. Nothing is hard-coded to one exercise or to one
-piece of feedback:
-
-    score_block          animated ring + verdict (colour *and* words)
-    checks_block         the measured checks behind the score
-    positives_block      "What you did well"
-    improvements_block   "What to improve" - a list, of any length
-    reference_block      "See the correct technique" card
-    reference_modal      the lightbox the card opens
-
-The hierarchy follows the brief: verdict first, then what went well, then what
-to fix, then the reference movement.
+Staged rather than shown at once: verdict, corrections and positives first,
+then the analysed video and a reference clip, then the per-finding and per-rep
+breakdown inside "See the full detail". Under FORMFIX_DEBUG that last section
+swaps in the full traceability chain.
 """
 
 from __future__ import annotations
 
-from utils.analysis import AnalysisResult
+from typing import Any
+
+import streamlit as st
+
+from utils.analysis import AnalysisResult, Improvement
 from utils.assets import asset_url, reference_video_url
 from utils.exercise_data import Exercise
 from utils.helpers import esc
 from utils.pose import render_pose
+from utils.styling import html
 
 CHECK_ICON = (
     '<svg class="ax-icon" viewBox="0 0 16 16" aria-hidden="true">'
@@ -36,57 +32,348 @@ PLAY_ICON = (
     'fill="currentColor" /></svg>'
 )
 
-
-# ---------------------------------------------------------------------------
-# Score
-# ---------------------------------------------------------------------------
+# a beginner turns up asking about their form, not about their score
+VERDICT_EYEBROW = "Overall form"
 
 
-def score_block(result: AnalysisResult) -> str:
-    """The animated score ring, the verdict and the run's headline facts."""
-    demo_tag = (
-        '<span class="ax-tag ax-tag--demo">Sample output</span>' if result.is_demo else ""
+# --- Level 1 - the verdict ---
+
+
+def verdict_block(result: AnalysisResult) -> str:
+    """The first thing on screen: a verdict in words plus one sentence saying what
+    it rests on. The ring stays, but nothing depends on reading a colour."""
+    demo_tag = '<span class="ax-tag ax-tag--demo">Sample output</span>' if result.is_demo else ""
+    facts = " &middot; ".join(
+        part
+        for part in (
+            esc(result.exercise_name),
+            f"{result.reps} rep{'' if result.reps == 1 else 's'}" if result.reps else "",
+            esc(result.duration),
+        )
+        if part
     )
+    headline = f'<p class="ax-score__headline">{esc(result.headline)}</p>' if result.headline else ""
+
+    # no check had reliable evidence, so leave it unscored - a 0 would read
+    # as "poor technique"
+    if not result.score_available:
+        ring = (
+            '  <div class="ax-score__ring-wrap">'
+            '    <svg class="ax-score__ring" viewBox="0 0 120 120" aria-hidden="true">'
+            '      <circle class="ax-score__track" cx="60" cy="60" r="52" />'
+            "    </svg>"
+            '    <div class="ax-score__center">'
+            '      <span class="ax-score__num">&mdash;</span>'
+            '      <span class="ax-score__den">not scored</span>'
+            "    </div>"
+            "  </div>"
+        )
+        verdict = "Not scored"
+        modifier = "attention"
+    else:
+        ring = (
+            '  <div class="ax-score__ring-wrap">'
+            '    <svg class="ax-score__ring" viewBox="0 0 120 120" aria-hidden="true">'
+            '      <circle class="ax-score__track" cx="60" cy="60" r="52" />'
+            f'      <circle class="ax-score__value" cx="60" cy="60" r="52" pathLength="100" '
+            f'style="--pct:{result.score}" />'
+            "    </svg>"
+            '    <div class="ax-score__center">'
+            f'      <span class="ax-score__num" data-ax-count-to="{result.score}">0</span>'
+            '      <span class="ax-score__den">/ 100</span>'
+            "    </div>"
+            "  </div>"
+        )
+        verdict = result.verdict
+        modifier = result.band
 
     return (
-        f'<div class="ax-score ax-score--{result.band}" data-animate="fade-up">'
-        '  <div class="ax-score__ring-wrap">'
-        '    <svg class="ax-score__ring" viewBox="0 0 120 120" aria-hidden="true">'
-        '      <circle class="ax-score__track" cx="60" cy="60" r="52" />'
-        f'      <circle class="ax-score__value" cx="60" cy="60" r="52" pathLength="100" '
-        f'style="--pct:{result.score}" />'
-        "    </svg>"
-        '    <div class="ax-score__center">'
-        f'      <span class="ax-score__num" data-ax-count-to="{result.score}">0</span>'
-        '      <span class="ax-score__den">/ 100</span>'
-        "    </div>"
-        "  </div>"
+        f'<div class="ax-score ax-score--{modifier}" data-animate="fade-up">'
+        f"{ring}"
         '  <div class="ax-score__meta">'
-        '    <p class="ax-score__eyebrow">Analysis complete</p>'
-        f'    <p class="ax-score__exercise">{esc(result.exercise_name)}</p>'
-        f'    <p class="ax-score__verdict">{esc(result.verdict)}</p>'
-        f'    <p class="ax-score__facts">{esc(result.filename)} &middot; '
-        f"{esc(result.duration)} &middot; {result.reps} reps detected</p>"
+        f'    <p class="ax-score__eyebrow">{VERDICT_EYEBROW}</p>'
+        f'    <p class="ax-score__verdict-lg">{esc(verdict)}</p>'
+        f"    {headline}"
+        f'    <p class="ax-score__facts">{facts}</p>'
         f"    {demo_tag}"
         "  </div>"
         "</div>"
     )
 
 
-def checks_block(result: AnalysisResult) -> str:
-    """
-    The measured checks behind the score.
+# --- Level 1 - corrections and positives ---
 
-    Each row is one rule from the analysis, so a score can always be traced
-    back to the specific check that produced it.
+
+def _correction_card(index: int, item: Improvement) -> str:
+    """One correction: what happened, why it matters, what to try. Three lines and
+    no numbers - the measured values are one expander away, and on the card they
+    made it read as a report rather than something to act on."""
+    why = f'<p class="ax-fix__why">{esc(item.why)}</p>' if item.why else ""
+    return (
+        f'<li class="ax-fix ax-fix--{esc(item.severity)}" data-animate="fade-up">'
+        '  <div class="ax-fix__head">'
+        f'    <span class="ax-fix__num">{index:02d}</span>'
+        f'    <h4 class="ax-fix__title">{esc(item.title)}</h4>'
+        "  </div>"
+        f'  <p class="ax-fix__issue">{esc(item.headline_issue)}</p>'
+        f"  {why}"
+        '  <p class="ax-fix__how"><span class="ax-fix__how-tag">Try this</span>'
+        f"{esc(item.headline_fix)}</p>"
+        "</li>"
+    )
+
+
+def corrections_block(result: AnalysisResult) -> str:
+    """"What to fix", capped at the top few findings. The list arrives ordered by
+    priority, so the cut is by importance rather than by whichever rule ran first."""
+    visible = result.key_improvements
+    if not visible:
+        return (
+            '<section class="ax-panel ax-panel--clear" data-animate="fade-up">'
+            '<h3 class="ax-panel__title">Nothing to fix in this set</h3>'
+            '<p class="ax-empty-note">None of the checks FormFix could measure found a '
+            "problem. Keep the same setup and add load gradually.</p>"
+            "</section>"
+        )
+
+    more = len(result.further_improvements)
+    note = (
+        f'<p class="ax-fixes__more">{more} smaller point{"" if more == 1 else "s"} '
+        "in the analysis details below.</p>"
+        if more
+        else ""
+    )
+    cards = "".join(_correction_card(index, item) for index, item in enumerate(visible, start=1))
+    count = len(visible)
+    return (
+        '<section class="ax-panel" data-animate="fade-up">'
+        '<h3 class="ax-panel__title"><span>What to fix</span>'
+        f'<span class="ax-count">{count} thing{"" if count == 1 else "s"}</span></h3>'
+        f'<ol class="ax-fixes">{cards}</ol>'
+        f"{note}"
+        "</section>"
+    )
+
+
+def positives_block(result: AnalysisResult) -> str:
     """
+    What the set got right. Every line comes from a check that actually
+    passed, which is also why it tends to be short.
+    """
+    items = result.key_positives
+    if not items:
+        return ""
+    rows = "".join(f'<li class="ax-win">{CHECK_ICON}<span>{esc(item)}</span></li>' for item in items)
+    return (
+        '<section class="ax-panel ax-panel--wins" data-animate="fade-up">'
+        '<h3 class="ax-panel__title">What you did well</h3>'
+        f'<ul class="ax-wins">{rows}</ul>'
+        "</section>"
+    )
+
+
+# --- Level 3 - how FormFix detected it ---
+
+
+# evidence keys that aren't settings and are printed elsewhere
+_SETTING_EXCLUSIONS = frozenset({"reliability_evidence", "threshold_source"})
+
+# How many configured values to print before the panel becomes a debug dump.
+_MAX_SETTINGS = 8
+
+
+def _format_setting(key: str, value: Any) -> str:
+    """One of a rule's configured settings, in readable form."""
+    name = key.replace("_", " ")
+    if isinstance(value, float):
+        return f"{name}: {value:.3g}"
+    if isinstance(value, (list, tuple)):
+        return f"{name}: {', '.join(str(v) for v in value)}"
+    return f"{name}: {value}"
+
+
+def _settings_lines(item: Improvement) -> list[str]:
+    """The rule's configured thresholds and where they came from. Scalars only - the
+    evidence dict also carries nested records, and dumping those read as a log."""
+    lines: list[str] = []
+    scalars = [
+        (key, value)
+        for key, value in item.settings.items()
+        if key not in _SETTING_EXCLUSIONS and not isinstance(value, dict)
+    ]
+    if scalars:
+        rendered = " &middot; ".join(
+            esc(_format_setting(key, value)) for key, value in scalars[:_MAX_SETTINGS]
+        )
+        lines.append(f'<p class="ax-ex__settings">Rule settings &mdash; {rendered}</p>')
+    source = item.settings.get("threshold_source")
+    if source:
+        lines.append(f'<p class="ax-ex__settings">Threshold source &mdash; {esc(str(source))}</p>')
+    return lines
+
+
+def _detection_card(item: Improvement, minor: bool = False, technical: bool = False) -> str:
+    """
+    One finding in the details panel. technical=False is what an athlete reads:
+    the mistake in one sentence and the one thing to try. technical=True
+    (FORMFIX_DEBUG) is the traceable record - landmarks, measurement, phase, rule,
+    evidence - in the order the analysis walked it.
+    """
+    if not technical:
+        lines = [
+            f'<p class="ax-ex__line">{esc(item.headline_issue)}</p>' if item.headline_issue else "",
+            (
+                f'<p class="ax-ex__line"><span class="ax-ex__tag">Try this</span>'
+                f"{esc(item.headline_fix)}</p>"
+                if item.headline_fix
+                else ""
+            ),
+        ]
+        tag = '<span class="ax-ex__minor">Also noticed</span>' if minor else ""
+        return (
+            f'<article class="ax-ex ax-ex--{esc(item.severity)}">'
+            f'<h4 class="ax-ex__title">{esc(item.title)}{tag}</h4>'
+            f"{''.join(lines)}"
+            "</article>"
+        )
+
+    lines: list[str] = []
+    if item.measures:
+        source = f" from {esc(item.measured_from)}" if item.measured_from else ""
+        lines.append(
+            f'<p class="ax-ex__line"><span class="ax-ex__tag">Measured</span>'
+            f"{esc(item.measures)}{source}.</p>"
+        )
+    scope = []
+    if item.phase:
+        scope.append(f"during the {esc(item.phase.replace('_', ' '))} phase")
+    if item.evaluable_reps:
+        scope.append(
+            esc(
+                f"flagged on {item.flagged_reps} of {item.evaluable_reps} judged repetition"
+                f"{'' if item.evaluable_reps == 1 else 's'}"
+            )
+        )
+    if item.reliability:
+        scope.append(f"{esc(item.reliability.lower())} evidence")
+    if scope:
+        # scope entries are escaped as they are built, so the separator can stay
+        # an HTML entity here
+        lines.append(
+            '<p class="ax-ex__line"><span class="ax-ex__tag">Where</span>'
+            + " &middot; ".join(scope)
+            + "</p>"
+        )
+    if item.issue:
+        lines.append(
+            f'<p class="ax-ex__line"><span class="ax-ex__tag">Detected</span>{esc(item.issue)}</p>'
+        )
+    if item.evidence:
+        rows = "".join(f"<li>{esc(line)}</li>" for line in item.evidence)
+        lines.append(f'<ul class="ax-ex__evidence">{rows}</ul>')
+    lines.extend(_settings_lines(item))
+    if item.rule_id:
+        lines.append(f'<p class="ax-ex__rule">Rule: {esc(item.rule_id)}</p>')
+
+    tag = '<span class="ax-ex__minor">Also noticed</span>' if minor else ""
+    return (
+        f'<article class="ax-ex ax-ex--{esc(item.severity)}">'
+        f'<h4 class="ax-ex__title">{esc(item.title)}{tag}</h4>'
+        f'{"".join(lines)}'
+        "</article>"
+    )
+
+
+def detection_markup(result: AnalysisResult, technical: bool = False) -> str:
+    """Every finding, top ones first. This is the only place the smaller ones
+    appear; "What to fix" on the first screen shows the top few."""
+    if not result.improvements:
+        return (
+            '<p class="ax-empty-note">No check produced a finding in this set, so there is '
+            "nothing to list here. The measured checks above show what was evaluated.</p>"
+        )
+    top = "".join(_detection_card(item, technical=technical) for item in result.key_improvements)
+    rest = "".join(
+        _detection_card(item, minor=True, technical=technical) for item in result.further_improvements
+    )
+    lede = (
+        "FormFix does not produce a black-box score. Each correction came from one rule, "
+        "reading one measurement, taken from specific body landmarks during a specific "
+        "part of the movement."
+        if technical
+        else "Everything FormFix found in this set, including the smaller points that did "
+        "not make the list above - each with the one thing to try next time."
+    )
+    return f'<p class="ax-empty-note">{lede}</p><div class="ax-exs">{top}{rest}</div>'
+
+
+def reps_block(result: AnalysisResult) -> str:
+    """One card per rep: what it passed, what it didn't, what wasn't
+    assessable on it."""
+    if not result.rep_results:
+        return ""
+
+    cards = []
+    for rep in result.rep_results:
+        lines = []
+        if rep.issues:
+            # escape each issue then join - escaping the joined string would turn the
+            # separator into a literal "&middot;"
+            lines.append(
+                '<p class="ax-rep__meta">'
+                + " &middot; ".join(esc(issue) for issue in rep.issues)
+                + "</p>"
+            )
+        if rep.passed:
+            lines.append(
+                '<p class="ax-rep__meta ax-rep__meta--muted">Passed: '
+                + esc(", ".join(rep.passed))
+                + "</p>"
+            )
+        if rep.not_assessed:
+            lines.append(
+                '<p class="ax-rep__meta ax-rep__meta--muted">Not assessed: '
+                + esc(", ".join(rep.not_assessed))
+                + "</p>"
+            )
+        tag = esc(rep.timestamp) if rep.timestamp and rep.timestamp != "-" else ""
+        cards.append(
+            f'<li class="ax-rep ax-rep--{esc(rep.status)}">'
+            f'<span class="ax-rep__num">Rep {rep.number:02d}</span>'
+            '<span class="ax-rep__body">'
+            f'<span class="ax-rep__headline">{esc(rep.headline)}</span>'
+            f'{"".join(lines)}'
+            "</span>"
+            f'<span class="ax-rep__tag">{tag}</span>'
+            "</li>"
+        )
+
+    count = len(result.rep_results)
+    return (
+        '<section class="ax-panel ax-panel--quiet">'
+        '<h3 class="ax-panel__title ax-panel__title--sm"><span>Repetition by repetition</span>'
+        f'<span class="ax-count">{count} {"rep" if count == 1 else "reps"}</span></h3>'
+        f'<ul class="ax-reps">{"".join(cards)}</ul>'
+        "</section>"
+    )
+
+
+def checks_block(result: AnalysisResult) -> str:
+    """The measured checks behind the score, one row per rule with its evidence
+    level. "Depth, 3 of 4 reps, high reliability" says something different from the
+    same figure off a barely visible recording."""
     if not result.rows:
         return ""
 
-    rows = []
+    measured = []
     for row in result.rows:
-        detail = f'<span class="ax-check__detail">{esc(row.detail)}</span>' if row.detail else ""
-        rows.append(
+        detail_text = " · ".join(
+            part
+            for part in (row.detail, f"{row.reliability} reliability" if row.reliability else "")
+            if part
+        )
+        detail = f'<span class="ax-check__detail">{esc(detail_text)}</span>' if detail_text else ""
+        measured.append(
             f'<li class="ax-check ax-check--{esc(row.status)}">'
             f'<span class="ax-check__label">{esc(row.label)}{detail}</span>'
             '<span class="ax-check__meter">'
@@ -95,82 +382,51 @@ def checks_block(result: AnalysisResult) -> str:
             "</li>"
         )
 
-    return (
-        '<section class="ax-panel ax-panel--quiet" data-animate="fade-up">'
-        '<h3 class="ax-panel__title ax-panel__title--sm">Measured checks</h3>'
-        f'<ul class="ax-checks">{"".join(rows)}</ul>'
-        "</section>"
-    )
-
-
-# ---------------------------------------------------------------------------
-# Feedback
-# ---------------------------------------------------------------------------
-
-
-def positives_block(result: AnalysisResult) -> str:
-    """What the athlete did well - always shown before the corrections."""
-    if not result.positives:
-        return ""
-
-    items = "".join(
-        f'<li class="ax-win">{CHECK_ICON}<span>{esc(item)}</span></li>'
-        for item in result.positives
-    )
-    return (
-        '<section class="ax-panel ax-panel--wins" data-animate="fade-up">'
-        '<h3 class="ax-panel__title">What you did well</h3>'
-        f'<ul class="ax-wins">{items}</ul>'
-        "</section>"
-    )
-
-
-def improvements_block(result: AnalysisResult) -> str:
-    """Every detected issue, each with what was seen and how to fix it."""
-    if not result.improvements:
-        return (
-            '<section class="ax-panel" data-animate="fade-up">'
-            '<h3 class="ax-panel__title">What to improve</h3>'
-            '<p class="ax-empty-note">No technique issues were detected in this set. '
-            "Keep the same setup and add load gradually.</p>"
-            "</section>"
-        )
-
-    cards = []
-    for index, item in enumerate(result.improvements, start=1):
-        cards.append(
-            f'<article class="ax-fix ax-fix--{esc(item.severity)}" data-animate="fade-up">'
-            '  <header class="ax-fix__head">'
-            f'    <span class="ax-fix__num">{index:02d}</span>'
-            f'    <h4 class="ax-fix__title">{esc(item.title)}</h4>'
-            f'    <span class="ax-sev ax-sev--{esc(item.severity)}">{esc(item.severity_label)}</span>'
-            "  </header>"
-            f'  <p class="ax-fix__issue">{esc(item.issue)}</p>'
-            '  <p class="ax-fix__how"><span class="ax-fix__how-tag">How to improve</span>'
-            f"{esc(item.correction)}</p>"
-            "</article>"
-        )
-
-    count = len(result.improvements)
+    count = len(measured)
     return (
         '<section class="ax-panel" data-animate="fade-up">'
-        '<h3 class="ax-panel__title"><span>What to improve</span>'
-        f'<span class="ax-count">{count} {"point" if count == 1 else "points"}</span></h3>'
-        f'<div class="ax-fixes">{"".join(cards)}</div>'
+        '<h3 class="ax-panel__title"><span>Measured checks</span>'
+        f'<span class="ax-count">{count} check{"" if count == 1 else "s"}</span></h3>'
+        f'<ul class="ax-checks">{"".join(measured)}</ul>'
         "</section>"
     )
 
 
-# ---------------------------------------------------------------------------
-# Reference movement
-# ---------------------------------------------------------------------------
+def not_assessed_block(result: AnalysisResult) -> str:
+    """
+    What FormFix deliberately did not judge, with the reason. It gets its own
+    block so an unavailable measurement can't be mistaken for a failed one.
+    """
+    if not result.not_assessed:
+        return ""
+    rows = "".join(
+        '<li class="ax-na__row">'
+        f'<span class="ax-na__title">{esc(item.title)}</span>'
+        f'<span class="ax-na__reason">{esc(item.reason)}</span>'
+        "</li>"
+        for item in result.not_assessed
+    )
+    return (
+        '<section class="ax-panel ax-panel--quiet">'
+        '<h3 class="ax-panel__title ax-panel__title--sm">Not assessed</h3>'
+        '<p class="ax-empty-note">These checks need something this recording could not '
+        "show, so FormFix left them unscored rather than guessing.</p>"
+        f'<ul class="ax-na">{rows}</ul>'
+        "</section>"
+    )
+
+
+# --- Level 2 - the reference movement ---
 
 
 def reference_block(exercise: Exercise) -> str:
-    """The card that opens the reference-technique lightbox."""
+    """
+    The card that opens the reference-technique lightbox. It sits under the
+    corrections, since watching how it should look is what you want next.
+    """
     return (
         '<section class="ax-panel ax-panel--ref" data-animate="fade-up">'
-        '<h3 class="ax-panel__title">See the correct technique</h3>'
+        f'<h3 class="ax-panel__title">See correct {esc(exercise.name.lower())} form</h3>'
         '<button class="ax-ref" type="button" data-ax-open '
         f'aria-label="Play the {esc(exercise.name)} reference movement">'
         '  <span class="ax-ref__thumb">'
@@ -182,7 +438,7 @@ def reference_block(exercise: Exercise) -> str:
         '    <span class="ax-ref__eyebrow">Reference movement</span>'
         f'    <span class="ax-ref__title">{esc(exercise.name)} &mdash; Correct Technique</span>'
         '    <span class="ax-ref__meta">Watch how the movement should look, then compare '
-        "it with your own set.</span>"
+        "it with your own set above.</span>"
         "  </span>"
         "</button>"
         "</section>"
@@ -190,13 +446,8 @@ def reference_block(exercise: Exercise) -> str:
 
 
 def reference_modal(exercise: Exercise) -> str:
-    """
-    The lightbox itself.
-
-    ``scripts/analyse.js`` moves this to ``<body>`` on load so its fixed
-    positioning is resolved against the viewport rather than against a
-    Streamlit block, then handles open / close / Escape / backdrop clicks.
-    """
+    """The reference lightbox. scripts/analyse.js moves it to <body> on load so its
+    fixed positioning resolves against the viewport, not a Streamlit block."""
     video = reference_video_url(exercise.id)
 
     if video:
@@ -206,8 +457,7 @@ def reference_modal(exercise: Exercise) -> str:
         )
         note = "Reference clip"
     else:
-        # No clip has been added yet - show the annotated still instead of an
-        # empty player, so the modal is still useful and never looks broken.
+        # no clip added yet, so show the annotated still
         media = (
             '<figure class="ax-modal__still">'
             f'<img src="{asset_url(exercise.image)}" alt="{esc(exercise.image_alt)}" />'
@@ -238,19 +488,186 @@ def reference_modal(exercise: Exercise) -> str:
     )
 
 
-# ---------------------------------------------------------------------------
-# Composition
-# ---------------------------------------------------------------------------
+# --- Recording quality ---
 
 
-def markup(result: AnalysisResult, exercise: Exercise) -> str:
-    """The whole results column, in the order the brief asks for."""
+# headline per estimated camera orientation. Named after what the camera
+# was; the advice underneath says what the exercise wants.
+_ORIENTATION_HEADLINES = {
+    "frontal": "Analysed from a front-on camera",
+    "side": "Analysed from a side-on camera",
+    "diagonal_side": "Analysis completed with a partial camera angle",
+}
+
+
+def recording_quality_block(result: AnalysisResult, exercise: Exercise) -> str:
+    """
+    A note above the results when the recording was usable but not ideal. Only for
+    the "limited" state - the analysis did run, so this says what the recording
+    cost. The advice is the exercise's own, since a squat wants a side view and a
+    press a front one.
+    """
+    if result.recording_quality != "limited" or not result.warnings:
+        return ""
+
+    headline = _ORIENTATION_HEADLINES.get(
+        result.camera_orientation, "Analysis completed with some limitations"
+    )
+    needed = (
+        f"{esc(exercise.name)} is analysed from a {esc(exercise.camera_view.lower())} view."
+        if exercise.camera_view
+        else ""
+    )
+    notes = "".join(f'<li class="ax-retry__tip">{esc(w)}</li>' for w in result.warnings)
+    return (
+        '<section class="ax-panel ax-panel--invalid" data-animate="fade-up">'
+        '  <p class="eyebrow">Recording quality</p>'
+        f'  <h3 class="ax-panel__title">{esc(headline)}</h3>'
+        f'  <p class="ax-video-note">FormFix could analyse this recording. {needed} '
+        "Keeping the whole movement in frame, with the camera still, gives the most "
+        "accurate measurements.</p>"
+        f'  <ul class="ax-retry__tips">{notes}</ul>'
+        "</section>"
+    )
+
+
+# --- Validation failure ---
+
+
+def failure_markup(result: AnalysisResult, exercise: Exercise | None = None) -> str:
+    """
+    Shown when the recording could not be analysed: what failed, why, and what
+    to change. The upload controls on the left stay available for a retry.
+    """
+    # prefer the analyser's own suggestions, falling back to the standing tips
+    suggestions = result.error_suggestions or (list(exercise.recording_tips) if exercise else [])
+    tips = "".join(f'<li class="ax-retry__tip">{esc(tip)}</li>' for tip in suggestions)
+    tips_block = (
+        '<div class="ax-retry">'
+        '<p class="ax-retry__label">For the best result</p>'
+        f'<ul class="ax-retry__tips">{tips}</ul>'
+        "</div>"
+        if tips
+        else ""
+    )
     return (
         '<div class="ff-page ax-results" data-ax-results>'
-        f"{score_block(result)}"
-        f"{positives_block(result)}"
-        f"{improvements_block(result)}"
-        f"{checks_block(result)}"
-        f"{reference_block(exercise)}"
+        '<section class="ax-panel ax-panel--invalid" data-animate="fade-up">'
+        '  <p class="eyebrow">Analysis not possible</p>'
+        f'  <h3 class="ax-invalid__title">{esc(result.error_title or "We couldn&rsquo;t analyse this recording")}</h3>'
+        f'  <p class="ax-invalid__body">{esc(result.error_message)}</p>'
+        f"  {tips_block}"
+        '  <p class="ax-invalid__note">Nothing was scored - FormFix never guesses when it '
+        "cannot see the movement clearly. Adjust the recording and upload again.</p>"
+        "</section>"
         "</div>"
     )
+
+
+# --- Composition ---
+
+
+def markup(result: AnalysisResult) -> str:
+    """The immediately visible feedback: verdict, what to fix, what you did well,
+    then the measured checks. Those used to sit inside the details, but they are
+    the evidence for the blocks above them, so they moved up."""
+    return (
+        '<div class="ff-page ax-results" data-ax-results>'
+        f"{verdict_block(result)}"
+        f"{corrections_block(result)}"
+        f"{positives_block(result)}"
+        f"{checks_block(result)}"
+        "</div>"
+    )
+
+
+def _annotated_video_section(result: AnalysisResult) -> None:
+    """"Your analysed movement" - the rendered overlay clip. It goes first, because
+    seeing the tracked movement is what makes the sentences under it mean
+    anything."""
+    path = result.annotated_video
+    if path is None or not path.is_file():
+        return
+    with st.container(key="ff_ax_annotated"):
+        html(
+            '<div class="ff-page ax-panel ax-panel--video" data-animate="fade-up">'
+            '<h3 class="ax-panel__title">Your analysed movement</h3>'
+            '<p class="ax-video-note">FormFix tracked your body through the movement. '
+            "The highlighted joints are the ones each finding was measured from.</p>"
+            "</div>"
+        )
+        st.video(str(path))
+
+
+def _technical_lines(result: AnalysisResult) -> list[str]:
+    """The run's own settings and limits, in the system's own vocabulary - so it
+    only appears under FORMFIX_DEBUG."""
+    lines = [
+        f"**Analysis side:** {result.analysis_side or '-'} side used for movement analysis",
+        f"**Repetitions:** {result.reps} complete"
+        + (
+            f", {result.partial_movements} partial movement(s) ignored"
+            if result.partial_movements
+            else ""
+        ),
+    ]
+    if result.score_formula and result.score_available:
+        lines.append(f"**Score formula:** {result.score_formula}")
+    if result.reliability:
+        lines.append(f"**Analysis reliability:** {result.reliability}")
+    lines.append(f"**Recording quality:** {result.recording_quality}")
+    if result.camera_orientation:
+        lines.append(
+            f"**Camera orientation:** {result.camera_orientation.replace('_', ' ')} "
+            f"(side-view confidence {result.side_view_confidence:.2f})"
+        )
+    if result.limited_metrics:
+        lines.append(
+            "**Not assessed for this recording:** "
+            + ", ".join(m.replace("_", " ") for m in result.limited_metrics)
+        )
+    for warning in result.warnings:
+        lines.append(f"**Note:** {warning}")
+    return lines
+
+
+def _analysis_details(result: AnalysisResult, debug_mode: bool) -> None:
+    """The optional detail layer, in one collapsed expander: how each finding was
+    detected, how every rep scored, and what the recording couldn't support."""
+    with st.container(key="ff_ax_tech"):
+        with st.expander("See the full detail - how FormFix measured every rep", expanded=False):
+            html(
+                '<p class="ax-details__lede">Everything behind the summary above: how each '
+                "finding was detected, how every repetition scored, and which checks could "
+                "not be assessed from this recording.</p>"
+            )
+            html(
+                '<div class="ax-details">'
+                f"{detection_markup(result, technical=debug_mode)}"
+                f"{reps_block(result)}"
+                f"{not_assessed_block(result)}"
+                "</div>"
+            )
+            if debug_mode:
+                st.caption("Run settings and limits (FORMFIX_DEBUG)")
+                st.markdown("  \n".join(_technical_lines(result)))
+            if debug_mode and result.debug:
+                st.caption("Developer metrics (FORMFIX_DEBUG)")
+                st.json(result.debug, expanded=False)
+
+
+def render(result: AnalysisResult, exercise: Exercise, debug_mode: bool = False) -> None:
+    """The whole results column: recording note, analysed movement, overall form,
+    what to fix, what you did well, the reference technique, then the full
+    detail."""
+    if not result.success:
+        html(failure_markup(result, exercise))
+        return
+
+    quality = recording_quality_block(result, exercise)
+    if quality:
+        html(f'<div class="ff-page ax-results">{quality}</div>')
+    _annotated_video_section(result)
+    html(markup(result))
+    html(f'<div class="ff-page ax-results ax-results--ref">{reference_block(exercise)}</div>')
+    _analysis_details(result, debug_mode)

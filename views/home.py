@@ -1,7 +1,4 @@
-"""
-The FormFix AI homepage.
-
-"""
+"""The FormFix homepage."""
 
 from __future__ import annotations
 
@@ -13,13 +10,8 @@ from utils.styling import inject_behaviour
 
 
 def _warn_about_missing_assets() -> None:
-    """
-    A quiet, non-fatal note if an image could not be found on disk.
-
-    Rendered at the very bottom of the page so it can never interfere with the
-    design; missing assets fall back to a transparent pixel rather than a
-    broken-image icon.
-    """
+    """Quiet note at the bottom of the page if an image is missing. Missing assets
+    render as a transparent pixel, so without this you would never notice."""
     missing = missing_assets()
     if missing:
         with st.container(key="ff_asset_warning"):
@@ -31,23 +23,23 @@ def _warn_about_missing_assets() -> None:
 
 
 def render() -> None:
-    # Fixed layers first - they get relocated to <body> by scripts/main.js.
+    # Fixed layers first; scripts/main.js moves them up to <body>.
     components.background.render()
     components.navbar.render()
 
-    # The page, in the order of the original prototype.
-    components.hero.render()  # 1  Hero
-    components.about.render()  # 1b What this is / who it is for
-    components.problem.render()  # 2  The problem
-    components.how_it_works.render()  # 3  How it works
-    components.exercise_section.render()  # 4  Exercise explorer
-    components.explainable.render()  # 5  Explainable AI
-    components.results_section.render_example()  # 6  Example analysis
-    components.technology.render()  # 7  Technology
-    components.research.render()  # 7b Academic foundation
-    components.outro.render()  # 8  Final CTA + footer
+    # Sections in the order of the original prototype.
+    components.hero.render()
+    components.about.render()
+    components.problem.render()
+    components.how_it_works.render()
+    components.exercise_section.render()
+    components.explainable.render()
+    components.results_section.render_example()
+    components.technology.render()
+    components.research.render()
+    components.outro.render()
 
     _warn_about_missing_assets()
 
-    # Behaviour last, so everything it enhances is already in the DOM.
+    # Behaviour last, so everything it hooks into is already in the DOM.
     inject_behaviour()

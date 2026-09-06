@@ -1,18 +1,9 @@
 """
 FormFix - the Streamlit app. Run it with `streamlit run app.py`.
 
-This file only does page config and routing. Where everything else lives:
-
-    views/              one module per page (home.py = /, analyse.py = /analyse)
-    components/         one module per section or feature
-    utils/              paths, routing, assets, styling, pose renderer,
-                        exercise data, analysis pipeline
-    styles/             main.css for the whole site, analyse.css on top of it
-                        for /analyse
-    scripts/            main.js (scroll progress, reveals, exercise explorer)
-                        and analyse.js (reference lightbox, score count-up)
-    static/assets/      images, logo, research paper, reference clips
-    .streamlit/         theme + server config
+This file only does page config and routing. views/ has one module per page,
+components/ one per section, utils/ the shared helpers, styles/ and scripts/
+the CSS and JS, static/assets/ the images and reference clips.
 """
 
 from __future__ import annotations
@@ -53,7 +44,7 @@ def configure_page() -> None:
 
 
 def build_navigation():
-  
+
     pages = [
         st.Page(views.home.render, title=HOME_TITLE, url_path=HOME_PATH, default=True),
         st.Page(views.analyse.render, title=ANALYSE_TITLE, url_path=ANALYSE_PATH),

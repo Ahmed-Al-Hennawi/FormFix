@@ -1,13 +1,6 @@
 """
-Pages.
-
-    home      the marketing site
-    analyse   the upload / analysis studio
-
-Both are registered in ``app.py`` with ``st.navigation``:
-
-    /            -> views.home.render
-    /analyse     -> views.analyse.render
+The two pages: home (the marketing site) and analyse (the analysis studio).
+app.py registers both with st.navigation.
 """
 
 from . import analyse, home

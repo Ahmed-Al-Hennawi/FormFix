@@ -1,16 +1,7 @@
 """
-Analysis report rendering.
-
-Two uses:
-
-* :func:`render_example` - section 6 of the website, the worked example that
-  shows what a session looks like (identical figures to the original prototype)
-* :func:`render_result` - the same card, driven by a real
-  :class:`~utils.analysis.AnalysisResult` once the computer-vision backend is
-  connected
-
-Because both go through :func:`report_markup`, real results will look exactly
-like the example the marketing page promises.
+Analysis report rendering. render_example draws the worked example in section
+6, render_result draws a real AnalysisResult. Both go through report_markup, so
+a real run looks like the example the homepage promises.
 """
 
 from __future__ import annotations
@@ -70,9 +61,7 @@ def report_markup(result: AnalysisResult, animate: bool = True) -> str:
 
 def render_example() -> None:
     """Section 6 - the worked example from the original prototype."""
-    html(
-        strip(
-            f"""
+    html(strip(f"""
             <div class="ff-page">
             <section class="analysis section" id="ff-analysis">
               <div class="container container--narrow">
@@ -82,33 +71,25 @@ def render_example() -> None:
               </div>
             </section>
             </div>
-            """
-        )
-    )
+            """))
 
 
 def render_result(result: AnalysisResult | None) -> None:
-    """
-    Render a real analysis result inside the upload section.
-
-    ``None`` means the computer-vision backend has not been connected yet, so
-    the placeholder explains that rather than inventing a fake analysis.
-    """
+    """Render a real analysis result. None means process_uploaded_video couldn't
+    run - no CV dependencies, or no analyser for the exercise - and the empty state
+    says so rather than inventing a result."""
     if result is None:
-        html(
-            strip(
-                """
+        html(strip("""
                 <div class="ff-page">
                 <div class="results__empty">
-                  <span class="results__empty-tag">PENDING</span>
-                  <p>Pose estimation is not connected in this prototype yet. Once
-                     <code>utils/analysis.py</code> is implemented, the analysis report
-                     appears here in exactly the format shown further up the page.</p>
+                  <span class="results__empty-tag">UNAVAILABLE</span>
+                  <p>This analysis could not be run on this machine - the pose-estimation
+                     dependencies are not available here, or that movement has no analyser
+                     registered. Everything else is unchanged: a completed run reports in
+                     exactly the format shown further up the page.</p>
                 </div>
                 </div>
-                """
-            )
-        )
+                """))
         return
 
     html(f'<div class="ff-page">{report_markup(result, animate=False)}</div>')

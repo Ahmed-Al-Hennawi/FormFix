@@ -1,17 +1,8 @@
 """
-Section 4 - Exercise explorer.
-
-Three movements, one analysis engine: Squat, Shoulder Press, Lat Pulldown.
-
-All three figures, copy panels, HUD read-outs and "next exercise" preview cards
-are rendered here from :mod:`utils.exercise_data` and live in the DOM together.
-``main.js`` then swaps which one is current, and the CSS transitions in
-``styles/main.css`` reproduce the original GSAP timeline: the outgoing athlete
-drifts, shrinks, blurs and fades; the copy fades down; the incoming athlete
-enters from the opposite side and settles; the landmark nodes pop back in.
-
-Keeping the transition in CSS rather than in Python is deliberate - a Streamlit
-rerun would reset the scroll position and destroy the cinematic feel.
+Section 4 - the exercise explorer. All three exercises are rendered into the
+DOM at once; main.js just changes which one is current and the CSS handles the
+crossfade. It has to be CSS, not a Python callback, because a Streamlit
+rerun resets the scroll position and throws you out of the section.
 """
 
 from __future__ import annotations
@@ -39,7 +30,7 @@ def _tabs() -> str:
 
 
 def _panels() -> str:
-    """The left-hand copy column - one panel per exercise, only one visible."""
+    """Left-hand copy column: one panel per exercise, all but one hidden."""
     panels = []
     for index, exercise in enumerate(EXERCISES):
         areas = "".join(f"<li>{area}</li>" for area in exercise.areas)
@@ -83,10 +74,10 @@ def _metrics() -> str:
 
 
 def _previews() -> str:
-    """One preview card per exercise; the card for the *next* one is shown."""
+    """One card per exercise, but the visible one is the *next* exercise."""
     cards = []
     for index, exercise in enumerate(EXERCISES):
-        # index 1 (the exercise after the initial squat) is visible first
+        # We start on the squat, so index 1 is what's up next.
         hidden = "" if index == 1 % len(EXERCISES) else " hidden"
         cards.append(
             f'<span class="explorer__preview-item" data-index="{index}"{hidden}>'
@@ -99,9 +90,7 @@ def _previews() -> str:
 
 
 def render() -> None:
-    html(
-        strip(
-            f"""
+    html(strip(f"""
             <div class="ff-page">
             <section class="explorer section" id="ff-exercises">
               <div class="explorer__head container">
@@ -140,6 +129,4 @@ def render() -> None:
               </div>
             </section>
             </div>
-            """
-        )
-    )
+            """))
