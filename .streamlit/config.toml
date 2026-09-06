@@ -1,5 +1,5 @@
 # ==========================================================================
-# FormFix AI - Streamlit configuration
+# FormFix - Streamlit configuration
 #
 # The goal here is to get Streamlit out of the way: dark surfaces that match
 # the "Cyber Pulse" palette, no toolbar, no sidebar, and static file serving
@@ -28,12 +28,18 @@ font = "sans serif"
 enableStaticServing = true
 headless = true
 
+# The analyser accepts clips up to 120 s, and a 120 s recording from a modern
+# phone can exceed Streamlit's 200 MB default - which rejects it with a generic
+# message rather than one of the analyser's own. 300 MB covers the clips this
+# app asks for.
+maxUploadSize = 300
+
 [browser]
 gatherUsageStats = false
 
 [client]
-# Kept on while this is a prototype - flip to "none" for a public demo.
-showErrorDetails = "full"
+
+showErrorDetails = "none"
 toolbarMode = "minimal"
 
 [runner]
