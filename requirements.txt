@@ -27,9 +27,15 @@ opencv-contrib-python==4.10.0.84; sys_platform == "darwin"
 jax==0.4.30; sys_platform == "darwin"
 jaxlib==0.4.30; sys_platform == "darwin"
 
-mediapipe>=0.10.14; sys_platform != "darwin"
-numpy>=1.26; sys_platform != "darwin"
-opencv-python>=4.9; sys_platform != "darwin"
+# Linux (deployment/CI) is pinned to the same versions the project was
+# developed and tested against. Left as floors, a fresh deploy resolves to
+# MediaPipe 1.x, NumPy 2.x and OpenCV 5.x - none of which this code has been
+# run against, and MediaPipe 1.0 is a major release. Pinning keeps the
+# deployed app the same program as the evaluated one, which matters for a
+# result anyone is expected to reproduce.
+mediapipe==0.10.14; sys_platform != "darwin"
+numpy==1.26.4; sys_platform != "darwin"
+opencv-python==4.10.0.84; sys_platform != "darwin"
 
 # --- development -----------------------------------------------------------
 # pytest, ruff and black are used for testing/linting; keep them if you want

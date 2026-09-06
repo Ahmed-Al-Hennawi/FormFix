@@ -709,10 +709,17 @@ GitHub mirror, with `app.py` as the entry point and Python 3.11.
 `packages.txt` lists the apt packages the deployment image installs before pip
 runs. It deliberately contains nothing but bare package names:
 
-* `libgl1` and `libglib2.0-0` - OpenCV's Python wheel links against libGL and
-  glib. They are present on a normal desktop but not in the deployment image,
-  and without them `import cv2` fails, which makes the app fall back to its
-  labelled sample output instead of analysing anything.
+* `libgl1` - OpenCV's Python wheel links against libGL, which is present on a
+  normal desktop but not in the deployment image. Without it `import cv2`
+  fails, which makes the app fall back to its labelled sample output instead
+  of analysing anything.
+
+Do **not** add `libglib2.0-0`. OpenCV needs glib, but the Community Cloud
+image mixes Debian bullseye and trixie sources, and on trixie glib was renamed
+`libglib2.0-0t64` by the 64-bit-time transition. Asking for the old name pulls
+the bullseye package, which `Breaks` the `t64` one that ffmpeg's `libavcodec61`
+requires, and apt deadlocks with `held broken packages`. Installing `ffmpeg`
+brings in the correct `libglib2.0-0t64` through its own dependency chain.
 * `ffmpeg` - converts the annotated clip to H.264 so it plays in the browser.
   It is a system binary, not a pip package.
 
