@@ -1,4 +1,4 @@
-# FormFix AI - Streamlit version
+# FormFix - Streamlit version
 __pycache__/
 *.py[cod]
 .venv/
@@ -33,3 +33,10 @@ evaluation/summary.md
 
 .pytest_cache/
 .ruff_cache/
+
+# Personal reference sheets I wrote for myself while preparing the viva.
+# Not part of the submission and not useful to anyone cloning the project.
+questions/
+
+# Backup archive from a local refactor.
+*.tgz
