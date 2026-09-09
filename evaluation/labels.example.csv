@@ -1,0 +1,10 @@
+video,exercise,expected
+LP01_correct.mp4,pulldown,correct
+LP02_excessive_lean.mp4,pulldown,pulldown_torso
+LP03_limited_rom.mp4,pulldown,pulldown_rom
+SP01_correct.mp4,press,correct
+SP02_asymmetric.mp4,press,press_symmetry
+SP03_elbow_misalignment.mp4,press,press_alignment
+SP04_incomplete_rom.mp4,press,press_rom
+SQ01_correct.mp4,squat,correct
+SQ02_shallow.mp4,squat,squat_depth
