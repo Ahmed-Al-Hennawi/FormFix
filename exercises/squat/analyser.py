@@ -21,7 +21,13 @@ from pathlib import Path
 import numpy as np
 
 from analysis import filters, pose_detector, smoothing, trimming, validation
-from analysis.annotation import FrameState, JointAngle, OverlayEvent, render_annotated_video
+from analysis.annotation import (
+    LOWER_BODY_DRAWN,
+    FrameState,
+    JointAngle,
+    OverlayEvent,
+    render_annotated_video,
+)
 from analysis.export import export_result
 from analysis.models import (
     METRIC_DEPTH,
@@ -307,6 +313,9 @@ def _run(
             camera_orientation=checks.orientation.value,
             on_frame=lambda i, n: report("render", (i + 1) / max(n, 1), "Rendering analysed video"),
             angle_joints=_angle_joints(side),
+            # torso and legs only: no squat rule reads the arms, and they are
+            # holding a bar or held out in front the whole time
+            drawn_landmarks=LOWER_BODY_DRAWN,
             frame_range=(render_window.start_frame, render_window.end_frame),
         )
     except Exception as exc:

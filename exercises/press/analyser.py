@@ -21,6 +21,7 @@ import numpy as np
 
 from analysis import filters, pose_detector, smoothing, trimming, validation
 from analysis.annotation import (
+    UPPER_BODY_DRAWN,
     FrameState,
     HudLine,
     JointAngle,
@@ -341,6 +342,9 @@ def _run(
                 JointAngle("Left elbow", LEFT_SHOULDER, LEFT_ELBOW, LEFT_WRIST),
                 JointAngle("Right elbow", RIGHT_SHOULDER, RIGHT_ELBOW, RIGHT_WRIST),
             ),
+            # upper body only: seated, the legs sit behind the bench and no
+            # press rule reads them
+            drawn_landmarks=UPPER_BODY_DRAWN,
             frame_range=(render_window.start_frame, render_window.end_frame),
         )
     except Exception:

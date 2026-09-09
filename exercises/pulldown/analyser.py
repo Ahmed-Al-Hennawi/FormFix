@@ -22,6 +22,7 @@ import numpy as np
 
 from analysis import filters, pose_detector, smoothing, trimming, validation
 from analysis.annotation import (
+    UPPER_BODY_DRAWN,
     FrameState,
     HudLine,
     JointAngle,
@@ -346,6 +347,9 @@ def _run(
             marker_label="CONTRACTED",
             # the ROM rule reads the elbow angle, so draw it on the elbow
             angle_joints=(JointAngle("Elbow", chain.shoulder, chain.elbow, chain.wrist),),
+            # upper body only. Nothing below the hip is measured, and the legs
+            # are half under the seat pad where tracking is at its worst
+            drawn_landmarks=UPPER_BODY_DRAWN,
             frame_range=(render_window.start_frame, render_window.end_frame),
         )
     except Exception:
