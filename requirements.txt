@@ -35,11 +35,15 @@ jaxlib==0.4.30; sys_platform == "darwin"
 # result anyone is expected to reproduce.
 mediapipe==0.10.14; sys_platform != "darwin"
 numpy==1.26.4; sys_platform != "darwin"
-# opencv-python links against libGL, a system package (apt libgl1). Community
-# Cloud installs no apt packages for this app, so the headless build is used
-# instead - the same library without the GUI bindings. Nothing here calls
-# cv2.imshow or cv2.namedWindow.
-opencv-python-headless==4.10.0.84; sys_platform != "darwin"
+# The OpenCV pin has to be opencv-contrib-python, not the headless build.
+# MediaPipe hard-depends on opencv-contrib-python (an unpinned Requires-Dist),
+# and both distributions install into the same site-packages/cv2 directory, so
+# contrib overwrites opencv-python-headless whatever the requirements say - the
+# deploy ends up running contrib's GUI build at whatever version pip resolved.
+# That build links against libGL.so.1, which is why packages.txt ships libgl1.
+# Pinning contrib here keeps the deployed OpenCV the version this project was
+# evaluated against. Nothing in this app calls cv2.imshow or cv2.namedWindow.
+opencv-contrib-python==4.10.0.84; sys_platform != "darwin"
 
 # FFmpeg as a pip wheel, so the H.264 conversion needs no system package. The
 # system binary still wins when one is installed (see analysis/video_processor).
