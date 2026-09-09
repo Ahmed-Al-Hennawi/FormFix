@@ -72,7 +72,7 @@ well.
 streamlit_app/
 ├── app.py                  page config, then the two-page router
 ├── requirements.txt        pinned Python dependencies
-├── packages.txt            apt packages the deploy installs first (OpenCV, FFmpeg)
+├── packages.txt            apt packages the deploy installs first (OpenCV's libGL, glib)
 ├── ruff.toml               lint rules
 ├── pyproject.toml          Black's formatting config
 ├── README.md               this file
@@ -709,19 +709,28 @@ GitHub mirror, with `app.py` as the entry point and Python 3.11.
 `packages.txt` lists the apt packages the deployment image installs before pip
 runs. It deliberately contains nothing but bare package names:
 
-* `libgl1` - OpenCV's Python wheel links against libGL, which is present on a
-  normal desktop but not in the deployment image. Without it `import cv2`
-  fails, which makes the app fall back to its labelled sample output instead
-  of analysing anything.
+* `libgl1` - the OpenCV wheel links against libGL, which is present on a normal
+  desktop but not in the deployment image.
+* `libglib2.0-0t64` - and against glib. Both are required: whichever is missing,
+  `import cv2` raises an `ImportError` naming the shared object it could not
+  open (`libGL.so.1`, then `libgthread-2.0.so.0`), and the app fails to start.
 
-Do **not** add `libglib2.0-0`. OpenCV needs glib, but the Community Cloud
-image mixes Debian bullseye and trixie sources, and on trixie glib was renamed
-`libglib2.0-0t64` by the 64-bit-time transition. Asking for the old name pulls
-the bullseye package, which `Breaks` the `t64` one that ffmpeg's `libavcodec61`
-requires, and apt deadlocks with `held broken packages`. Installing `ffmpeg`
-brings in the correct `libglib2.0-0t64` through its own dependency chain.
-* `ffmpeg` - converts the annotated clip to H.264 so it plays in the browser.
-  It is a system binary, not a pip package.
+Use the `t64` name, not `libglib2.0-0`. The Community Cloud image mixes Debian
+bullseye and trixie sources, and on trixie glib was renamed by the 64-bit-time
+transition; asking for the old name pulls the bullseye package, which `Breaks`
+the `t64` one, and apt deadlocks with `held broken packages`.
+
+The headless OpenCV build links against neither library, but it cannot be used
+here. MediaPipe declares `opencv-contrib-python` as a hard dependency, and both
+distributions install into the same `site-packages/cv2` directory, so contrib
+overwrites `opencv-python-headless` whatever `requirements.txt` asks for - the
+deploy runs contrib's GUI build either way. The Linux pin is therefore
+`opencv-contrib-python`, the distribution that actually ends up as `cv2`, and
+the two apt packages above cover what it links against.
+
+FFmpeg is no longer requested here. The H.264 conversion uses the static build
+from the `imageio-ffmpeg` wheel, and a system binary still takes precedence
+where one is installed - see `analysis/video_processor._ffmpeg_executable`.
 
 Do not add comments to `packages.txt`. Community Cloud feeds the file to
 `apt-get` through `xargs`, which does not strip `#` lines and treats
