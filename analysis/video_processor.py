@@ -147,8 +147,29 @@ def iter_frames(capture: cv2.VideoCapture) -> Iterator[tuple[int, np.ndarray]]:
 # --- Output ---
 
 
+def _ffmpeg_executable() -> str | None:
+    """
+    The FFmpeg binary to use: the system one when installed, otherwise the
+    static build shipped by the imageio-ffmpeg wheel. Streamlit Community
+    Cloud installs no apt packages, so the pip-provided binary is what runs
+    there; a local `brew install ffmpeg` still takes precedence.
+    """
+    system = shutil.which("ffmpeg")
+    if system:
+        return system
+    try:
+        import imageio_ffmpeg
+    except ImportError:
+        return None
+    try:
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception as exc:  # imageio raises its own error types
+        logger.warning("imageio-ffmpeg could not provide a binary: %s", exc)
+        return None
+
+
 def ffmpeg_available() -> bool:
-    return shutil.which("ffmpeg") is not None
+    return _ffmpeg_executable() is not None
 
 
 def _render_failure() -> AnalysisFailure:
@@ -190,12 +211,13 @@ def convert_to_h264(source: Path, target: Path, timeout: int = 600) -> bool:
     keeps the mp4v rather than losing the run. +faststart puts the moov atom at
     the front so playback can start early; -an drops the audio.
     """
-    if not ffmpeg_available():
+    executable = _ffmpeg_executable()
+    if executable is None:
         logger.warning("FFmpeg not found - annotated video stays mp4v (may not play in all browsers)")
         return False
 
     command = [
-        "ffmpeg",
+        executable,
         "-y",
         "-v",
         "error",

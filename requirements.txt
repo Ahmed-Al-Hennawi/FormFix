@@ -35,7 +35,15 @@ jaxlib==0.4.30; sys_platform == "darwin"
 # result anyone is expected to reproduce.
 mediapipe==0.10.14; sys_platform != "darwin"
 numpy==1.26.4; sys_platform != "darwin"
-opencv-python==4.10.0.84; sys_platform != "darwin"
+# opencv-python links against libGL, a system package (apt libgl1). Community
+# Cloud installs no apt packages for this app, so the headless build is used
+# instead - the same library without the GUI bindings. Nothing here calls
+# cv2.imshow or cv2.namedWindow.
+opencv-python-headless==4.10.0.84; sys_platform != "darwin"
+
+# FFmpeg as a pip wheel, so the H.264 conversion needs no system package. The
+# system binary still wins when one is installed (see analysis/video_processor).
+imageio-ffmpeg==0.6.0
 
 # --- development -----------------------------------------------------------
 # pytest, ruff and black are used for testing/linting; keep them if you want
@@ -49,9 +57,10 @@ ruff>=0.4
 black==26.5.1
 
 # NOTE: the annotated result video is converted to browser-playable H.264
-# with FFmpeg, which is a system binary, not a pip package. Install it with
-# `brew install ffmpeg` (macOS) or your platform's package manager. Without
-# it the app still works, but the annotated clip may not play in a browser.
+# with FFmpeg. The system binary is used when present (`brew install ffmpeg`
+# on macOS); otherwise the static build from imageio-ffmpeg above is used,
+# which is what runs on Community Cloud. Without either the app still works,
+# but the annotated clip may not play in a browser.
 #
 # NOTE: the MediaPipe Pose Landmarker model file is also required - run
 # `python scripts/download_pose_model.py` once (see README).
