@@ -480,8 +480,16 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 }
 
 .st-key-ff_ax_upload [role="radiogroup"] label {
+  /* equal thirds with the name centred in each - left-aligned labels in
+     unequal pills read as a list rather than as a switch */
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
   margin: 0 !important;
-  padding: 0.55em 1.1em !important;
+  padding: 0.55em 0.9em !important;
   border-radius: 999px;
   font-family: var(--font-display) !important;
   font-weight: 600;
@@ -558,6 +566,24 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzoneInstructions"] small {
   color: var(--ink-60) !important;
   font-family: var(--font-body) !important;
+}
+
+/* Streamlit writes its own "Limit 300MB per file - MP4, MOV, AVI" caption and
+   gives no way to change the words, so the original is collapsed to nothing and
+   a shorter line is put in its place. The formats are already stated twice on
+   this page - the panel note and the hint under the dropzone - so only the size
+   is repeated here. It has to stay in step with maxUploadSize in
+   .streamlit/config.toml. */
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzoneInstructions"] small {
+  font-size: 0 !important;
+  line-height: 0 !important;
+}
+
+.st-key-ff_ax_upload [data-testid="stFileUploaderDropzoneInstructions"] small::after {
+  content: "300MB max";
+  display: block;
+  font-size: 0.78rem;
+  line-height: 1.5;
 }
 
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzoneInstructions"] svg,
@@ -784,7 +810,8 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 /* ==========================================================================
    I - Waiting state
    ========================================================================== */
-.ax-wait { display: flex; flex-direction: column; }
+/* the last preview row sat hard against the card edge */
+.ax-wait { display: flex; flex-direction: column; padding-bottom: 1.1rem; }
 
 p.ax-wait__title, .ax-wait__title {
   font-family: var(--font-display);
@@ -1590,10 +1617,18 @@ p.ax-modal__meta, .ax-modal__meta {
      stretched lozenge */
   .st-key-ff_ax_upload [role="radiogroup"] { border-radius: 18px; padding: 0.35rem; }
 
+  /* the type comes down a notch so all three names still sit on one row as
+     equal thirds - a lone "Lat Pulldown" wrapping onto a second row is the one
+     thing that made this control look untidy on a phone */
   .st-key-ff_ax_upload [role="radiogroup"] label {
-    flex: 1 1 auto;
-    justify-content: center;
-    text-align: center;
+    padding: 0.65em 0.35em !important;
+    font-size: 0.7rem;
+    white-space: nowrap;
+  }
+
+  .st-key-ff_ax_upload [role="radiogroup"] label p {
+    font-size: 0.7rem !important;
+    white-space: nowrap;
   }
 
   .ax-score { gap: 1rem; }
@@ -1982,7 +2017,7 @@ li.ax-na__row, .ax-na__row {
 
 .ax-guide {
   margin: 1rem 0 1.3rem;
-  padding: 1.15rem 1.3rem 1.2rem;
+  padding: 1.15rem 1.3rem 1.5rem;
   border: 1px solid rgba(0, 240, 255, 0.16);
   border-radius: 14px;
   background: linear-gradient(180deg, rgba(28, 37, 65, 0.55), rgba(11, 19, 43, 0.35));
@@ -2046,6 +2081,211 @@ li.ax-guide__tip::before, .ax-guide__tip::before {
   opacity: 0.85;
 }
 
+/* Plan on the left, the three lines on the right. The plan holds its width at
+   the text's expense: it is the part people actually look at. */
+.ax-guide__body {
+  display: flex;
+  align-items: center;
+  gap: 1.15rem;
+}
+
+/* the plan sits in its own tile, so it reads as a figure rather than as
+   loose artwork floating next to the text */
+.ax-guide__plan {
+  flex: 0 0 38%;
+  max-width: 180px;
+  min-width: 0;
+  padding: 0.5rem 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 12px;
+  background: radial-gradient(circle at 50% 46%, rgba(0, 240, 255, 0.07), rgba(11, 19, 43, 0) 72%);
+}
+
+.ax-guide__words {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Height and distance ride under the tips as chips rather than as two more
+   sentences - they are settings, not instructions. */
+.ax-guide__set {
+  display: flex;
+  flex-wrap: wrap;
+  /* the two chips read as one lozenge when they sit this close together */
+  gap: 0.9rem;
+  margin: 2.4rem 0 0.35rem;
+  padding: 0;
+  list-style: none;
+}
+
+li.ax-guide__chip, .ax-guide__chip {
+  padding: 0.2rem 0.55rem;
+  border: 1px solid rgba(0, 240, 255, 0.22);
+  border-radius: 999px;
+  font-size: 0.7rem;
+  letter-spacing: 0.04em;
+  color: rgba(255, 255, 255, 0.66);
+  background: rgba(0, 240, 255, 0.05);
+}
+
+/* Below this the upload column is too narrow to hold a diagram and a sentence
+   side by side without the sentence breaking after two words, so the plan goes
+   on top. Most people upload from a phone, so this is the layout that matters:
+   the whole panel has to be readable without pinching or scrolling sideways. */
+@media (max-width: 900px) {
+  .ax-guide {
+    padding: 1rem 1rem 1.35rem;
+  }
+
+  .ax-guide__body {
+    flex-direction: column;
+    align-items: center;
+    gap: 0.85rem;
+  }
+
+  .ax-guide__plan {
+    flex: 0 0 auto;
+    width: 100%;
+    max-width: 172px;
+  }
+
+  .ax-guide__words {
+    width: 100%;
+  }
+
+  /* the view is the headline on a phone, so it gets its own line under the
+     label rather than being squeezed against it and wrapping mid-phrase */
+  p.ax-guide__head, .ax-guide__head {
+    display: block;
+    margin-bottom: 0.8rem;
+  }
+
+  .ax-guide__head .ax-guide__view {
+    display: block;
+    margin-top: 0.2rem;
+    font-size: 0.78rem;
+  }
+
+  li.ax-guide__tip, .ax-guide__tip {
+    padding-left: 1.35rem;
+    font-size: 0.86rem;
+  }
+
+  ul.ax-guide__tips, .ax-guide__tips {
+    gap: 0.55rem;
+  }
+
+  .ax-guide__set {
+    margin-top: 2.1rem;
+  }
+}
+
+
+/* ---------------------------------------------------------------------------
+   Camera plan
+   The bird's-eye diagram inside the guidance panel, drawn by utils/camera_guide.
+   Lime is where to stand - the same lime the app uses for "this is right"
+   everywhere else - and cyan is what the camera can see from there.
+   --------------------------------------------------------------------------- */
+
+svg.cg-plan, .cg-plan {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+/* every position the camera could take */
+.cg-orbit {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.16);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 7;
+  stroke-linecap: round;
+}
+
+/* the stretch of it this exercise can be measured from */
+.cg-band {
+  fill: none;
+  stroke: var(--lime, #39ff14);
+  stroke-width: 5;
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+
+/* the mirror image, when the other side works just as well */
+.cg-band--alt {
+  opacity: 0.26;
+  stroke-width: 4;
+  stroke-dasharray: 5 7;
+}
+
+.cg-cone {
+  fill: var(--cg-cone-fill);
+}
+
+.cg-figure__ground {
+  fill: rgba(0, 240, 255, 0.05);
+}
+
+.cg-figure__shoulders {
+  fill: #1c2541;
+  stroke: rgba(0, 240, 255, 0.5);
+  stroke-width: 1.4;
+}
+
+.cg-figure__head {
+  fill: #0b132b;
+  stroke: var(--cyan, #00f0ff);
+  stroke-width: 1.8;
+}
+
+/* which way the person is facing - without it the plan is ambiguous */
+.cg-figure__facing,
+.cg-figure__nose {
+  fill: none;
+  stroke: rgba(0, 240, 255, 0.55);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.cg-kit__bar {
+  stroke: rgba(255, 255, 255, 0.34);
+  stroke-width: 3;
+  stroke-linecap: round;
+}
+
+.cg-kit__plate {
+  fill: rgba(255, 255, 255, 0.24);
+}
+
+.cg-kit__pad,
+.cg-kit__frame {
+  fill: rgba(255, 255, 255, 0.07);
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 1.2;
+}
+
+.cg-kit__cable {
+  stroke: rgba(255, 255, 255, 0.26);
+  stroke-width: 1.4;
+  stroke-dasharray: 3 4;
+}
+
+.cg-cam__body {
+  fill: #0b132b;
+  stroke: var(--lime, #39ff14);
+  stroke-width: 1.8;
+}
+
+.cg-cam__lens {
+  fill: var(--lime, #39ff14);
+}
+
+.cg-cam__screen {
+  fill: rgba(57, 255, 20, 0.16);
+}
+
 
 /* ==========================================================================
    S - Analysis details ("How did FormFix detect this?")
@@ -2054,11 +2294,13 @@ li.ax-guide__tip::before, .ax-guide__tip::before {
    the same radii and the same type scale as everything else.
    ========================================================================== */
 
+/* the expander's own header sits directly above this, so it needs air at the
+   top or it reads as part of the header rather than as the first line inside */
 p.ax-details__lede, .ax-details__lede {
   color: var(--ink-60);
   font-size: 0.9rem;
   line-height: 1.55;
-  margin: 0 0 0.9rem;
+  margin: 0.7rem 0 1rem;
   max-width: 62ch;
 }
 

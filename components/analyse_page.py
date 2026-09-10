@@ -25,6 +25,7 @@ from utils.analysis import (
     unexpected_failure,
 )
 from utils.assets import LOGO_MARK, asset_url
+from utils.camera_guide import render_camera_plan
 from utils.exercise_data import EXERCISES
 from utils.exercise_data import get as get_exercise
 from utils.helpers import esc, strip
@@ -230,18 +231,47 @@ def _panel_head(number: str, title: str, note: str = "") -> str:
 
 
 def _recording_guidance(exercise) -> str:
-    """"How to record this" - the camera view plus the exercise's own checklist,
-    read from its config so it can't drift from the thresholds validation uses."""
-    if not exercise.recording_tips:
+    """"How to record this" - an overhead plan of where to stand the camera, and
+    three lines beside it. Both come from the exercise's own config, so neither
+    can drift from the thresholds validation uses.
+
+    It is deliberately short. Testers told us the earlier five-line checklist was
+    too much to read before uploading, and filmed from the wrong side anyway; the
+    long version is still what a rejected video comes back with, where the reader
+    has a reason to work through it.
+    """
+    tips = exercise.quick_tips or exercise.recording_tips
+    if not tips:
         return ""
-    items = "".join(f'<li class="ax-guide__tip">{esc(tip)}</li>' for tip in exercise.recording_tips)
+
+    items = "".join(f'<li class="ax-guide__tip">{esc(tip)}</li>' for tip in tips)
+
+    setup = exercise.camera
+    plan = ""
+    chips = ""
+    if setup is not None:
+        label = f"Overhead plan: {exercise.camera_view} camera position for the {exercise.name}"
+        plan = f'<div class="ax-guide__plan">{render_camera_plan(setup, exercise.id, esc(label))}</div>'
+        chips = (
+            '<ul class="ax-guide__set">'
+            f'<li class="ax-guide__chip">{esc(setup.height)}</li>'
+            f'<li class="ax-guide__chip">{esc(setup.distance)}</li>'
+            "</ul>"
+        )
+
     return (
         '<div class="ff-page ax-guide">'
         '  <p class="ax-guide__head">'
         '    <span class="ax-guide__label">How to record</span>'
         f'    <span class="ax-guide__view">{esc(exercise.camera_view)} view</span>'
         "  </p>"
-        f'  <ul class="ax-guide__tips">{items}</ul>'
+        '  <div class="ax-guide__body">'
+        f"    {plan}"
+        '    <div class="ax-guide__words">'
+        f'      <ul class="ax-guide__tips">{items}</ul>'
+        f"      {chips}"
+        "    </div>"
+        "  </div>"
         "</div>"
     )
 
@@ -300,9 +330,8 @@ def _upload_column(stage: str, uploaded) -> None:
         # from the wrong camera position
         html(_recording_guidance(exercise))
 
-        uploader_help = f"{exercise.camera_view} view. " + (
-            exercise.recording_tips[0] if exercise.recording_tips else ""
-        )
+        help_tips = exercise.quick_tips or exercise.recording_tips
+        uploader_help = f"{exercise.camera_view} view. " + (help_tips[0] if help_tips else "")
 
         st.file_uploader(
             "Workout video",
@@ -319,11 +348,9 @@ def _upload_column(stage: str, uploaded) -> None:
                 + " &middot; ".join(f".{ext}" for ext in SUPPORTED_VIDEO_TYPES)
                 + "</p>"
                 # people are uploading video of their own bodies, so say what happens to
-                # it before they do. The wording is precise: the upload really is deleted
-                # when the run finishes, while the annotated clip is swept a few hours later.
-                '<p class="ff-page ax-hint ax-hint--privacy">Your video is deleted as '
-                "soon as it has been analysed, the result is erased a few hours later, "
-                "and no account is needed.</p>"
+                # it before they do
+                '<p class="ff-page ax-hint ax-hint--privacy">Your video is automatically '
+                "deleted right after processing and is never stored.</p>"
             )
             return
 

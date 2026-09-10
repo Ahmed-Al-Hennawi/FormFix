@@ -34,6 +34,7 @@ __all__ = [
     "ANY_VIEW",
     "RECOMMENDED_VIEW",
     "RECORDING_TIPS",
+    "QUICK_TIPS",
     "DEFAULT_CONFIG",
     "DEFAULT_RULES",
     "FRONTAL_VIEWS",
@@ -371,6 +372,15 @@ RECOMMENDED_VIEW = "side-on"
 RECORDING_TIPS: tuple[str, ...] = (
     *RETRY_TIPS,
     "Start standing, perform several full squats, and finish standing.",
+)
+
+# The three lines shown beside the camera diagram before upload. People skim
+# this panel, so it says only what changes whether the analysis can run; the
+# fuller RECORDING_TIPS above are kept for the retry advice after a rejection.
+QUICK_TIPS: tuple[str, ...] = (
+    "Film from the side, level with your hips.",
+    "Fit your whole body in frame, head to feet.",
+    "Keep the camera still. A few full squats is enough.",
 )
 
 

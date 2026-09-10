@@ -230,6 +230,15 @@ RECORDING_TIPS: tuple[str, ...] = (
     "Keep the camera still, and record several controlled repetitions.",
 )
 
+# The three lines shown beside the camera diagram before upload. People skim
+# this panel, so it says only what changes whether the analysis can run; the
+# fuller RECORDING_TIPS above are kept for the retry advice after a rejection.
+QUICK_TIPS: tuple[str, ...] = (
+    "Film from the front, level with your chest.",
+    "Keep both arms and the dumbbells in frame at the top.",
+    "Keep the camera still. A few controlled reps is enough.",
+)
+
 
 # --- Rule specifications ---
 

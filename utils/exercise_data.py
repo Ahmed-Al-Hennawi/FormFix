@@ -14,6 +14,7 @@ from exercises.pulldown import config as pulldown_config
 from exercises.squat import config as squat_config
 
 from . import assets
+from .camera_guide import CameraSetup
 
 # The photographs share this intrinsic coordinate space.
 POSE_VIEWBOX = "0 0 1122 1402"
@@ -58,6 +59,13 @@ class Exercise:
     # recording instructions, imported from the exercise's config rather than
     # retyped, so the advice matches what the analyser enforces
     recording_tips: tuple[str, ...] = field(default=())
+    # the three lines actually shown before upload. The full list above is long
+    # enough that testers skipped it, so the panel gets these and the diagram,
+    # and the full list is kept for the retry advice after a rejection.
+    quick_tips: tuple[str, ...] = field(default=())
+    # the same camera position as geometry, for the overhead plan drawn beside
+    # the tips. Kept next to camera_view so the words and the picture agree.
+    camera: CameraSetup | None = None
     # clip length the analyser accepts, also read from the exercise config
     min_duration: float = 0.0
     max_duration: float = 0.0
@@ -98,6 +106,17 @@ SQUAT = Exercise(
     ),
     camera_view="Side-on",
     recording_tips=squat_config.RECORDING_TIPS,
+    quick_tips=squat_config.QUICK_TIPS,
+    # square to the side of the bar: depth and torso lean are only measurable
+    # from the sagittal plane, and either side of the lifter serves equally
+    camera=CameraSetup(
+        angle=90,
+        arc=(72, 108),
+        height="Hip height",
+        distance="2-3 m back",
+        equipment="barbell",
+        either_side=True,
+    ),
     min_duration=squat_config.DEFAULT_CONFIG.VIDEO_MIN_DURATION,
     max_duration=squat_config.DEFAULT_CONFIG.VIDEO_MAX_DURATION,
     pose=Pose(
@@ -159,6 +178,16 @@ PRESS = Exercise(
     rules=("press_symmetry", "press_alignment", "press_rom"),
     camera_view="Front-on",
     recording_tips=press_config.RECORDING_TIPS,
+    quick_tips=press_config.QUICK_TIPS,
+    # straight in front: the press rules compare the left arm against the right,
+    # so both have to be equally visible
+    camera=CameraSetup(
+        angle=0,
+        arc=(-22, 22),
+        height="Chest height",
+        distance="2-3 m back",
+        equipment="bench",
+    ),
     min_duration=press_config.DEFAULT_CONFIG.VIDEO_MIN_DURATION,
     max_duration=press_config.DEFAULT_CONFIG.VIDEO_MAX_DURATION,
     pose=Pose(
@@ -219,6 +248,20 @@ PULLDOWN = Exercise(
     rules=("pulldown_rom", "pulldown_torso"),
     camera_view="Side or three-quarter",
     recording_tips=pulldown_config.RECORDING_TIPS,
+    quick_tips=pulldown_config.QUICK_TIPS,
+    # square-on at the side, or rotated back from there towards the rear
+    # shoulder - never forward, where the machine frame, the bar and the weight
+    # stack sit between the lens and the body. Past about 135 degrees the head
+    # is lost and the torso rule can only report the size of a lean, not which
+    # way it went.
+    camera=CameraSetup(
+        angle=108,
+        arc=(80, 135),
+        height="Chest height",
+        distance="2-3 m back",
+        equipment="machine",
+        either_side=True,
+    ),
     min_duration=pulldown_config.DEFAULT_CONFIG.VIDEO_MIN_DURATION,
     max_duration=pulldown_config.DEFAULT_CONFIG.VIDEO_MAX_DURATION,
     pose=Pose(

@@ -301,8 +301,7 @@ def detection_markup(result: AnalysisResult, technical: bool = False) -> str:
         "reading one measurement, taken from specific body landmarks during a specific "
         "part of the movement."
         if technical
-        else "Everything FormFix found in this set, including the smaller points that did "
-        "not make the list above - each with the one thing to try next time."
+        else "Every finding, smaller ones included - each with one thing to try next time."
     )
     return f'<p class="ax-empty-note">{lede}</p><div class="ax-exs">{top}{rest}</div>'
 
@@ -637,9 +636,8 @@ def _analysis_details(result: AnalysisResult, debug_mode: bool) -> None:
     with st.container(key="ff_ax_tech"):
         with st.expander("See the full detail - how FormFix measured every rep", expanded=False):
             html(
-                '<p class="ax-details__lede">Everything behind the summary above: how each '
-                "finding was detected, how every repetition scored, and which checks could "
-                "not be assessed from this recording.</p>"
+                '<p class="ax-details__lede">How each finding was detected, how every rep '
+                "scored, and what this recording could not answer.</p>"
             )
             html(
                 '<div class="ax-details">'
