@@ -1,159 +1,113 @@
 # Choosing the smoothing filter
 
-## Why this needed measuring rather than deciding
+## The problem
 
-FormFix reads its two most consequential squat numbers at the two turning
-points of the knee-angle signal: the depth reached at the bottom, and the
-extension reached at the top. Turning points are the worst place for a causal
-smoothing filter. It rounds the extreme off and reports it late, so the depth
-FormFix sees is systematically **shallower** than the depth that happened —
-and shallower is the direction that produces false findings, because it makes
-a good repetition look like a shallow one.
+FormFix reads its two most important squat numbers at the turning points of
+the knee angle: depth at the bottom and extension at the top. Turning points
+are exactly where a causal filter (like an EMA) is worst - it rounds off the
+peak and reports it late. So the depth FormFix sees is a bit **shallower** than
+what really happened, which is the direction that creates false "too shallow"
+findings.
 
-FormFix's default has always been an exponential moving average, which is
-causal. That was never argued for; it was just the obvious first choice.
+My default was an EMA just because it was the obvious first choice.
 
-Dill et al. (2024) hit the same problem from the measurement side. Grid-
-searching a moving-average, a Butterworth low-pass and a Savitzky–Golay filter
-over MediaPipe squat data, they noted that the moving average "suffer[s] from
-the fact that the squat movement features two sudden shifts in direction, when
-the subject reaches the highest and lowest point of the movement, leading to a
-visible delay in the filtered signal", and selected a **4th-order Butterworth
-low-pass at 2 Hz** instead.
+Dill et al. (2024) had the same issue. They compared a moving average, a
+Butterworth low-pass and a Savitzky-Golay filter on MediaPipe squat data,
+said the moving average shows "a visible delay in the filtered signal" at the
+top and bottom, and chose a **4th-order Butterworth at 2 Hz**.
 
-The obvious move is to adopt their answer. This document is why that would
-have been wrong, and what was done instead.
+I didn't just copy their choice, because we care about different things.
 
-## The criterion is not the same one
+## Different criterion
 
-Dill et al. selected on overall landmark RMSE across the whole recording.
-FormFix's criterion is narrower: the bias in **one number, at one instant, on
-each repetition**. A filter can be better on the first and worse on the
-second, and the comparison is cheap to run, so it was run.
+Dill et al. picked the filter with the lowest overall landmark error across
+the whole recording. I care about the error in **one number per rep**. A filter
+can be better at one and worse at the other, so I tested it.
 
-`scripts/compare_filters.py` puts each filter over synthetic knee-angle traces
-whose true minimum is known by construction, at 30 fps with 1.5° of landmark
-noise, across three repetition rates and two shapes of turnaround:
+`scripts/compare_filters.py` runs each filter on synthetic knee-angle traces
+where the true minimum is known, at 30 fps with 1.5° of noise, at three speeds
+and two shapes:
 
-* **smooth** — a sinusoid: a controlled repetition that pauses at the bottom.
-  Nearly all of its energy is below 2 Hz.
-* **cusped** — a triangle: the athlete reverses direction sharply with no
-  pause. A corner contains energy at every frequency.
+- **smooth** - a sine wave, like a controlled rep with a pause at the bottom
+- **cusped** - a triangle, like bouncing straight out of the bottom
 
-## What it measured
+## Results
 
-Depth bias in degrees. Positive means the filter reports a **shallower** squat
-than was performed.
+Depth bias in degrees (positive = reported **shallower** than it was).
 
 **Smooth (paused bottom)**
 
 | Filter | 0.33 Hz | 0.5 Hz | 1.0 Hz |
 | --- | ---: | ---: | ---: |
-| EMA (FormFix default) | −1.09 | −0.40 | +0.87 |
-| Moving average w=5 (trailing) | +0.42 | −0.24 | +1.70 |
-| **Butterworth 4th/2 Hz zero-phase** | **+0.04** | **−0.03** | **+0.25** |
-| Savitzky–Golay 9/2 | −1.11 | +0.16 | −0.57 |
+| EMA (default) | −1.09 | −0.40 | +0.87 |
+| Moving average (5, trailing) | +0.42 | −0.24 | +1.70 |
+| **Butterworth 4th order, 2 Hz** | **+0.04** | **−0.03** | **+0.25** |
+| Savitzky-Golay (9, 2) | −1.11 | +0.16 | −0.57 |
 
-**Cusped (sharp reversal)**
+**Cusped (sharp bounce)**
 
 | Filter | 0.33 Hz | 0.5 Hz | 1.0 Hz |
 | --- | ---: | ---: | ---: |
-| EMA (FormFix default) | +1.40 | +2.47 | +4.53 |
-| Moving average w=5 (trailing) | +1.65 | +3.49 | +6.94 |
-| Butterworth 4th/2 Hz zero-phase | +2.63 | +3.61 | **+7.67** |
-| **Savitzky–Golay 9/2** | +1.58 | **+2.27** | **+3.27** |
+| EMA (default) | +1.40 | +2.47 | +4.53 |
+| Moving average (5, trailing) | +1.65 | +3.49 | +6.94 |
+| Butterworth 4th order, 2 Hz | +2.63 | +3.61 | **+7.67** |
+| **Savitzky-Golay (9, 2)** | +1.58 | **+2.27** | **+3.27** |
 
-## The finding
+## What I found
 
-**The ranking reverses between the two shapes.** The 2 Hz Butterworth is
-essentially unbiased on a smooth repetition — better than everything else by
-an order of magnitude — and the *worst* of the four on a sharp one, worse even
-than the trailing moving average that Dill et al. rejected.
+**The ranking flips between the two shapes.** The Butterworth is almost
+perfect on a smooth rep and the *worst* on a sharp one - worse than the moving
+average Dill et al. rejected. A sharp bounce has real signal above 2 Hz, and a
+2 Hz filter removes it with the noise. Their recordings were supervised lab
+squats (smooth); a beginner filming on a phone often bounces.
 
-The reason is not subtle once stated: a sharp reversal carries real signal
-above 2 Hz, and a 2 Hz low-pass removes it along with the noise. Dill et al.'s
-recordings were made under laboratory supervision to a defined protocol, where
-repetitions are smooth. A beginner filming themselves on a phone does not
-reverse smoothly, and the sharper the reversal the more depth a low-pass
-filter eats.
+Savitzky-Golay is never the worst - it fits a curve through each window
+instead of averaging it flat, so it keeps peaks better. Its worst case (+3.27°)
+is the smallest of the four.
 
-Savitzky–Golay is the only filter that is never worst. It fits a polynomial
-through each window and evaluates it, rather than averaging the window flat,
-so it preserves the height of an extreme far better than any filter of
-comparable smoothing power. Its worst case (+3.27°) is the smallest worst case
-of the four.
+## What I did
 
-## What FormFix does with that
+1. **The filter is a setting.** `ANGLE_FILTER` can be `ema`, `butterworth`,
+   `savgol` or `moving_average`, and the evaluation script has `--filter`.
+2. **The default stays `ema`.** Changing it would change every result so far,
+   and I have no labelled videos to justify it. Savitzky-Golay is *probably*
+   better, but "probably, on synthetic data" isn't enough to change a default.
+3. **The bias goes into the verdict.** Each filter's worst-case depth bias is in
+   `analysis/filters.py` (`MEASURED_DEPTH_BIAS_DEG`) and is added to the depth
+   error band: √(10.7² + 4.53²) = 11.6° for the EMA
+   ([measurement_uncertainty.md](measurement_uncertainty.md)).
 
-Three things, and deliberately not a silent swap of the default.
+## How it's implemented
 
-**1. The filter is a configuration value.** `ANGLE_FILTER` in each exercise's
-config takes `"ema"`, `"butterworth"`, `"savgol"` or `"moving_average"`, and
-the evaluation harness takes `--filter` so a manifest can be run under each.
-A question this open should be a setting, not a decision buried in a pipeline.
+No SciPy - it isn't in the requirements, and the macOS install is pinned to
+NumPy 1 for MediaPipe, so I didn't want to risk it for one function.
+`analysis/filters.py` builds the Butterworth from the bilinear transform, does
+forward-backward filtering for zero lag, and builds the Savitzky-Golay kernel
+from a least-squares fit.
 
-**2. The default is unchanged.** It stays `"ema"`. Changing it would
-invalidate every result FormFix has produced so far, and there are no labelled
-recordings against which the change could be justified — the same rule the
-threshold tuning log already imposes on itself. The evidence above says
-Savitzky–Golay is probably the better choice; "probably, on synthetic data"
-is not enough to move a default.
+Because I wrote it myself, `tests/test_filters.py` checks it against known
+maths rather than saved output:
 
-**3. The residual bias is carried into the verdict.** This is the part that
-matters. Each filter's measured worst-case depth bias lives in
-`analysis/filters.py::MEASURED_DEPTH_BIAS_DEG` and is added, in quadrature, to
-the depth measurement's uncertainty band. With the default EMA the depth band
-is `√(10.7² + 4.53²) = 11.6°` rather than 10.7°. The cost of the smoothing
-choice therefore reaches the point of decision instead of being described in a
-document nobody reads while the verdict is being formed. See
-[measurement uncertainty](measurement_uncertainty.md).
+- Butterworth gain is 1 at DC, −3.01 dB at the cut-off and 0 at Nyquist
+- forward-backward filtering doesn't move a peak; a single pass does
+- a quadratic passes through Savitzky-Golay unchanged, including the ends
+- noise is reduced by the theoretical √(2/15)
+- gaps in tracking stay gaps - no filter draws a landmark through them
 
-## The implementation
+The Butterworth is also used (separately) to smooth the skeleton drawn on the
+result video. That's display only and doesn't change any measurement.
 
-No new dependency. SciPy is not in `requirements.txt`, and the macOS install
-is pinned to a NumPy-1 ABI for MediaPipe's sake, so pulling SciPy in for
-`filtfilt` would risk the one fragile part of the install for one function.
-`analysis/filters.py` therefore derives the Butterworth cascade from the
-bilinear transform of the analogue prototype, implements forward–backward
-filtering for zero phase, and builds the Savitzky–Golay kernel from the
-pseudo-inverse of the window's Vandermonde matrix.
-
-Because it is written rather than imported, it is tested against behaviour
-that is known analytically rather than against a stored snapshot of its own
-output (`tests/test_filters.py`):
-
-* DC gain exactly 1, response exactly −3.0103 dB at the cut-off, exactly zero
-  at Nyquist, monotonic roll-off throughout — the defining properties of a
-  Butterworth, any of which a coefficient error would break.
-* Forward–backward filtering leaves an asymmetric pulse's peak at the frame it
-  started on; a single forward pass moves it later.
-* A quadratic survives a quadratic Savitzky–Golay filter exactly, at every
-  sample including the first and last. (This is what forced proper end
-  handling: padding the ends fabricates samples, and for a curved signal it
-  fabricates them wrongly. The first and last windows are fitted once and
-  evaluated off-centre instead.)
-* Noise is reduced by the factor theory predicts, `√(2/15)`, not merely "by
-  some amount".
-* Every filter leaves a tracked-landmark gap as a gap. Each contiguous run of
-  finite samples is filtered independently, so no filter can draw a landmark
-  through a stretch where nobody was detected — the rule the rest of the
-  pipeline already follows.
-
-## Reproducing the table
+## Reproduce
 
 ```bash
-python scripts/compare_filters.py                        # the table above
-python scripts/compare_filters.py --noise 3.0            # heavier landmark noise
+python scripts/compare_filters.py                 # the tables above
+python scripts/compare_filters.py --noise 3.0     # more noise
 python scripts/compare_filters.py --csv evaluation/filters.csv
 ```
 
-## Honest limits of this comparison
+## Limits
 
-The traces are synthetic. That is deliberate — the true minimum has to be
-known exactly for a bias to be measurable at all, and no real recording comes
-with one — but it means these numbers describe how each filter behaves on a
-*model* of a squat, not on a squat. The two shapes were chosen to bracket real
-execution rather than to represent it. What the comparison establishes is that
-the ranking is shape-dependent, which is enough to justify making the filter a
-setting; it does not establish which filter is best for real athletes, and
-nothing here should be quoted as though it did.
+The traces are synthetic on purpose - you need the true minimum to measure a
+bias, and real videos don't come with one. So this shows the ranking depends on
+the rep shape (enough to make the filter a setting), not which filter is best
+for real people.

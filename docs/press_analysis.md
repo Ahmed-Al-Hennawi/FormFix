@@ -1,278 +1,176 @@
-# The FormFix dumbbell shoulder-press analyser — technical documentation
+# Dumbbell shoulder press analyser
 
-This document is the reference for the shoulder-press implementation: what it
-measures, how it decides, what every threshold means and where it came from,
-and what it deliberately does not claim.
-
-Companion documents: `squat_analysis.md`, `pulldown_analysis.md`,
-`threshold_tuning.md` and `limitations.md`.
+What the press analyser measures, how it decides, where the thresholds come
+from, and what it doesn't claim.
 
 ---
 
-## 1. Exercise variant
+## 1. Which press
 
-The analysis is written for the movement the FormFix reference clip
-demonstrates:
+Written for the movement in the reference clip:
 
-> A **seated dumbbell shoulder press with the back supported**, a **pronated
-> grip**, both arms pressing **together**, from about shoulder height to
-> overhead.
+> **Seated dumbbell press, back supported, overhand grip, both arms together,
+> from shoulder height to overhead.**
 
-An Arnold press rotates the forearm through the movement; a neutral-grip press
-changes the frontal-plane geometry the alignment rule measures; a single-arm
-press breaks the assumption that both arms are doing the same thing at the
-same time; a standing or push press adds trunk and leg motion the seated model
-does not describe. The rules below would misdescribe those variations.
+Arnold, neutral-grip, single-arm and standing presses move differently and the
+rules would describe them wrongly.
 
 ---
 
 ## 2. Pipeline
 
 ```
-video file
-   → probe metadata                     analysis/video_processor.py
-   → file validation                    analysis/validation.py
-   → pose detection (MediaPipe VIDEO)   analysis/pose_detector.py
-   → recording validation               analysis/validation.py
-   → short-gap interpolation + EMA      analysis/smoothing.py
-   → per-frame measurement              exercises/press/metrics.py
-   → repetition state machine           exercises/common/phases.py
-   → per-repetition measurement         exercises/press/metrics.py
-   → rule evaluation (view-gated)       exercises/press/rules.py
-   → reliability per measurement        exercises/common/confidence.py
-   → explainable feedback               exercises/press/feedback.py
-   → annotated video                    analysis/annotation.py
-   → JSON / CSV export                  analysis/export.py
+video -> check file -> MediaPipe pose -> check recording -> gap filling + EMA
+ -> measure every frame -> count reps (shared state machine)
+ -> per-rep measurements -> rules (camera-gated) -> reliability
+ -> feedback -> annotated video -> JSON/CSV export
 ```
 
 ---
 
-## 3. Camera view
+## 3. Camera
 
-**Required: a front-on view, roughly level with the chest, camera centred.**
+**Film from the front, level with your chest.** Two of the three checks compare
+your arms, and from the side one arm hides the other. The wrist-over-elbow
+check also can't work from the side, because that direction is depth. Only the
+range-of-motion check works from any angle.
 
-Two of the three checks are comparisons *between* the arms. From the side one
-arm hides the other, so the measured "difference" between them would be
-describing the camera angle rather than the athlete. The wrist-over-elbow
-alignment check has the same problem: from the side, the horizontal
-relationship between wrist and elbow is depth, which one RGB camera cannot
-resolve. Only the range-of-motion check — a single arm's joint angle — survives
-a side-on recording.
+This is the opposite of the squat, and it's just a setting in the validation:
 
-This is the mirror image of the squat's camera policy, and the generalised
-validation layer expresses it as configuration rather than as a special case:
-
-| Camera estimate | Arm symmetry | Elbow/wrist alignment | Range of motion |
+| Camera | Symmetry | Alignment | Range of motion |
 | --- | --- | --- | --- |
-| Front-on | assessed, full view support | assessed, full view support | assessed |
-| Diagonal | assessed, reduced reliability | assessed, reduced reliability | assessed |
-| Side-on | **not assessed**, with the reason | **not assessed**, with the reason | assessed |
-| Unknown | assessed, reduced reliability | assessed, reduced reliability | assessed |
+| Front | assessed | assessed | assessed |
+| Diagonal | lower reliability | lower reliability | assessed |
+| Side | **not assessed** | **not assessed** | assessed |
 
-A side-on press recording is therefore still analysed and still scored — on the
-one check it can support — and the other two report what they could not see.
+For these front-view checks, a nearly side-on diagonal is the *bad* case, so
+they use `1 - side_view_confidence`. (Using the same number as the side-view
+checks gave the worst angles the highest confidence.)
 
-### A subtlety worth recording
-
-`side_view_confidence` measures how *side-on* the camera is. For a sagittal
-measurement such as trunk lean, a diagonal recording that is nearly side-on is
-the good case and scores high. For a **frontal-plane** measurement such as
-comparing two arms, nearly side-on is the *bad* case, and using the same
-number unchanged would credit the worst diagonal recordings with the highest
-confidence. `common.confidence.view_support` therefore takes a `frontal_plane`
-flag and scores the complement for those metrics
-(`tests/test_press_rules.py::TestFrontalPlaneViewSupport`).
+The press also uses tighter camera bands than the squat (0.35 / 0.70), because
+a straight front view only reaches a ratio of about 0.8 - with the squat's
+bands, good front-on videos were classed as diagonal.
 
 ---
 
 ## 4. Landmarks
 
-| Role | MediaPipe landmarks | Used for |
+| Role | Landmarks | Used for |
 | --- | --- | --- |
-| Shoulders | `LEFT_SHOULDER` (11), `RIGHT_SHOULDER` (12) | elbow angle, height reference, **shoulder width** |
-| Elbows | `LEFT_ELBOW` (13), `RIGHT_ELBOW` (14) | elbow angle, alignment offset, elbow height |
-| Wrists | `LEFT_WRIST` (15), `RIGHT_WRIST` (16) | elbow angle, alignment offset, wrist height |
-| Hips | `LEFT_HIP` (23), `RIGHT_HIP` (24) | scale fallback only, when the shoulders overlap |
+| Shoulders | 11, 12 | elbow angle, height reference, **shoulder width** |
+| Elbows | 13, 14 | elbow angle, alignment |
+| Wrists | 15, 16 | elbow angle, alignment, wrist height |
+| Hips | 23, 24 | only a backup scale when the shoulders overlap |
 
-The dumbbells are not tracked. A dumbbell that hides a wrist therefore shows up
-as a *visibility* problem — reported as "not assessed" — rather than as a wrong
-number.
+The dumbbells aren't tracked. If one hides a wrist, that check is "not
+assessed" rather than a wrong number.
 
 ---
 
-## 5. Measurements and normalisation
+## 5. Measurements
 
-| Measurement | Definition | Units |
-| --- | --- | --- |
-| `left/right_elbow_angle` | shoulder → elbow → wrist interior angle | degrees |
-| `elbow_flexion` | 180° − mean elbow angle — **the movement signal** | degrees |
-| `elbow_angle_difference` | \|left − right\| elbow angle | degrees |
-| `left/right_wrist_height` | wrist height above the shoulder line ÷ shoulder width | dimensionless |
-| `wrist_height_difference` | left − right; **positive means the left wrist is higher** | dimensionless |
-| `left/right_elbow_height` | the same for the elbows | dimensionless (exported) |
-| `left/right_alignment_offset` | \|wrist x − elbow x\| ÷ shoulder width | dimensionless |
-| `shoulder_width` | shoulder-to-shoulder distance | pixels |
+| Measurement | What it is |
+| --- | --- |
+| `elbow_angle` (each arm) | shoulder-elbow-wrist |
+| `elbow_flexion` | 180° - elbow angle - **the signal used to count reps** |
+| `elbow_angle_difference` | \|left - right\| |
+| `wrist_height` (each arm) | height above the shoulders / shoulder width |
+| `wrist_height_difference` | left - right (positive = left higher) |
+| `alignment_offset` (each arm) | \|wrist x - elbow x\| / shoulder width |
 
-### Why shoulder width is the scale reference
+**Why shoulder width:** these are all measured in the plane facing the camera,
+and shoulder width is in that plane. Trunk length looks shorter as soon as you
+lean. It also gives the thresholds a real meaning: shoulder width is about
+0.40 m, so 0.38 shoulder widths ≈ 15 cm.
 
-Both normalised measurements are relationships in the plane facing the camera,
-and shoulder width is the body dimension measured in that same plane. Trunk
-length foreshortens the moment the athlete leans or the seat reclines, which
-would make the "normalised" values drift during the very phase they are read
-in. Using shoulder width also gives the thresholds a physical reading: an adult
-shoulder width is roughly 0.40 m, so an offset of 0.38 shoulder widths is
-about 15 cm of horizontal wrist-to-elbow displacement.
-
-A guard exists for the near side-on case, where the apparent shoulder
-separation collapses towards zero and every normalised value would explode: the
-trunk-derived estimate is used as a floor. The frontal-plane rules are already
-reporting "not assessed" for such a recording, so the guard exists to keep the
-*exported numbers* finite and comparable, not to rescue a verdict.
+If you turn side-on the shoulder width shrinks towards zero, so the trunk
+length is used as a floor - just to keep the exported numbers sensible.
 
 ---
 
-## 6. Repetition detection
+## 6. Counting reps
+
+The press moves **up** while the others move down, but using elbow **flexion**
+(180° - angle) gives the same "high at rest, drops into the rep" shape, so it
+reuses the shared state machine unchanged.
+
+The thresholds are adaptive (same reason as the pulldown - someone who never
+locks out still needs their reps counted):
 
 ```
-READY (at the shoulders) → PRESSING → TOP → LOWERING → READY
-                                        ↑_______________|
+reference = 90th percentile of flexion, clamped to 45-140°
+rest = ref - 6°   start = ref - 14°   top = ref - 30°   end = ref - 10°
 ```
 
-The press travels **upwards** where the squat and pulldown travel down, so it
-would appear to need its own state machine. It does not: expressing the
-movement as elbow **flexion** (180° − elbow angle) gives the same "high at
-rest, falling into the repetition" shape the shared machine expects, and the
-press reuses it unchanged. One machine, one set of robustness guarantees, one
-set of tests.
+**Where top and bottom are measured:**
 
-The thresholds are adaptive for the same reason as the pulldown's — an athlete
-who never reaches lockout must still have their repetitions counted, or the
-range-of-motion rule meant to notice that habit would never run:
-
-```
-reference     = 90th percentile of the measured flexion series,
-                clamped to [45°, 140°]
-rest level    = reference − 6°
-start level   = reference − 14°
-extreme level = reference − 30°
-end level     = reference − 10°
-```
-
-### Where the top and bottom are read
-
-Neither is read at the repetition's own boundary frames. The state machine
-commits a repetition once the press has clearly begun, a fraction of a second
-*after* the athlete left the bottom position; reading the bottom angle there
-would over-report everyone's depth. The bottom is therefore measured in the
-rest windows on either side of the repetition, bounded by the neighbouring
-repetitions so one rep can never borrow another's depth.
-
-Each arm's **top** extension is the best value *it* sustained anywhere in the
-repetition, not the value both arms happened to hold during a shared window.
-If one arm arrives a fraction of a second later, a shared window would read the
-late arm mid-press and report a limited range for a repetition whose only fault
-is timing — which the symmetry rule is already there to say. Measuring each arm
-on its own terms keeps the two checks answering two different questions
-(`tests/test_press_metrics.py::TestRepMeasurements`).
+- The **bottom** is read in the rest frames either side of the rep, not the
+  rep's first frame - the rep only starts once you're already pressing, which
+  would hide a shallow press.
+- The **top** is each arm's own best held value. If one arm arrives later, a
+  shared window would give it a range fault for what is really a timing issue
+  (which the symmetry rule already reports).
 
 ---
 
 ## 7. Rules
 
-### Rule table
-
-| Field | `press_symmetry` | `press_alignment` | `press_rom` |
+| | `press_symmetry` | `press_alignment` | `press_rom` |
 | --- | --- | --- | --- |
-| **Rule ID** | `press_symmetry` | `press_alignment` | `press_rom` |
-| **Exercise** | Shoulder Press | Shoulder Press | Shoulder Press |
-| **Mistake** | One arm leads, lags or travels less than the other | A wrist drifts away from being stacked over its elbow | Incomplete range of motion, reported as *which end* fell short |
-| **Camera view** | Front-on or diagonal only | Front-on or diagonal only | Any; reliability reduced when the view is uncertain |
-| **Required landmarks** | 11/12 shoulders, 13/14 elbows, 15/16 wrists (**both** arms) | shoulder, elbow, wrist of the judged side | shoulder, elbow, wrist |
-| **Phase** | the press and the overhead position | the press and the overhead position | whole repetition (bottom read in the rest windows either side) |
-| **Measurement** | three interpretable signals: \|left − right\| elbow angle; \|left − right\| wrist height ÷ shoulder width; \|left ROM − right ROM\| | \|wrist x − elbow x\| ÷ shoulder width, per arm, worst side reported | elbow angle overhead and at the shoulders, and the excursion between them |
-| **Threshold** | angle warn 15° / fail 25°; height warn 0.12 / fail 0.20 shoulder widths; ROM warn 15° / fail 25° | warn 0.38, fail 0.52 shoulder widths | top ≥ 155° (warn below 143°); bottom ≤ 100° (warn above 115°); excursion ≥ 50° |
-| **Persistence** | ≥ 5 consecutive frames **and** ≥ 25% of the phase (either in-movement signal may carry it; a whole-repetition range difference also qualifies) | ≥ 5 consecutive frames **and** ≥ 25% of the phase | per-repetition extremes, already sustained-filtered (3 consecutive frames) |
-| **Confidence requirement** | both arms usable on ≥ 60% of the repetition, and mean arm visibility ≥ 0.5 | the **best** side's elbow/wrist pair ≥ 0.5 — one visible arm is enough, since the sides are judged independently | landmark visibility floor 0.4 |
-| **Rationale** | Three separate interpretable signals rather than one combined index: a beginner can act on "your left arm stayed lower" and cannot act on "symmetry score 0.72". The angle and height signals describe the movement *while* it happens; the range difference catches an arm that travels the same way but not as far. | In the frontal plane the wrist should stay reasonably stacked over its own elbow. Normalising by shoulder width makes the measure independent of camera distance, resolution and body size. The sides are judged independently because a drift usually belongs to one arm, and averaging would hide it. | Judging both ends separately distinguishes "stopping short of overhead" from "not lowering the dumbbells back to the shoulders" — different habits, different corrections. |
-| **Feedback** | *"Your right arm stayed higher than your left arm during 2 of your 3 repetitions… a left/right elbow-angle difference of up to about 23°."* → press at a controlled pace, both arms together | *"Your left wrist drifted noticeably away from being stacked over your left elbow… about 46% of your shoulder width."* → keep each dumbbell stacked above its forearm | *"Your presses stopped before reaching the configured top range in 3 of 5 repetitions."* → finish each press through a comfortable, controlled range |
-| **Limitation** | Needs both arms visible simultaneously; a dumbbell that hides a wrist makes the repetition unassessable. A few degrees of asymmetry is normal human movement and also lies inside MediaPipe's estimation error, which is why the bar sits well above zero. | A markedly limited top range necessarily leaves the wrist beside the elbow (see below). Wrist landmarks are among the least reliable when a dumbbell occludes them. | Foreshortening at an oblique angle biases the elbow angle; the top criterion is not 180° and full lockout is never required. |
+| **Fault** | one arm leads, lags or moves less | wrist drifts away from over the elbow | range too short - says which end |
+| **Camera** | front or diagonal | front or diagonal | any |
+| **Measures** | elbow angle difference, wrist height difference, ROM difference | wrist-elbow offset per arm, worst one reported | elbow angle at top and bottom, and the range |
+| **Thresholds** | angle warn 15° / fail 25°; height warn 0.12 / fail 0.20; ROM warn 15° / fail 25° | warn 0.38, fail 0.52 shoulder widths | top ≥ 155° (warn < 143°), bottom ≤ 100° (warn > 115°), range ≥ 50° |
+| **Must last** | ≥ 5 frames and ≥ 25% of the phase | ≥ 5 frames and ≥ 25% | values held for 3 frames |
+| **Needs** | both arms usable on ≥ 60% of the rep | one arm's elbow and wrist visible | visibility ≥ 0.4 |
 
-### A known correlation, stated rather than engineered around
+Symmetry uses three separate signals instead of one score, because "your left
+arm stayed lower" is useful and "symmetry index 0.72" isn't. The thresholds are
+well above zero because nobody presses perfectly evenly and a few degrees is
+inside MediaPipe's error. The top isn't 180° - a locked elbow under load isn't
+the goal.
 
-A repetition that stops well short of overhead *necessarily* leaves the wrist
-beside the elbow, because the elbow is still bent there. The alignment
-measurement and the range-of-motion measurement are therefore **not
-statistically independent**, and a strongly limited press can register both.
+**Alignment and ROM overlap.** A press that stops well short of overhead leaves
+the wrist beside the elbow, because the elbow is still bent. I widened the
+alignment thresholds from 0.30/0.45 to 0.38/0.52 so moderate cases don't get
+reported twice, but a very short press can still trigger both. Read that as one
+habit reported twice.
 
-The tolerance was widened from an initial 0.30/0.45 to 0.38/0.52 for exactly
-this reason (see `threshold_tuning.md`), which removes the overlap for
-moderate cases. It cannot remove it entirely without making the alignment
-check meaningless, so the coupling is documented rather than hidden — and the
-evaluation should read a simultaneous alignment finding on a
-severely-limited-range recording as one habit reported twice, not as two
-independent detections.
+**A hidden arm only costs symmetry.** My first version averaged both arms for
+the alignment check, so a hidden arm switched it off for the visible one. Now
+alignment and ROM work per arm.
 
-### One hidden arm costs only the check that needs both
-
-Symmetry is a comparison and genuinely requires both arms. Alignment judges
-each side independently and reports the worse one, and range of motion is a
-single-arm joint angle — neither should be disabled by a hidden arm. An earlier
-version averaged both arms' visibility into a single alignment gate, which let
-a hidden arm switch the check off for the arm that was perfectly visible;
-`tests/test_press_integration.py::test_one_hidden_arm_costs_only_the_check_that_needs_both`
-pins the corrected behaviour.
-
-### Deliberately not implemented
-
-**Sagittal trunk lean** — the "arching the back" fault. It happens in the plane
-a front-on camera cannot see, and this exercise needs a front-on camera for its
-other checks. Claiming to measure it from this view would be exactly the kind
-of unsupported assessment the project argues against.
-
-**Also not claimed:** shoulder mobility, impingement, scapular mechanics, joint
-loading, injury risk, and any medical or physiotherapeutic assessment.
+**Not included:** trunk lean / arching the back (can't be seen from the front),
+shoulder mobility, impingement, loading, injury risk, or anything medical.
 
 ---
 
-## 8. Failure handling
+## 8. Failures and the video
 
-| Situation | Outcome |
+| Situation | Result |
 | --- | --- |
-| No person detected | `NO_POSE` |
-| Arms not trackable in enough frames | `INSUFFICIENT_VISIBILITY`, naming shoulders, elbows and wrists |
-| Hands leave the top of the frame | warning; range of motion marked not assessed if persistent |
-| One arm hidden | symmetry and alignment not assessed; range of motion still reported |
-| Side-on camera | analysed; symmetry and alignment reported as not assessed, with reasons |
-| No complete repetition | `NO_COMPLETE_REPETITION`, with the partial count and reasons |
-| Video too short / unreadable | `INVALID_VIDEO` |
+| No person | `NO_POSE` |
+| Arms not visible enough | `INSUFFICIENT_VISIBILITY` |
+| One arm hidden | symmetry and alignment not assessed, ROM still reported |
+| Side-on camera | analysed, symmetry and alignment not assessed |
+| No complete rep | `NO_COMPLETE_REPETITION` |
+| Doesn't look like an overhead press | `EXERCISE_MISMATCH` (e.g. a bench press - the wrists never go above the shoulders) |
 
-An unavailable measurement is **never** scored as a failure. A side-on press
-recording with three good repetitions scores 100 on the one check that had
-evidence (`tests/test_press_integration.py::test_a_side_on_recording_is_not_scored_as_a_failure`).
+A check that couldn't be assessed is never scored as a fail - a side-on video
+with three good reps scores 100 on the one check it could do.
 
----
-
-## 9. Annotated output
-
-Both arms are emphasised — a press is a bilateral movement and two of its three
-checks are comparisons — with a HUD showing the repetition counter, the phase
-and both live elbow angles, a `TOP` marker across the wrists during the
-overhead window, and an issue banner only around the evidence frame of a
-finding. An alignment finding highlights the arm it is about; a symmetry or
-range finding highlights both.
+The annotated video only draws the upper body. An alignment finding rings the
+arm it's about; symmetry and ROM findings ring both.
 
 ---
 
-## 10. Testing
+## 9. Tests
 
 | File | Covers |
 | --- | --- |
-| `tests/test_common_phases.py` | the shared state machine |
-| `tests/test_press_metrics.py` | measurement, normalisation, scale guard, segmentation, per-rep facts |
-| `tests/test_press_rules.py` | all three rules and their view gating, from constructed repetitions |
-| `tests/test_press_integration.py` | the whole pipeline on synthetic recordings, including false-positive protection and graceful degradation |
-| `tests/test_evaluation_harness.py` | the labelled-video evaluation harness |
+| `test_common_phases.py` | the shared rep counter |
+| `test_press_metrics.py` | measurements, normalisation, rep counting, per-rep values |
+| `test_press_rules.py` | all three rules and camera gating |
+| `test_press_integration.py` | the full pipeline, including false-positive tests |
 
-`tests/synthetic_press.py` is aspect-corrected so a skeleton built with a 90°
-elbow measures 90° after the pipeline converts the landmarks back to pixels; a
-guard test asserts it for both arms.
+The synthetic generator is aspect-corrected so a 90° elbow really measures 90°.
