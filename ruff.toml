@@ -1,7 +1,6 @@
 # FormFix - lint configuration.
-# An explicit, conventional rule set: errors, pyflakes, warnings, import
-# order, bugbear, pyupgrade and simplify. Stylistic nit rules (RUF/PLR
-# micro-optimisations) are deliberately not enabled - clarity over churn.
+# Standard rules: errors, pyflakes, warnings, imports, bugbear, pyupgrade and
+# simplify. No nitpicky style rules.
 line-length = 104
 target-version = "py311"
 
@@ -15,7 +14,7 @@ ignore = [
 ]
 
 [lint.per-file-ignores]
-# Path bootstrap before imports is required in entry points and scripts.
+# these add the app folder to sys.path before importing
 "app.py" = ["E402"]
 "scripts/*.py" = ["E402"]
 "tests/conftest.py" = ["E402"]

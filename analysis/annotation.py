@@ -1,11 +1,7 @@
 """
-Renders the annotated result video. This module decides what goes on each
-frame; overlay.py handles how it is drawn, so the styling can change without
-touching the analysis.
-
-Per frame: a thin cyan skeleton, the focus chain heavier and lit, the joints an
-active finding was measured from ringed in the warning colour, and a small HUD.
-Coordinates come from the cleaned pose.xy, never the raw detections.
+Renders the annotated result video. This file decides what goes on each frame
+and overlay.py decides how it looks, so I can restyle it without touching the
+analysis. Coordinates always come from the cleaned pose.xy, not raw detections.
 """
 
 from __future__ import annotations
@@ -84,64 +80,51 @@ __all__ = [
     "render_annotated_video",
 ]
 
-# what the overlay draws: the skeleton joints plus one head marker. Eyes,
-# ears and mouth are tracked but no rule reads them.
+# skeleton joints plus one head marker - eyes, ears and mouth are tracked but
+# no rule uses them
 DRAWN_LANDMARKS: frozenset[int] = frozenset(
     {landmark for segment in SEGMENTS for landmark in segment} | {HEAD_LANDMARK}
 )
 
-# below this confidence, draw nothing. Matched to the analysis floor so the
-# overlay can't draw points the measurements already threw away.
+# same floor as the analysis, so the overlay never draws a point the
+# measurements already threw away
 MIN_DRAW_VISIBILITY = 0.40
 
-# full-strength visibility. Nothing fades any more - a landmark is drawn or it
-# is not - but the constant still marks the top of the confidence range the
-# gates below are written in.
+# top of the confidence range the gates below work in
 FULL_DRAW_VISIBILITY = 0.95
 
-# --- Hysteresis: what stopped the skeleton flickering ---
-#
-# Every gate below used to be a single per-frame yes/no test on a noisy signal,
-# so a landmark sitting anywhere near a threshold switched on and off several
-# times a second and the limb blinked. Each gate now takes more to change its
-# answer than to keep it, the way a thermostat does.
+# --- Hysteresis (stops the skeleton flickering) ---
+# One yes/no threshold on a noisy signal made limbs blink, so each gate needs
+# more to change its answer than to keep it, like a thermostat.
 
-# A landmark already being drawn is not dropped the moment it dips under
-# MIN_DRAW_VISIBILITY; it has to fall this far below it.
+# a drawn landmark is only dropped once it falls to this
 DRAW_RELEASE_VISIBILITY = 0.30
 
-# ...and once the answer has changed, it stands for at least this many frames.
+# once the answer changes it holds for at least this many frames
 MIN_DRAW_DWELL_FRAMES = 5
 
-# A drawn landmark that goes missing is held at its last position for this many
-# frames before it is dropped. A two-frame gap is detector noise, not the limb
-# leaving the shot - and because a link needs both ends, one missing wrist used
-# to take the whole forearm with it.
+# a landmark that drops out is held at its last position for this many frames.
+# A short gap is detector noise, and since a link needs both ends, one missing
+# wrist would take the whole forearm with it.
 MAX_HOLD_FRAMES = 4
 
 # orientations where one side of the body sits behind the other
 SAGITTAL_ORIENTATIONS: frozenset[str] = frozenset({"side", "diagonal_side"})
 
-# how confident a camera-far landmark has to be before it is drawn at all.
-# MediaPipe still emits positions for limbs behind the torso, usually 0.2-0.6,
-# that swing about because they are guesses.
-# drawn at all. MediaPipe still emits positions for the limbs behind the torso,
+# how confident a camera-far landmark has to be before it is drawn. MediaPipe
+# still gives positions for limbs behind the torso but they are guesses.
 MIN_FAR_SIDE_VISIBILITY = 0.90
 
-# how close a far landmark has to sit to its near twin, in torso lengths,
-# before we call it occluded. This is the check that works side-on: MediaPipe's
-# visibility is really "is it inside the frame", so a knee behind the other leg
-# still scores 0.8+. 0.12 of a torso is a bit under a thigh's width.
+# how close (in torso lengths) a far landmark has to sit to its near twin to
+# count as occluded. MediaPipe's visibility really means "inside the frame", so
+# a knee behind the other leg still scores 0.8+. 0.12 is a bit under a thigh.
 FAR_OCCLUSION_TORSO_FRACTION = 0.12
 
-# A far limb is judged once for the whole clip rather than frame by frame: if it
-# is occluded or under-confident on this fraction of the tracked frames, it stays
-# out of the drawing for the entire video. Asked per frame, the question is
-# answered by two noisy signals either side of a threshold, which is exactly what
-# made the far knee blink through a squat descent.
+# a far limb that is occluded or unsure on this share of tracked frames is left
+# out of the whole video. Deciding it per frame made the far knee blink.
 FAR_HIDE_CLIP_FRACTION = 0.5
 
-# far landmark -> its near twin, for the occlusion test. Limbs only.
+# far landmark -> its near twin, for the occlusion test
 _MIRROR_LANDMARK: dict[int, int] = {
     LEFT_ELBOW: RIGHT_ELBOW,
     RIGHT_ELBOW: LEFT_ELBOW,
@@ -159,40 +142,33 @@ _MIRROR_LANDMARK: dict[int, int] = {
     RIGHT_EAR: LEFT_EAR,
 }
 
-# biggest believable single-frame jump for one landmark, in torso lengths at
-# 30 fps. Beyond it the detector has swapped the point. Scaled by fps below.
+# biggest believable one-frame jump, in torso lengths at 30 fps (scaled by fps
+# below). Anything bigger means the detector swapped the point.
 MAX_DRAW_JUMP_TORSOS = 0.28
 
 # after this many rejections in a row, accept anyway, else a camera cut would
 # suppress the landmark for the rest of the clip
 MAX_CONSECUTIVE_JUMP_REJECTS = 3
 
-# Severity order when two findings land on the same frame; the worse one wins.
+# when two findings share a frame the worse one wins
 _LEVEL_RANK: dict[str, int] = {"info": 0, "pass": 0, "warning": 1, "fail": 2}
 
 # --- Display-only smoothing ---
-#
-# The coordinates the rules read are left exactly as the analysis left them.
-# These filter a copy, used for drawing only. Rendering happens once the whole
-# clip is known, so the overlay can afford a zero-phase filter that the causal
-# EMA in smoothing.py cannot be - and zero phase means no lag at the turning
-# points, which is where a lagging skeleton looks worst. Parameters are the ones
-# filters.BUTTERWORTH_2HZ documents (Dill et al., 2024).
+# Only a copy of the coordinates is filtered, for drawing. The whole clip is
+# known by render time, so I can use a zero-phase filter (no lag at the turning
+# points), which the causal EMA in smoothing.py can't do. Settings are from
+# filters.BUTTERWORTH_2HZ (Dill et al., 2024).
 RENDER_SMOOTHING_CUTOFF_HZ = 2.0
 RENDER_SMOOTHING_ORDER = 4
 
 # --- What the skeleton is made of, per exercise ---
-#
-# Drawing every landmark on every video means drawing limbs no rule reads, in
-# the part of the frame the detector tracks worst: the legs under a pulldown
-# seat, the feet behind a press bench. Jaiswal et al. (2023) select landmarks
-# per exercise the same way ("the choice of landmarks depended on our
-# understanding of the biomechanics of each exercise"), and Kotte et al. (2024)
-# report that people find specific body parts highlighted more useful than the
-# whole skeleton lighting up.
+# Drawing every landmark means drawing limbs no rule reads, in the parts the
+# detector tracks worst (legs under a pulldown seat, feet behind a press bench).
+# Jaiswal et al. (2023) also pick landmarks per exercise, and Kotte et al.
+# (2024) found people prefer specific body parts highlighted over the whole
+# skeleton lighting up.
 
-# Shoulders, elbows, wrists and hips: everything a pulldown or a press measures,
-# cut off at the hip.
+# pulldown and press: shoulders, elbows, wrists and hips, cut off at the hip
 UPPER_BODY_DRAWN: frozenset[int] = frozenset(
     {
         HEAD_LANDMARK,
@@ -207,8 +183,7 @@ UPPER_BODY_DRAWN: frozenset[int] = frozenset(
     }
 )
 
-# Torso and both legs, no arms: the squat is measured from the hip, knee and
-# ankle, and the arms are holding a bar or held out in front either way.
+# squat: torso and legs, no arms - they are only holding the bar
 LOWER_BODY_DRAWN: frozenset[int] = frozenset(
     {
         HEAD_LANDMARK,
@@ -230,14 +205,12 @@ LOWER_BODY_DRAWN: frozenset[int] = frozenset(
 
 @dataclass(frozen=True)
 class OverlayEvent:
-    """A finding shown over a window of frames, plus the joints it was measured
-    from, so the overlay can point at the right part of the body."""
+    """A finding shown over a range of frames, with the joints it came from."""
 
     start_frame: int
     end_frame: int
     text: str
     level: str = "warning"  # pass | warning | fail | info
-    # Landmark indices to emphasise while this event is on screen.
     highlight_landmarks: tuple[int, ...] = ()
     # two or three words for the label by the body; defaults to text before the dash
     short_text: str = ""
@@ -247,8 +220,8 @@ class OverlayEvent:
         return self.short_text or self.text.split(" - ")[0].strip()
 
 
-# phases where the athlete is at rest. Matching on the string rather than the
-# enum lets one renderer handle all three exercises.
+# rest phases. Matched on the string, not the enum, so one renderer works for
+# all three exercises
 NEUTRAL_PHASE_VALUES: frozenset[str] = frozenset({"standing", "top", "ready"})
 
 
@@ -263,15 +236,15 @@ class HudLine:
 
 @dataclass(frozen=True)
 class FrameState:
-    """What the HUD says on one frame. phase is any string enum - each exercise
-    names its own phases and the renderer only prints .value."""
+    """What the HUD shows on one frame. Each exercise has its own phase enum and
+    only .value gets printed."""
 
     phase: Any = None
     rep_number: int = 0
     total_reps: int = 0
     # true inside the turning-point window (squat bottom, press lockout)
     is_bottom_window: bool = False
-    # Extra HUD chips from the exercise, drawn under the phase.
+    # extra chips from the exercise, drawn under the phase
     extra: tuple[HudLine, ...] = field(default_factory=tuple)
 
     @property
@@ -281,8 +254,7 @@ class FrameState:
 
     @property
     def inside_repetition(self) -> bool:
-        """True while the athlete is actually in a rep. Measured joints go lime here
-        and stay cyan at rest, so green means "in the movement, nothing flagged"."""
+        """True mid-rep. Measured joints go lime here and stay cyan at rest."""
         return self.rep_number > 0 and self.phase_label not in NEUTRAL_PHASE_VALUES
 
 
@@ -305,8 +277,8 @@ def render_annotated_video(
     drawn_landmarks: frozenset[int] | None = None,
 ) -> Path:
     """
-    Render the annotated video and return the final path (H.264 where possible).
-    Exercise-specific choices come in as parameters rather than branches:
+    Render the annotated video and return its path (H.264 where possible).
+    Anything exercise-specific comes in as a parameter instead of an if/else:
 
         emphasis_landmarks  the focus chain (leg chain, one arm, or both arms)
         marker_landmarks    the turning-point marker and its caption
@@ -315,15 +287,15 @@ def render_annotated_video(
         frame_range         inclusive range of ORIGINAL frames to write
         drawn_landmarks     which landmarks make up the skeleton at all
     """
-    # two styles on purpose: things drawn on the athlete are sized from the
-    # athlete, the HUD and watermark stay sized to the frame
+    # two styles on purpose: the skeleton is sized to the athlete, the HUD and
+    # watermark to the frame
     style = OverlayStyle.for_frame(video.width, video.height, _body_pixels(pose, video))
     chrome = OverlayStyle.for_frame(video.width, video.height)
     canvas = OverlayCanvas(video.width, video.height, style)
     intermediate = output_path.with_name(output_path.stem + "_raw.mp4")
 
-    # the skeleton this exercise is drawn with, and a display-smoothed copy of
-    # the coordinates to draw it from. The analysis keeps its own pose untouched.
+    # which landmarks to draw, and a smoothed copy of the coordinates just for
+    # drawing (the analysis pose is left alone)
     drawn = (DRAWN_LANDMARKS if drawn_landmarks is None else frozenset(drawn_landmarks)) | {
         HEAD_LANDMARK
     }
@@ -339,8 +311,7 @@ def render_annotated_video(
         for f in range(event.start_frame, event.end_frame + 1):
             by_frame_events.setdefault(f, []).append(event)
 
-    # render window in original frame numbers. Frames outside it are decoded but
-    # not drawn on or written.
+    # render window in original frame numbers; frames outside it are skipped
     first_frame, last_frame = _resolve_range(frame_range, pose.frame_count)
     expected_frames = max(1, last_frame - first_frame + 1)
     written = 0
@@ -362,29 +333,27 @@ def render_annotated_video(
             if _has_drawable_pose(render_pose, index):
                 points, alphas = _drawable_points(render_pose, index, video, policy, drawn)
                 _draw_analysis_layer(canvas, points, alphas, style, state, active, focus, angle_joints)
-                # Turning-point marker stays off; only the rep counter is on the frame now.
             _draw_readout(canvas, chrome, state, metric, active)
             canvas.commit()
 
             writer.write(frame)
             written += 1
             if on_frame is not None:
-                # Progress counts frames actually rendered, so a trimmed run still fills the bar.
+                # count rendered frames so a trimmed run still fills the progress bar
                 on_frame(written - 1, expected_frames)
 
     if convert_to_h264(intermediate, output_path):
         intermediate.unlink(missing_ok=True)
         return output_path
 
-    # No FFmpeg, or it failed: keep the mp4v file rather than lose the run.
+    # no FFmpeg or it failed - keep the mp4v file rather than lose the run
     logger.warning("Returning mp4v annotated video (H.264 conversion unavailable)")
     return intermediate
 
 
 def _resolve_range(frame_range: tuple[int, int] | None, frame_count: int) -> tuple[int, int]:
-    """Clamp a requested render window to frames that exist. Anything unusable
-    falls back to the whole video - an empty output file looks like a broken
-    analysis, which is worse than not trimming."""
+    """Clamp the render window to real frames. Anything unusable falls back to the
+    whole video, since an empty output looks like a broken analysis."""
     last_index = max(0, frame_count - 1)
     if frame_range is None:
         return 0, last_index
@@ -444,8 +413,8 @@ def _draw_analysis_layer(
             colour=LEVEL_COLOURS.get(event.level, AMBER),
         )
 
-    # angle read-outs and the issue label are off the frame now, but angle_joints
-    # is still accepted so each exercise keeps declaring what it measures
+    # I took the angle read-outs and issue label off the frame, but angle_joints
+    # stays so each exercise still declares what it measures
     _ = (angle_joints, colour)
 
 
@@ -458,9 +427,8 @@ def _draw_angles(
     flag_colour,
     inside_rep: bool,
 ) -> None:
-    """Draw the rules' joint angles on the joints. Colour means what it does
-    everywhere else: warning colour if a finding came from this joint, lime
-    mid-rep, cyan at rest."""
+    """Draw joint angles on the joints: warning colour if a finding came from that
+    joint, lime mid-rep, cyan at rest."""
     for spec in angle_joints:
         proximal = points.get(spec.proximal)
         vertex = points.get(spec.vertex)
@@ -478,15 +446,14 @@ def _label_issue_region(
     active: Sequence[OverlayEvent],
     colour,
 ) -> None:
-    """Two or three words beside the highlighted joints. One label at most and
-    never over the face; the pill at the bottom has the fuller wording."""
+    """Short label beside the highlighted joints - one at most, never over the face."""
     for event in active:
         marked = [points[lm] for lm in event.highlight_landmarks if lm in points]
         if not marked:
             continue
         offset = int(round(18 * style.scale))
         y = int(sum(point[1] for point in marked) / len(marked))
-        # normally sit to the right of the joints, flip left when there isn't room
+        # right of the joints, or left if there isn't room
         right = max(point[0] for point in marked) + offset
         if right > canvas.width * 0.72:
             anchor, align = (min(point[0] for point in marked) - offset, y), "right"
@@ -530,8 +497,8 @@ def _draw_readout(
     metric: Any,
     active: Sequence[OverlayEvent],
 ) -> None:
-    """On-screen chrome: rep counter and watermark. The phase and measurement chips
-    only repeated what the results panel says in plain language."""
+    """Rep counter and watermark. I dropped the phase and measurement chips because
+    they just repeated the results panel."""
     lines: list[tuple[str, tuple[int, int, int], bool]] = []
     if state.total_reps:
         lines.append((f"REP {max(state.rep_number, 0)} / {state.total_reps}", WHITE, True))
@@ -545,8 +512,7 @@ def _draw_readout(
 
 
 def _body_pixels(pose: FramePoseData, video: VideoMetadata) -> float:
-    """Typical torso length in pixels, used only to size the overlay so someone
-    further from the camera gets a smaller skeleton."""
+    """Typical torso length in pixels, used to size the overlay to the person."""
     shoulders = (LEFT_SHOULDER, RIGHT_SHOULDER)
     hips = (LEFT_HIP, RIGHT_HIP)
     valid = pose.valid[:, [*shoulders, *hips]].all(axis=1)
@@ -563,8 +529,8 @@ def _body_pixels(pose: FramePoseData, video: VideoMetadata) -> float:
 
 
 def _visibility_is_informative(pose: FramePoseData) -> bool:
-    """Does the visibility track carry anything? Synthetic fixtures leave it all
-    zero, and gating on that would hide the whole skeleton."""
+    """False when visibility is all zero (synthetic test data), otherwise gating on
+    it would hide the whole skeleton."""
     visibility = pose.visibility
     return bool(
         visibility.size and np.isfinite(visibility).any() and float(np.nanmax(visibility)) > 0.0
@@ -573,12 +539,9 @@ def _visibility_is_informative(pose: FramePoseData) -> bool:
 
 def _has_drawable_pose(pose: FramePoseData, index: int) -> bool:
     """
-    Is there anything worth drawing on this frame?
-
-    Not pose.pose_found[index] - that says whether the detector fired on the raw
-    frame, but short gaps are interpolated afterwards, so a frame can hold good
-    landmarks with the flag still False. Gating on it made the skeleton vanish on
-    exactly those frames.
+    Is there anything worth drawing on this frame? Uses pose.valid, not
+    pose_found, because interpolated frames have good landmarks but pose_found
+    is still False, and the skeleton vanished on them.
     """
     return bool(pose.valid[index].any())
 
@@ -591,16 +554,14 @@ class _DrawPolicy:
         trust_visibility  did the detector report per-landmark confidence at all
         far_limbs         limbs on the away-from-camera side, held to a higher bar
         max_jump_px       how far a landmark may move before it looks swapped
-        hidden            limbs left out of the whole clip, decided once up front
+        hidden            limbs left out of the whole clip
     """
 
     trust_visibility: bool
-    # Landmarks held to the far-side floor - limbs only.
     far_limbs: frozenset[int]
     max_jump_px: float
-    # horizontal distance under which a far limb counts as hidden. 0 turns it off.
+    # horizontal gap under which a far limb counts as hidden (0 = off)
     occlusion_px: float = 0.0
-    # Landmarks suppressed for the entire video - see _clip_hidden_far_limbs.
     hidden: frozenset[int] = frozenset()
     hold_frames: int = MAX_HOLD_FRAMES
     _last: dict[int, tuple[float, float, int]] = field(default_factory=dict)
@@ -613,13 +574,9 @@ class _DrawPolicy:
 
     def should_draw(self, landmark: int, frame_idx: int, confidence: float | None) -> bool:
         """
-        Is this landmark confident enough to draw? Two thresholds rather than
-        one: it takes MIN_DRAW_VISIBILITY to start drawing and a fall all the way
-        to DRAW_RELEASE_VISIBILITY to stop, and either answer stands for
-        MIN_DRAW_DWELL_FRAMES frames. A single threshold on a signal that hovers
-        around it is what made limbs blink.
-
-        confidence None means the source reports none, so nothing is gated.
+        Hysteresis check: MIN_DRAW_VISIBILITY to start drawing, down to
+        DRAW_RELEASE_VISIBILITY to stop, and each answer holds for
+        MIN_DRAW_DWELL_FRAMES. confidence=None means there is nothing to gate on.
         """
         if confidence is None:
             return True
@@ -640,9 +597,8 @@ class _DrawPolicy:
         return drawn
 
     def continues_from_last_frame(self, drawn_now: int) -> bool:
-        """Is this frame the same shot as the last one? Losing a landmark or two is
-        normal; losing half the figure at once is not, and whatever was held is
-        then a picture of somewhere the athlete no longer is."""
+        """Is this the same shot as the last frame? Losing a landmark or two is
+        normal, losing half the figure at once means a cut."""
         before = self._previous_drawn
         self._previous_drawn = drawn_now
         if before <= 0:
@@ -650,20 +606,15 @@ class _DrawPolicy:
         return drawn_now * 2 >= before
 
     def remember(self, landmark: int, frame_idx: int, x: float, y: float) -> None:
-        """Keep the last position this landmark was actually drawn at."""
         self._held[landmark] = (x, y, frame_idx)
 
     def forget_holds(self) -> None:
-        """Throw the hold buffer away. Called when the frame no longer follows on
-        from the last one - see the cut check in _drawable_points."""
+        """Clear the held positions after a cut."""
         self._held.clear()
 
     def hold(self, landmark: int, frame_idx: int) -> tuple[float, float] | None:
-        """
-        Where to draw a landmark that has just gone missing, or None once it has
-        been gone too long to pretend. Holding a couple of frames is what stops a
-        one-frame detector hiccup taking a limb off the figure.
-        """
+        """Last drawn position of a landmark that just went missing, or None once
+        it has been gone too long."""
         held = self._held.get(landmark)
         if held is None:
             return None
@@ -673,9 +624,9 @@ class _DrawPolicy:
         return x, y
 
     def accept_position(self, landmark: int, frame_idx: int, x: float, y: float) -> bool:
-        """Did this joint move, or did the detector swap the point? The allowance grows
-        with the frames since it was last drawn, and after a few rejections in a row
-        the gate lapses so a camera cut can recover."""
+        """Did the joint really move, or did the detector swap the point? The limit
+        grows with frames since it was last drawn, and gives up after a few
+        rejections in a row so a camera cut can recover."""
         if self.max_jump_px <= 0:
             return True
         previous = self._last.get(landmark)
@@ -697,14 +648,9 @@ class _DrawPolicy:
         width: float,
     ) -> bool:
         """
-        Is this far-side landmark hidden behind its near-side twin?
-
-        Filmed from the side, a limb behind the body projects onto the one in front,
-        so the two land at nearly the same horizontal position. Only the horizontal
-        gap is compared - vertical separation is real movement.
-
-        False whenever the question can't be answered, since the other gates are a
-        better failure mode than hiding a limb on a guess.
+        Is this far-side landmark hidden behind its near-side twin? From the side
+        the two land at almost the same x, so only the horizontal gap is checked.
+        Returns False when it can't tell, so a limb isn't hidden on a guess.
         """
         if self.occlusion_px <= 0:
             return False
@@ -728,8 +674,8 @@ def _draw_policy(
 ) -> _DrawPolicy:
     """
     Build the drawing policy for one video. The far side comes from the analysed
-    side, not a guess. Nothing in the exercise's measured chain is ever
-    suppressed - a press is measured from both arms even filmed from the side.
+    side, and the measured chain is never hidden (a press uses both arms even
+    from the side).
     """
     far_limbs: frozenset[int] = frozenset()
     sagittal = (camera_orientation or "").lower() in SAGITTAL_ORIENTATIONS
@@ -741,7 +687,7 @@ def _draw_policy(
     fps = video.fps if getattr(video, "fps", 0) else 30.0
     frame_rate_factor = min(4.0, max(0.5, 30.0 / fps)) if fps > 0 else 1.0
     max_jump_px = torso_px * MAX_DRAW_JUMP_TORSOS * frame_rate_factor if torso_px > 0 else 0.0
-    # Only meaningful where there is a far side to test, i.e. a sagittal view.
+    # only matters in a side view, where there is a far side
     occlusion_px = torso_px * FAR_OCCLUSION_TORSO_FRACTION if (torso_px > 0 and far_limbs) else 0.0
 
     logger.info(
@@ -768,18 +714,12 @@ def _clip_hidden_far_limbs(
     pose: FramePoseData, video: VideoMetadata, policy: _DrawPolicy
 ) -> frozenset[int]:
     """
-    Which far-side limbs to leave out of the entire video.
+    Which far-side limbs to leave out of the whole video. Deciding per frame made
+    limbs blink, so a limb that is behind the body for most of the clip is never
+    drawn and the rest are drawn normally.
 
-    The occlusion and far-side confidence tests are both right and both unusable
-    frame by frame: they sit on noisy signals, so a limb near either boundary
-    switches on and off several times a second and the viewer sees a blink, not a
-    judgement. Asked once over the whole clip the answer is stable - a limb that
-    spends most of the video behind the body is never drawn, and one that does not
-    is drawn like any other, with no far-side gate left to trip on.
-
-    Dill et al. (2024) are the reason this errs towards hiding: with the far arm
-    behind the torso their reconstruction attached it to a jacket on a chair. An
-    occluded limb does not merely get noisy, it gets attached to the wrong thing.
+    I err towards hiding because of Dill et al. (2024): with the far arm behind
+    the torso, their reconstruction attached it to a jacket on a chair.
     """
     if not policy.far_limbs or not policy.trust_visibility:
         return frozenset()
@@ -795,8 +735,7 @@ def _clip_hidden_far_limbs(
         xy = pose.xy[frame]
         visibility = pose.visibility[frame]
         for landmark in policy.far_limbs:
-            # untracked, hidden behind its twin, or too unsure to believe - all
-            # three are the same answer here: not something to draw
+            # untracked, hidden behind its twin, or too unsure - all mean don't draw
             if (
                 landmark >= len(valid)
                 or not valid[landmark]
@@ -815,14 +754,9 @@ def _render_coordinates(
     pose: FramePoseData, video: VideoMetadata, drawn_landmarks: frozenset[int]
 ) -> np.ndarray:
     """
-    A smoothed copy of the coordinates, for drawing only.
-
-    pose.xy - what every rule reads - is untouched. This is the display layer: it
-    runs a zero-phase Butterworth over each drawn landmark, which the analysis
-    itself cannot have for free but rendering can, because by then the whole clip
-    is known and there is no lag to pay at the turning points. The causal EMA the
-    analysis uses barely dents MediaPipe's per-frame noise, which is why the
-    figure looked like it was floating while the numbers beside it were calm.
+    Smoothed copy of the coordinates, for drawing only - pose.xy is untouched.
+    A zero-phase Butterworth over each drawn landmark. The analysis EMA alone left
+    the figure looking like it was floating.
     """
     xy = pose.xy.copy()
     fps = float(getattr(video, "fps", 0.0) or 30.0)
@@ -847,19 +781,8 @@ def _drawable_points(
     drawn_landmarks: frozenset[int] | None = None,
 ) -> tuple[dict[int, tuple[int, int]], dict[int, float]]:
     """
-    Landmarks to draw on one frame, in pixels, with their opacity.
-
-    Three things changed here after the overlay was judged on how it looked
-    rather than on whether it was correct:
-
-    - the far-side and occlusion tests moved out to _clip_hidden_far_limbs,
-      where they are answered once for the video instead of once per frame;
-    - what is left is hysteretic, so a landmark near a threshold stays put
-      instead of chattering, and a landmark that drops out for a frame or two is
-      held at its last position rather than deleted;
-    - opacity is no longer driven by confidence. It was modulating the whole
-      skeleton frame by frame off a noisy signal, which read as the figure
-      breathing. A landmark is drawn or it is not.
+    Landmarks to draw on one frame, in pixels, with their opacity. Opacity is
+    fixed - tying it to confidence made the figure look like it was breathing.
     """
     points: dict[int, tuple[int, int]] = {}
     alphas: dict[int, float] = {}
@@ -885,18 +808,15 @@ def _drawable_points(
         fresh[landmark] = (x_px, y_px)
         policy.remember(landmark, frame_idx, x_px, y_px)
 
-    # Holding a landmark only makes sense if this frame follows on from the last
-    # one. When most of the figure goes at once - a cut, a second person, the
-    # athlete leaving the shot - the held positions belong to a picture that is
-    # no longer on screen, and drawing them smears the old pose over the new one.
+    # holding only makes sense if this frame follows the last one. After a cut
+    # the held positions would smear the old pose over the new shot
     if not policy.continues_from_last_frame(len(fresh)):
         policy.forget_holds()
 
     for landmark in sorted(set(wanted)):
         if landmark >= xy.shape[0] or landmark in policy.hidden:
             continue
-        # a gap of a frame or two is the detector stuttering, not the limb
-        # leaving; a link needs both ends, so dropping one costs two links
+        # a frame or two missing is the detector stuttering, so hold the point
         position = fresh.get(landmark) or policy.hold(landmark, frame_idx)
         if position is None:
             continue

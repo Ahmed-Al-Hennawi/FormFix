@@ -1,20 +1,13 @@
 """
-Does this movement look like the exercise the user chose?
+Does this movement look like the exercise the user picked?
 
-The upload page asks people to pick their exercise, and nothing downstream
-questions that choice - each analyser measures whatever it was pointed at and
-writes confident, specific feedback about it. So somebody uploads a bench
-press, picks "shoulder press" because it is the closest option, and gets a
-detailed critique of a movement they never performed.
+Without this, someone could upload a bench press, pick "shoulder press" as the
+closest option, and get detailed feedback on a movement they never did.
 
-This runs after rep detection, on the measurements the analysers already
-produce, and asks whether the movement is consistent with the label. It is not
-a classifier - it never works out what the exercise actually was.
-
-The bias is one-directional: every check looks for a contradiction, movement
-the chosen exercise cannot produce. Anything ambiguous or merely unusual
-passes, so a shallow or sideways-filmed press still passes while a bench press
-fails on the arms never travelling overhead.
+It runs after rep detection on the existing measurements. It's not a
+classifier - it only looks for movement the chosen exercise can't produce, so
+anything unusual or ambiguous still passes (a shallow press passes, a bench
+press fails because the arms never go overhead).
 """
 
 from __future__ import annotations
@@ -29,19 +22,18 @@ logger = logging.getLogger(__name__)
 
 # --- squat ---
 
-# a squat has to bend the knees. The rep detector already rejects anything
-# with no dip, so this only catches an upper-body exercise mislabelled.
+# a squat has to bend the knees - this catches an upper-body exercise
+# uploaded as a squat
 SQUAT_MAX_KNEE_ANGLE = 155.0
 
-# how far the wrists may travel, in torso lengths, before a "squat" looks
-# like an arm exercise. Generous - it catches a press labelled as a squat.
+# how far the wrists can travel (torso lengths) before a "squat" looks like
+# an arm exercise. Generous on purpose
 SQUAT_MAX_WRIST_TRAVEL_TORSOS = 2.5
 
 # --- press ---
 
-# an overhead press finishes with the wrists well above the shoulders, in
-# SHOULDER WIDTHS. A real press peaks near 1.5 of these; a bench press
-# finishes near 0, so the threshold sits well between them.
+# wrists above the shoulders at the top, in SHOULDER WIDTHS. A real press
+# peaks around 1.5 and a bench press around 0
 PRESS_MIN_WRIST_ABOVE_SHOULDER = 0.40
 
 # the elbow has to open on the way up, else it is a shrug or a hold
@@ -49,27 +41,25 @@ PRESS_MIN_ROM_DEGREES = 25.0
 
 # --- pulldown ---
 
-# a pulldown starts with the arms overhead, so at the top of the rep the
-# wrists are above the shoulders. In trunk lengths, and low on purpose - it
-# only has to separate a pulldown from a row or a curl.
+# a pulldown starts with the wrists above the shoulders (trunk lengths). Low
+# on purpose, it only has to tell it apart from a row or a curl
 PULLDOWN_MIN_WRIST_ABOVE_SHOULDER_AT_START = 0.05
 
-# The elbow has to close through the pull.
+# the elbow has to close through the pull
 PULLDOWN_MIN_ROM_DEGREES = 20.0
 
-# share of measurable reps that must contradict the exercise before we stop.
-# Over half, so one odd rep can never reject a recording.
+# share of reps that must contradict the exercise before rejecting, so one
+# odd rep can't reject a recording
 MIN_CONTRADICTING_REP_RATIO = 0.6
 
-# reps that must be measurable before the gate says anything at all
+# measurable reps needed before this check says anything
 MIN_REPS_TO_JUDGE = 2
 
 
 @dataclass(frozen=True)
 class PlausibilityResult:
-    """Whether the movement matches the selected exercise. plausible is False only
-    when the evidence contradicts the label; too few measurable reps is True with a
-    reason saying so."""
+    """plausible is only False when the evidence contradicts the exercise. Too few
+    reps gives True with a reason."""
 
     plausible: bool
     reason: str = ""
@@ -164,10 +154,9 @@ def check_press(
     reps: Sequence[Any], wrist_above_shoulder_at_top: float | None = None
 ) -> PlausibilityResult:
     """
-    Does this look like an overhead press? Fails when the wrists never finish above
-    the shoulders, or when the elbows barely open. wrist_above_shoulder_at_top is
-    the highest the wrists get above the shoulder line across the set, in torso
-    lengths - a bench press, a curl and a front raise all fail on it.
+    Does this look like an overhead press? Fails when the wrists never get above
+    the shoulders (bench press, curl, front raise) or the elbows barely open.
+    wrist_above_shoulder_at_top is in shoulder widths.
     """
     if (
         wrist_above_shoulder_at_top is not None
@@ -211,8 +200,7 @@ def check_pulldown(
     reps: Sequence[Any], wrist_above_shoulder_at_start: float | None = None
 ) -> PlausibilityResult:
     """Does this look like a lat pulldown? Fails when the arms never start above the
-    shoulders - which is what separates it from a row or a curl - or when the
-    elbows barely close."""
+    shoulders (a row or a curl) or the elbows barely close."""
     if (
         wrist_above_shoulder_at_start is not None
         and wrist_above_shoulder_at_start < PULLDOWN_MIN_WRIST_ABOVE_SHOULDER_AT_START
@@ -251,8 +239,8 @@ def check_pulldown(
     )
 
 
-# what the retry text says here - nothing about lighting or framing helps
-# when the wrong exercise was selected
+# retry tips for this case - lighting or framing advice doesn't help if the
+# wrong exercise was picked
 MISMATCH_TIPS = [
     "Check the exercise you selected matches the one in the video.",
     "FormFix analyses the squat, the shoulder press and the lat pulldown.",

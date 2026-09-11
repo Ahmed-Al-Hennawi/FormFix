@@ -1,8 +1,7 @@
 """
-Two fixed layers: the scroll-progress hairline at the top of the viewport and
-the atmosphere behind everything. main.js moves both to document.body after
-render - inside a Streamlit block container, position: fixed resolves against
-the container, not the viewport.
+Two fixed layers: the scroll progress line at the top and the background glow.
+main.js moves both to document.body, because inside Streamlit's container
+position: fixed is relative to the container, not the viewport.
 """
 
 from __future__ import annotations

@@ -1,15 +1,14 @@
 """
-Landmarks in, numbers out. Measurement only - no thresholds, no verdicts.
+Landmarks in, numbers out. Only measuring - no thresholds or verdicts.
 
     landmarks -> per-frame metrics -> per-rep facts
 
-Per arm: elbow flexion angle, wrist height above the shoulder line, elbow
-height, and the wrist-over-elbow offset. All the normalised ones use shoulder
-width rather than trunk length, because they live in the plane facing the
-camera and trunk length foreshortens the moment the lifter leans.
+Per arm: elbow angle, wrist height above the shoulder line, elbow height and
+wrist-over-elbow offset. Normalised by shoulder width, not trunk length, since
+the trunk looks shorter as soon as the person leans.
 
-Conventions: image y grows downward, a positive wrist_height_difference means
-the LEFT wrist is higher, and anything unmeasurable is NaN rather than 0.
+Image y grows downward, positive wrist_height_difference means the LEFT wrist
+is higher, and anything unmeasurable is NaN, not 0.
 """
 
 from __future__ import annotations
@@ -51,7 +50,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PressFrameMetrics:
-    """Everything measured on one frame."""
+    """Measurements for one frame."""
 
     frame_index: int
     timestamp: float
@@ -61,18 +60,18 @@ class PressFrameMetrics:
     right_elbow_angle: float = float("nan")
     elbow_angle: float = float("nan")
     elbow_flexion: float = float("nan")
-    # |left - right| elbow angle. NaN unless both arms are usable.
+    # |left - right| elbow angle, NaN unless both arms are usable
     elbow_angle_difference: float = float("nan")
 
     left_wrist_height: float = float("nan")
     right_wrist_height: float = float("nan")
-    # left - right wrist height. POSITIVE means the LEFT wrist is higher.
+    # left - right wrist height, POSITIVE = LEFT wrist higher
     wrist_height_difference: float = float("nan")
     left_elbow_height: float = float("nan")
     right_elbow_height: float = float("nan")
     elbow_height_difference: float = float("nan")
 
-    # |wrist_x - elbow_x| / shoulder width, per arm. 0 is a stacked forearm.
+    # |wrist_x - elbow_x| / shoulder width, per arm (0 = wrist right over elbow)
     left_alignment_offset: float = float("nan")
     right_alignment_offset: float = float("nan")
 
@@ -87,9 +86,8 @@ def compute_frame_metrics(
     side: str,
     config: PressConfig,
 ) -> list[PressFrameMetrics]:
-    """Measure every frame, both arms, in pixel space. MediaPipe normalises x and y
-    separately, so an angle - or a horizontal offset compared against a vertical
-    one - is skewed on any non-square frame."""
+    """Measure every frame, both arms, in pixels (normalised coordinates skew angles
+    and offsets on non-square frames)."""
     chain = ARM_CHAINS[side]
     metrics: list[PressFrameMetrics] = []
 
@@ -115,8 +113,8 @@ def compute_frame_metrics(
         left_shoulder, right_shoulder = px(LEFT_SHOULDER), px(RIGHT_SHOULDER)
         shoulder_width = distance(left_shoulder, right_shoulder)
         shoulder_line_y = _shoulder_line(left_shoulder, right_shoulder)
-        # turning towards side-on collapses the apparent shoulder separation and
-        # every normalised value explodes, so the trunk estimate acts as a floor
+        # turning side-on shrinks the shoulder width and everything normalised by it
+        # blows up, so the trunk estimate is used as a floor
         trunk_estimate = _trunk_fallback(px)
         if not np.isfinite(shoulder_width) or shoulder_width < 1e-6:
             shoulder_width = trunk_estimate
@@ -213,7 +211,7 @@ def compute_frame_metrics(
 
 
 def _shoulder_line(left, right) -> float:
-    """Mid-shoulder height in pixels; one shoulder alone will do."""
+    """Mid-shoulder height in pixels (one shoulder is enough)."""
     points = [p for p in (left, right) if p is not None]
     if not points:
         return float("nan")
@@ -221,9 +219,8 @@ def _shoulder_line(left, right) -> float:
 
 
 def _trunk_fallback(px) -> float:
-    """Trunk length as a scale reference when the shoulders overlap. Only reached
-    near side-on, where the frontal-plane rules are already off, so this just keeps
-    the exported numbers finite."""
+    """Trunk length as the scale when the shoulders overlap (near side-on). Just
+    keeps the exported numbers finite."""
     shoulders = [p for p in (px(LEFT_SHOULDER), px(RIGHT_SHOULDER)) if p is not None]
     hips = [p for p in (px(LEFT_HIP), px(RIGHT_HIP)) if p is not None]
     if not shoulders or not hips:
@@ -239,14 +236,13 @@ def _trunk_fallback(px) -> float:
 
 
 def movement_signal(metrics: list[PressFrameMetrics]) -> np.ndarray:
-    """The signal the rep state machine runs on: elbow flexion (180 - elbow angle),
-    high at the shoulders and near zero overhead. Using flexion is what lets the
-    press reuse the same machine as the other two."""
+    """Signal for the rep state machine: elbow flexion (180 - elbow angle), high at
+    the shoulders and near zero overhead."""
     return series(metrics, "elbow_flexion", range(len(metrics)))
 
 
 def phase_frames(rep: PressRep, phase: str) -> range:
-    """Frame range a rule should read for phase on rep."""
+    """Frame range a rule should read for this phase."""
     return frames_for(rep.segmentation, phase)
 
 
@@ -255,9 +251,9 @@ def phase_frames(rep: PressRep, phase: str) -> range:
 
 def bottom_windows(raw_reps: list[RawRep], index: int, fps: float, frame_count: int) -> list[range]:
     """
-    Frames where the dumbbells are genuinely back at the shoulders. Not the rep's
-    own first frame - the state machine only commits once the press has started, so
-    reading the bottom angle there over-reports depth and hides a shallow press.
+    Frames where the dumbbells are really back at the shoulders. Not the rep's
+    first frame - the rep only starts once the press is moving, so reading there
+    would hide a shallow press.
     """
     raw = raw_reps[index]
     span = max(int(round(1.0 * fps)), 1)
@@ -274,10 +270,8 @@ def bottom_windows(raw_reps: list[RawRep], index: int, fps: float, frame_count: 
 def _sustained_bottom(
     metrics: list[PressFrameMetrics], windows: list[range], attribute: str, hold: int
 ) -> float:
-    """
-    Smallest elbow angle held for hold consecutive frames in any window - the
-    deepest position actually stayed at, not one jittering frame's apparent depth.
-    """
+    """Smallest elbow angle held for `hold` frames in a row, so one jittery frame
+    doesn't count."""
     best = float("nan")
     for window in windows:
         values = series(metrics, attribute, window)
@@ -292,10 +286,8 @@ def _sustained_bottom(
 def _sustained_top(
     metrics: list[PressFrameMetrics], windows: list[range], attribute: str, hold: int
 ) -> float:
-    """
-    Largest value of attribute held for hold consecutive frames in any
-    window - the extension actually reached, not one frame's apparent lockout.
-    """
+    """Largest value held for `hold` frames in a row, so one frame can't look like
+    a lockout."""
     best = float("nan")
     for window in windows:
         values = series(metrics, attribute, window)
@@ -313,8 +305,8 @@ def build_reps(
     pose: FramePoseData,
     config: PressConfig,
 ) -> list[PressRep]:
-    """Turn detected rep boundaries into measured reps, taking each measurement from
-    the frames of the phase it belongs to. Peaks are sustained extremes."""
+    """Turn rep boundaries into measured reps, each value taken from its own phase.
+    Peaks are sustained extremes."""
     timestamps = pose.timestamps
     fps = effective_fps(timestamps)
     reps: list[PressRep] = []
@@ -340,9 +332,8 @@ def build_reps(
         )
         working = frames_for(segmentation, "working")
 
-        # range of motion, per arm: each arm's best sustained value anywhere in the
-        # rep, not what both held in a shared window. Otherwise an arm arriving late
-        # gets a limited-range finding for what is really a timing fault.
+        # ROM per arm, each arm's own best sustained value in the rep - otherwise an
+        # arm arriving late gets a range finding for what is really a timing issue
         left_top = _sustained_top(metrics, [rep_frames], "left_elbow_angle", 3)
         right_top = _sustained_top(metrics, [rep_frames], "right_elbow_angle", 3)
         left_bottom = _sustained_bottom(metrics, rest_windows, "left_elbow_angle", 3)
@@ -360,7 +351,7 @@ def build_reps(
             else float("nan")
         )
 
-        # Symmetry: sustained peaks, never a single spike.
+        # symmetry: sustained peaks, never a single spike
         angle_gap, angle_offset = sustained_extreme(
             series(metrics, "elbow_angle_difference", working), config.SYMMETRY_MIN_FRAMES
         )
@@ -368,7 +359,7 @@ def build_reps(
         height_gap, height_offset = sustained_extreme(np.abs(height_signed), config.SYMMETRY_MIN_FRAMES)
         higher_side = _higher_side(height_signed)
 
-        # Alignment: worst sustained offset per arm.
+        # alignment: worst sustained offset per arm
         left_offset, left_offset_at = sustained_extreme(
             series(metrics, "left_alignment_offset", working), config.ALIGNMENT_MIN_FRAMES
         )
@@ -384,8 +375,7 @@ def build_reps(
             raw.start_frame : raw.end_frame + 1,
             [c for chain in ARM_CHAINS.values() for c in chain.arm],
         ]
-        # alignment is judged per side with the worse one reported, so it only
-        # needs one arm's elbow/wrist pair
+        # alignment only needs one arm's elbow and wrist
         side_visibility = [
             float(
                 np.mean(
@@ -452,8 +442,8 @@ def _difference(a: float, b: float) -> float:
 
 
 def _higher_side(signed_difference: np.ndarray) -> str:
-    """Which arm sat higher through the working phase. The median of the signed
-    difference, so one frame where the arms crossed can't name the wrong side."""
+    """Which arm was higher during the working phase (median, so one odd frame
+    can't pick the wrong side)."""
     finite = signed_difference[np.isfinite(signed_difference)]
     if finite.size == 0:
         return ""
@@ -466,9 +456,8 @@ def _higher_side(signed_difference: np.ndarray) -> str:
 def _top_timing_difference(
     metrics: list[PressFrameMetrics], frames: range, timestamps: np.ndarray
 ) -> float:
-    """Seconds between the arms reaching their own highest position. Supporting
-    evidence only - it comes from two independently noisy peak frames - but "your
-    right arm arrives first" is more actionable than a bare angle gap."""
+    """Seconds between each arm reaching its highest point. Evidence only since it's
+    noisy, but "your right arm gets there first" is easier to act on than an angle."""
     left = series(metrics, "left_wrist_height", frames)
     right = series(metrics, "right_wrist_height", frames)
     if not (np.isfinite(left).any() and np.isfinite(right).any()):

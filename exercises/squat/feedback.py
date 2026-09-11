@@ -1,7 +1,6 @@
 """
-The squat's wording. The aggregation is shared (exercises/common/feedback.py);
-the only squat-specific parts are the two tables below - which wording belongs
-to which rule, and which measured values are worth printing.
+Squat feedback wording. The logic is shared (exercises/common/feedback.py),
+this file just has the squat's templates and which values to print.
 """
 
 from __future__ import annotations
@@ -57,13 +56,10 @@ __all__ = [
     "transparent_score",
 ]
 
-# The line that opens "What you did well". {n} / {s} are filled in.
+# first line of "What you did well"
 POSITIVES_OPENING = "{n} full rep{s} completed"
 
-# feedback_key (declared on each rule in config.py) -> wording. Each entry has
-# the beginner's three lines plus the plain-language description shown in the
-# "how did we detect this" panel.
-# has the beginner's three lines plus the plain-language description of the
+# feedback_key (set on each rule in config.py) -> wording
 FEEDBACK_TEMPLATES: dict[str, FeedbackTemplate] = {
     "depth": FeedbackTemplate(
         title="Squat depth",
@@ -127,7 +123,7 @@ FEEDBACK_TEMPLATES: dict[str, FeedbackTemplate] = {
     ),
 }
 
-# Which measured values a finding prints, and in what units.
+# which measured values a finding prints, and their units
 EVIDENCE_FORMATS = {
     "min_knee_angle": lambda v: f"minimum knee angle {float(v):.0f} deg",
     "max_torso_lean": lambda v: f"peak torso lean {float(v):.0f} deg",
@@ -138,7 +134,6 @@ EVIDENCE_FORMATS = {
 
 
 def template_for(rule: RuleResult) -> FeedbackTemplate:
-    """Look up a squat rule's wording by its declared feedback key."""
     return _template_for(rule, FEEDBACK_TEMPLATES)
 
 
@@ -148,12 +143,10 @@ def build_findings(rule_results: list[RuleResult]) -> list[FeedbackFinding]:
 
 
 def build_positives(rule_results: list[RuleResult], reps: list[SquatRep]) -> list[str]:
-    """What went well, limited to what the measurements support."""
     return _build_positives(rule_results, reps, FEEDBACK_TEMPLATES, POSITIVES_OPENING)
 
 
 def build_rep_summaries(reps: list[SquatRep], rule_results: list[RuleResult]) -> list[RepSummary]:
-    """One verdict per rep."""
     return _build_rep_summaries(reps, rule_results, FEEDBACK_TEMPLATES)
 
 
@@ -163,7 +156,6 @@ def build_overview(rule_results: list[RuleResult]) -> list[str]:
 
 
 def build_not_assessed(rule_results: list[RuleResult]) -> list[NotAssessedItem]:
-    """The checks we did not judge, with the reason for each."""
     return _build_not_assessed(rule_results, FEEDBACK_TEMPLATES)
 
 
@@ -172,5 +164,4 @@ def build_summary(
     partial_movements: int,
     rule_results: list[RuleResult],
 ) -> SessionSummary:
-    """Everything the results page needs for the set as a whole."""
     return _build_summary(reps, partial_movements, rule_results, FEEDBACK_TEMPLATES, POSITIVES_OPENING)

@@ -1,7 +1,6 @@
 """
-Lat-pulldown measurement layer. Nothing here says whether a pulldown was any
-good, only that the numbers describe the movement that was generated, so
-re-tuning a threshold shouldn't need any of these to change.
+Tests for the lat pulldown measurements. No verdicts, just that the numbers
+match the generated movement, so changing a threshold shouldn't break these.
 """
 
 from __future__ import annotations
@@ -49,8 +48,7 @@ def measured(spec: PulldownSpec, side: str = "left"):
 
 class TestElbowAngle:
     def test_the_measured_elbow_angle_matches_the_generated_one(self):
-        # The generator is aspect-corrected, so a 172-degree elbow measures 172.
-        # If this drifts, every range threshold is compared at the wrong scale.
+        # the generator is aspect-corrected, so a 172 degree elbow measures 172
         spec = PulldownSpec(top_elbow=172.0, bottom_elbow=80.0)
         _, _, metrics = measured(spec)
         angles = [m.elbow_angle for m in metrics if m.valid]
@@ -70,11 +68,10 @@ class TestElbowAngle:
         assert all(not m.valid for m in metrics)
 
     def test_an_implausible_angle_is_discarded(self):
-        # An extrapolated limb can give a geometrically valid but anatomically
-        # impossible angle, which has to come out as "not measured".
+        # a guessed limb can give an impossible angle, which should be "not measured"
         pose = make_pose_data(PulldownSpec())
         video = video_for(pose)
-        # Wrist onto shoulder puts the elbow angle under the plausibility floor.
+        # wrist on the shoulder puts the elbow angle under the plausibility floor
         pose.xy[40:50, 15] = pose.xy[40:50, 11]
         pose.xy[40:50, 16] = pose.xy[40:50, 12]
         metrics = metrics_mod.compute_frame_metrics(video, pose, "left", CONFIG)
@@ -142,7 +139,7 @@ class TestTorsoMeasurement:
         )
         mode = metrics_mod.apply_torso_excursion(metrics, baseline, CONFIG)
         assert mode == "unsigned"
-        # The size still comes out, it's only the direction we've lost.
+        # the size still comes out, only the direction is lost
         peak = max(m.torso_excursion for m in metrics if math.isfinite(m.torso_excursion))
         assert peak == pytest.approx(20.0, abs=3.0)
 
@@ -170,7 +167,7 @@ def _pose_and_video(spec: PulldownSpec):
 
 class TestNormalisation:
     def test_measurements_do_not_depend_on_video_resolution(self):
-        # Fail this and we're measuring the camera, not the lifter.
+        # if this fails we're measuring the camera, not the person
         pose = make_pose_data(PulldownSpec())
         small = VideoMetadata(
             path=__import__("pathlib").Path("s.mp4"),
@@ -212,8 +209,8 @@ class TestRestingExtensionReference:
 
 class TestTopWindows:
     def test_the_top_is_read_outside_the_repetition_not_at_its_first_frame(self):
-        # The state machine only commits a rep once the pull has begun, so
-        # the extended position sits in the frames either side of it.
+        # the rep only starts once the pull is moving, so the top position is in
+        # the frames either side
         raws = [RawRep(start_frame=40, extreme_frame=55, end_frame=70, extreme_value=80.0)]
         windows = metrics_mod.top_windows(raws, 0, 30.0, 200)
         assert windows[0].start < 40 <= windows[0].stop
@@ -247,8 +244,8 @@ class TestPhaseSegmentation:
         assert MovementPhase.RETURN in seen
 
     def test_a_restricted_athlete_still_has_their_repetitions_counted(self):
-        # Why segmentation is adaptive: someone who never straightens their
-        # arms still needs reps counted, or the range rule can't tell them.
+        # this is why rep detection is adaptive - someone who never straightens
+        # their arms still needs their reps counted
         pose, _, metrics = measured(PulldownSpec(top_elbow=132.0, bottom_elbow=80.0))
         detection = detect_reps(metrics_mod.movement_signal(metrics), pose.timestamps, CONFIG)
         assert len(detection.reps) == 3
@@ -287,11 +284,7 @@ class TestRepMeasurements:
 
 
 def test_the_generator_itself_is_geometrically_faithful():
-    """
-    Fixture guard, not a test of the system. Everything above assumes the
-    synthetic skeleton really has the elbow angle it was asked for, so a
-    regression in the aspect correction would go unnoticed without this.
-    """
+    """Checks the synthetic skeleton really has the elbow angle it was given."""
     from analysis.geometry import calculate_angle
 
     spec = PulldownSpec(top_elbow=140.0, bottom_elbow=70.0)
@@ -306,10 +299,8 @@ def test_the_generator_itself_is_geometrically_faithful():
 
 class TestRangeOfMotionNeedsOneArmNotTwo:
     """
-    In the side view this exercise asks for, the far arm spends much of the
-    pull behind the near one. Range of motion is a joint angle, not a
-    comparison, so requiring both arms had the check reporting "not assessed"
-    on the camera position the guidance recommends.
+    Side-on the far arm is mostly hidden, and requiring both arms made ROM say
+    "not assessed" on the recommended camera angle.
     """
 
     def _pose_with_a_hidden_far_arm(self):

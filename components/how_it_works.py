@@ -1,7 +1,6 @@
 """
-Section 3 - How it works. Five steps on a vertical rail; main.js scrubs the
-cyan-to-lime progress line with scroll position and lights up whichever step
-is currently in view.
+Section 3 - How it works. Five steps on a vertical line that fills as you
+scroll (main.js), lighting up the step in view.
 """
 
 from __future__ import annotations

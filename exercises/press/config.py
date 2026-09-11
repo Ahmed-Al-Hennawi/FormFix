@@ -1,10 +1,9 @@
 """
-Every tunable value for the dumbbell shoulder press, in one place.
+All tunable values for the dumbbell shoulder press in one place.
 
-Two kinds, marked by the section headings. ENGINEERING values control
-stability and say nothing about how a press should be performed. TECHNIQUE
-(OPERATIONAL) values do make claims: prototype values from the exercise
-definition, the reference clip and testing, not biomechanical constants.
+ENGINEERING values just keep the system stable. TECHNIQUE (OPERATIONAL) values
+do judge the press - they're my prototype values from the exercise definition,
+the reference clip and testing, not biomechanical constants.
 
 Conventions:
 
@@ -48,11 +47,11 @@ class PressConfig:
     MAX_SHORT_GAP_FRAMES: int = 5
 
     # --- ENGINEERING - anatomical plausibility gates ---
-    # a dumbbell in front of a wrist, or an arm crossing the head, makes MediaPipe
-    # extrapolate confidently. Outside these wide bands is NaN, never a fault.
+    # a dumbbell in front of the wrist or an arm crossing the head makes MediaPipe
+    # guess confidently. Outside these wide bands is NaN, not a fault
     PLAUSIBLE_ELBOW_ANGLE_MIN: float = 15.0
     PLAUSIBLE_ELBOW_ANGLE_MAX: float = 190.0
-    # A left/right elbow gap this big is one arm being extrapolated.
+    # a left/right elbow gap this big means one arm is being guessed
     ELBOW_DIFFERENCE_MAX_PLAUSIBLE: float = 70.0
     # a wrist-height gap this big is tracking failure, not an uneven press
     WRIST_HEIGHT_DIFFERENCE_MAX_PLAUSIBLE: float = 1.0
@@ -63,34 +62,31 @@ class PressConfig:
     ANGLE_EMA_ALPHA: float = 0.5
 
     # --- ENGINEERING - phase state machine / hysteresis ---
-    # adaptive, same argument as the pulldown: someone who never locks out would
-    # never cross a fixed "extended" threshold, so the range-of-motion rule meant
-    # to catch that habit would never run.
+    # adaptive like the pulldown: with a fixed "extended" threshold, someone who
+    # never locks out would never count a rep, so the ROM rule would never run.
     #     SEGMENTATION  was this a rep?              adaptive
     #     JUDGEMENT     did it cover enough range?   fixed, the ROM_* values
-    # the signal is elbow FLEXION (180 - elbow angle): high at the shoulders,
-    # near zero overhead
+    # signal is elbow FLEXION (180 - elbow angle), high at the shoulders
     REST_REFERENCE_PERCENTILE: float = 90.0
     REST_REFERENCE_MIN: float = 45.0
     REST_REFERENCE_MAX: float = 140.0
-    # Degrees below the reference at which the arms stop counting as rested.
+    # degrees below the reference where the arms stop counting as rested
     REST_MARGIN: float = 6.0
-    # ...at which a press attempt begins.
+    # ...where a press attempt starts
     PRESS_START_MARGIN: float = 14.0
-    # ...needed for a real top position to exist.
+    # ...needed for a real top position
     TOP_MARGIN: float = 30.0
-    # ...back above which the rep completes.
+    # ...back above which the rep is complete
     REP_END_MARGIN: float = 10.0
-    # Fallback resting flexion when the series is unusable.
+    # fallback resting flexion if the series is unusable
     READY_ELBOW_FLEXION: float = 95.0
 
     PHASE_MIN_FRAMES: int = 3
     # how far flexion must rise past its running minimum before the top commits
     TOP_REVERSAL_DELTA: float = 5.0
-    # minimum flexion excursion to count as a press attempt. A segmentation
-    # guard, not a technique criterion.
+    # minimum range to count as a press attempt (not a technique check)
     MIN_RANGE_OF_MOTION: float = 25.0
-    # Frames either side of the raw minimum used to find a stable top.
+    # frames either side of the raw minimum used for a stable top
     TOP_WINDOW_FRAMES: int = 3
     MAX_TRACKING_LOSS_FRAMES: int = 10
 
@@ -103,11 +99,9 @@ class PressConfig:
     VIDEO_MAX_DURATION: float = 120.0
     MULTI_PERSON_WARN_RATIO: float = 0.10
     MULTI_PERSON_FAIL_RATIO: float = 0.50
-    # frontality bands: max(shoulder, hip) separation over trunk length. Here a
-    # HIGH ratio is the good case, since the press is analysed from the front.
-    # Tighter than the squat's because they recognise the opposite situation:
-    # adult shoulder width is about 0.8-0.9 of trunk length, so a square front
-    # view lands near 0.8 and asking for 1.0 called good clips diagonal.
+    # frontality bands. Here a HIGH ratio is good because the press is filmed
+    # from the front. Shoulder width is about 0.8-0.9 of trunk length, so a
+    # straight front view is near 0.8 - asking for 1.0 called good clips diagonal
     SIDE_VIEW_GOOD_RATIO: float = 0.35
     SIDE_VIEW_FRONTAL_RATIO: float = 0.70
     VIEW_STABILITY_SPREAD: float = 0.35
@@ -117,63 +111,57 @@ class PressConfig:
 
     # --- ENGINEERING - evidence requirements ---
     BASELINE_MIN_FRAMES: int = 5
-    # share of a rep both arms must be usable on before they get compared. Below
-    # it symmetry says "cannot assess" - one arm is never inferred from the other.
+    # share of a rep both arms must be usable before they're compared, otherwise
+    # symmetry says "cannot assess"
     SYMMETRY_MIN_BOTH_SIDES_RATIO: float = 0.6
-    # ...and the far arm must clear this visibility floor.
+    # ...and the far arm has to be above this visibility
     SYMMETRY_MIN_VISIBILITY: float = 0.5
-    # alignment only needs one side, since the arms are judged independently.
-    # Averaging both let a hidden arm switch the check off for the visible one.
+    # alignment is per arm, so a hidden arm doesn't switch it off for the other
     ALIGNMENT_MIN_VISIBILITY: float = 0.5
 
     # --- TECHNIQUE (OPERATIONAL) - arm symmetry ---
-    # three signals a beginner can act on, not one score: "your left arm
-    # stayed lower" is usable, "symmetry index 0.72" is not. Any one of them
-    # persisting flags the rep.
-    # the bars sit well above zero on purpose - a few degrees is normal movement
-    # and inside MediaPipe's own error. All provisional.
-    # |left - right| elbow angle, degrees.
+    # three signals instead of one score, because "your left arm stayed lower"
+    # is useful to a beginner and "symmetry index 0.72" isn't. Any one of them
+    # persisting flags the rep. Bars are well above zero since a few degrees is
+    # normal and inside MediaPipe's error.
+    # |left - right| elbow angle, degrees
     SYMMETRY_ANGLE_WARN: float = 15.0
     SYMMETRY_ANGLE_FAIL: float = 25.0
-    # |left - right| wrist height, in shoulder widths.
+    # |left - right| wrist height, in shoulder widths
     SYMMETRY_HEIGHT_WARN: float = 0.12
     SYMMETRY_HEIGHT_FAIL: float = 0.20
-    # |left ROM - right ROM| over the rep, degrees.
+    # |left ROM - right ROM| over the rep, degrees
     SYMMETRY_ROM_WARN: float = 15.0
     SYMMETRY_ROM_FAIL: float = 25.0
-    # seconds between the arms reaching their highest position. Evidence only.
+    # seconds between the arms reaching the top (evidence only)
     SYMMETRY_TIMING_NOTE: float = 0.30
-    # persistence: an asymmetry must hold this many frames and cover this share
-    # of the press
+    # an asymmetry has to hold this many frames and cover this share of the press
     SYMMETRY_MIN_FRAMES: int = 5
     SYMMETRY_MIN_VIOLATION_RATIO: float = 0.25
 
     # --- TECHNIQUE (OPERATIONAL) - elbow / wrist alignment ---
-    # in the frontal plane the wrist should stay roughly over the elbow. Measured
-    # as |wrist_x - elbow_x| / shoulder width, so camera distance and body size
-    # cancel out. 0.30 shoulder widths is roughly 12 cm.
-    # started at 0.30/0.45 and raised after testing (docs/press_thresholds.md):
-    # a rep stopping short of overhead leaves the wrist beside the elbow anyway,
-    # so it got flagged for alignment as well as range of motion
+    # from the front the wrist should stay roughly over the elbow, measured as
+    # |wrist_x - elbow_x| / shoulder width (0.38 is about 15 cm). I raised it
+    # from 0.30/0.45 after testing (docs/threshold_tuning.md) because a rep
+    # stopping short of overhead was flagged for both alignment and ROM
     ALIGNMENT_OFFSET_WARN: float = 0.38
     ALIGNMENT_OFFSET_FAIL: float = 0.52
     ALIGNMENT_MIN_FRAMES: int = 5
     ALIGNMENT_MIN_VIOLATION_RATIO: float = 0.25
 
     # --- TECHNIQUE (OPERATIONAL) - range of motion ---
-    # judged at both ends and reported as which end fell short. The top is not
-    # 180 degrees - a locked-out elbow is neither required nor desirable under
-    # load. All provisional values.
-    # Top: how far the elbow must open overhead.
+    # checked at both ends, and says which end fell short. The top isn't 180 -
+    # a fully locked elbow under load isn't the goal
+    # top: how far the elbow must open overhead
     ROM_TOP_EXTENSION_PASS: float = 155.0
     ROM_TOP_EXTENSION_WARN: float = 143.0
-    # Bottom: how far the elbow must close at the shoulders.
+    # bottom: how far the elbow must close at the shoulders
     ROM_BOTTOM_FLEXION_PASS: float = 100.0
     ROM_BOTTOM_FLEXION_WARN: float = 115.0
-    # Total angular excursion within the rep.
+    # total elbow range within the rep
     ROM_MIN_EXCURSION: float = 50.0
 
-    # Free-form notes shown in the technical-details panel.
+    # notes shown in the technical details panel
     notes: dict[str, str] = field(
         default_factory=lambda: {
             "variant": (
@@ -203,13 +191,12 @@ class PressConfig:
 
     # --- ENGINEERING - which filter smooths the movement signal ---
     # "ema" (default), "butterworth" (Dill et al. 2024), "savgol" or
-    # "moving_average". docs/filter_selection.md has the measured trade-off.
+    # "moving_average" - see docs/filter_selection.md
     ANGLE_FILTER: str = "ema"
 
     # --- ENGINEERING - measurement-uncertainty policy ---
-    # False (default): a finding is annotated with the published error of the
-    # quantity behind it and marked "indicative" if its margin falls inside it.
-    # True also downgrades it a step. See exercises/common/uncertainty.py.
+    # False: findings inside the published error are marked "indicative".
+    # True: they are also downgraded a step. See exercises/common/uncertainty.py
     UNCERTAINTY_STRICT: bool = False
 
     def as_dict(self) -> dict:
@@ -220,8 +207,8 @@ class PressConfig:
 
 RECOMMENDED_VIEW = "front-on"
 
-# shown before upload and on a rejection. Two of the three checks compare
-# the arms, which isn't observable from the side.
+# full tips, shown with the retry advice after a rejection. Filmed from the
+# front because two of the three checks compare the arms
 RECORDING_TIPS: tuple[str, ...] = (
     "Film from the front, roughly level with your chest, with the camera centred on you.",
     "Keep both shoulders, both elbows and both wrists visible for the whole set.",
@@ -230,9 +217,7 @@ RECORDING_TIPS: tuple[str, ...] = (
     "Keep the camera still, and record several controlled repetitions.",
 )
 
-# The three lines shown beside the camera diagram before upload. People skim
-# this panel, so it says only what changes whether the analysis can run; the
-# fuller RECORDING_TIPS above are kept for the retry advice after a rejection.
+# the three short lines next to the camera diagram before upload
 QUICK_TIPS: tuple[str, ...] = (
     "Film from the front, level with your chest.",
     "Keep both arms and the dumbbells in frame at the top.",
@@ -242,7 +227,7 @@ QUICK_TIPS: tuple[str, ...] = (
 
 # --- Rule specifications ---
 
-# Phase keys from exercises/common/metrics.py, renamed for the press.
+# phase keys from exercises/common/metrics.py, renamed for the press
 PHASE_READY = "start"
 PHASE_PRESS = "towards"
 PHASE_TOP = "extreme"
@@ -261,7 +246,7 @@ PHASE_LABELS: dict[str, str] = {
 
 
 def rule_specs(config: PressConfig) -> tuple[RuleSpec, ...]:
-    """Every press rule, in the order the results page shows them."""
+    """All press rules, in the order the results page shows them."""
     return (
         RuleSpec(
             name="Arm symmetry",
@@ -292,7 +277,7 @@ def rule_specs(config: PressConfig) -> tuple[RuleSpec, ...]:
             minimum_persistence_frames=config.ALIGNMENT_MIN_FRAMES,
             min_violation_ratio=config.ALIGNMENT_MIN_VIOLATION_RATIO,
             minimum_visibility=config.ALIGNMENT_MIN_VISIBILITY,
-            # frontal-plane: from the side these are depth, which one camera can't do
+            # from the side this would be depth, which one camera can't measure
             supported_views=FRONTAL_VIEWS,
             feedback_key="press_alignment",
             threshold_source=PROTOTYPE_THRESHOLD,

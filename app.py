@@ -1,9 +1,9 @@
 """
-FormFix - the Streamlit app. Run it with `streamlit run app.py`.
+FormFix - run with `streamlit run app.py`.
 
-This file only does page config and routing. views/ has one module per page,
-components/ one per section, utils/ the shared helpers, styles/ and scripts/
-the CSS and JS, static/assets/ the images and reference clips.
+This file just sets up the pages and routing. views/ has the pages, components/
+the sections, utils/ shared helpers, styles/ and scripts/ the CSS and JS, and
+static/assets/ the images and reference clips.
 """
 
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import streamlit as st
 
-# So `components` and `utils` import cleanly whatever directory you launch from.
+# so the imports work from any working directory
 APP_DIR = Path(__file__).resolve().parent
 if str(APP_DIR) not in sys.path:
     sys.path.insert(0, str(APP_DIR))
@@ -70,7 +70,7 @@ def main() -> None:
 
     ensure_pose_model()
 
-    # Site-wide stylesheet; /analyse adds its own on top.
+    # site-wide CSS, /analyse adds its own on top
     inject_styles()
 
     build_navigation().run()

@@ -1,9 +1,8 @@
 /* ==========================================================================
    FormFix - Streamlit behaviour layer
 
-   This is the deliberately small amount of JavaScript the design needs. It is
-   injected into the Streamlit document by utils/styling.py and replaces the
-   GSAP + ScrollTrigger layer of the original prototype with native APIs:
+   The small bit of JS the site needs, injected by utils/styling.py. Replaces
+   the GSAP + ScrollTrigger code from the prototype with native APIs:
 
      * scroll progress line      - one rAF-throttled scroll handler
      * sticky nav surface        - class toggle on the same handler
@@ -14,9 +13,8 @@
      * exercise explorer         - class-driven CSS transitions
      * hero mouse parallax       - pointer-fine only
 
-   Everything degrades: if this file never runs, main.css leaves all content
-   visible (the reveal rules are scoped to html.ff-motion, which is added
-   here).
+   If this never runs, everything is still visible (the reveal CSS only applies
+   under html.ff-motion, which is added here).
    ========================================================================== */
 
 (function () {
@@ -27,8 +25,8 @@
   var reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
   /* ----------------------------------------------------------------------
-     Teardown - Streamlit reruns re-inject this script, so any previous
-     instance must release its listeners and observers first.
+     Teardown - Streamlit reruns inject this again, so the old copy has to
+     remove its listeners and observers first.
      ---------------------------------------------------------------------- */
   var cleanups = [];
 
@@ -56,10 +54,9 @@
   /* ----------------------------------------------------------------------
      Scroll container
 
-     Streamlit does not scroll <html>: the scrollbar lives on the main
-     section. The exact element has changed name across Streamlit versions,
-     so it is resolved by measurement rather than by hard-coded selector,
-     and re-resolved whenever the layout changes.
+     Streamlit scrolls its main section, not <html>, and the element name has
+     changed between versions, so it's found by measuring instead of a fixed
+     selector.
      ---------------------------------------------------------------------- */
   var SCROLLER_SELECTORS = [
     'section.stMain',
@@ -98,12 +95,10 @@
   }
 
   /* ----------------------------------------------------------------------
-     Relocate the fixed layers to <body>
+     Move the fixed layers to <body>
 
-     The atmosphere, the progress line and the navigation must be positioned
-     against the viewport, not against a Streamlit block. Moving them to the
-     document body guarantees that, whatever containing blocks Streamlit
-     introduces around its own elements.
+     The background, progress line and nav need to be fixed to the viewport,
+     not a Streamlit block.
      ---------------------------------------------------------------------- */
   function hoist(selector) {
     var el = doc.querySelector(selector);
@@ -152,8 +147,7 @@
     applyScrollState();
   }
 
-  // Scroll events do not bubble, but they are observable in the capture
-  // phase - so one listener covers whichever element ends up scrolling.
+  // scroll doesn't bubble, but capture phase catches it from any element
   on(doc, "scroll", function (event) {
     var target = event.target;
     if (target && target.nodeType === 1 && target !== scroller) {
@@ -185,7 +179,7 @@
     doc.fonts.ready.then(remeasure).catch(function () {});
   }
 
-  // Images decoding late will change the document height.
+  // late-loading images change the page height
   Array.prototype.forEach.call(doc.querySelectorAll(".ff-page img"), function (img) {
     if (!img.complete) on(img, "load", remeasure);
   });
@@ -259,8 +253,7 @@
       revealObserver.observe(el);
     });
 
-    /* Steps light up while they own the viewport, and dim again on the way
-       back up - the ScrollTrigger onEnter / onLeaveBack behaviour. */
+    /* steps light up when in view and dim again scrolling back up */
     var stepObserver = track(new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
         entry.target.classList.toggle("is-active", entry.isIntersecting);
@@ -271,7 +264,7 @@
       stepObserver.observe(step);
     });
 
-    /* Active section indication in the navigation. */
+    /* active section in the nav */
     var navLinks = Array.prototype.slice.call(doc.querySelectorAll(".nav__link[data-scroll-to]"));
     var sectionObserver = track(new IntersectionObserver(function (entries) {
       entries.forEach(function (entry) {
@@ -288,7 +281,7 @@
       if (section) sectionObserver.observe(section);
     });
   } else {
-    // Reduced motion / no IntersectionObserver: settle everything visible.
+    // reduced motion or no IntersectionObserver: just show everything
     Array.prototype.forEach.call(doc.querySelectorAll("[data-animate]"), function (el) {
       el.classList.add("is-inview");
     });
@@ -362,9 +355,8 @@
   /* ----------------------------------------------------------------------
      Exercise explorer
 
-     All three panels are rendered by Python and live in the DOM; switching
-     is a matter of moving the is-current / is-leaving classes around and
-     letting the CSS transitions in main.css do the cinematic work.
+     All three panels are already in the DOM, switching just moves the
+     is-current / is-leaving classes and the CSS does the transition.
      ---------------------------------------------------------------------- */
   var explorer = doc.querySelector(".explorer__stage-wrap");
 
@@ -443,7 +435,7 @@
       outgoing.classList.add("is-leaving");
       if (info) info.classList.add("is-swapping");
 
-      // Swap the copy while the stage is empty, then bring the new figure in.
+      // swap the text while the stage is empty, then bring the new figure in
       var swapTimer = setTimeout(function () {
         showOnly(panels, index);
         showOnly(metrics, index);

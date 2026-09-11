@@ -1,10 +1,7 @@
 """
-Getting the prototype's CSS and JS into the Streamlit document.
-
-CSS is easy - st.markdown puts a style element in the same document. JavaScript
-isn't, because Streamlit strips <script> out of markdown, so it goes in through
-a zero-height components.html iframe whose script reaches into
-window.parent.document and installs the behaviour there.
+Gets the CSS and JS into the Streamlit page. CSS just goes in with st.markdown.
+Streamlit strips <script> from markdown, so the JS goes through a zero-height
+components.html iframe that installs it into window.parent.document.
 """
 
 from __future__ import annotations
@@ -25,7 +22,6 @@ GOOGLE_FONTS = (
 
 
 def inject_styles() -> None:
-    """Load styles/main.css into the page."""
     css = read_text(MAIN_CSS)
     st.markdown(
         f'<style>@import url("{GOOGLE_FONTS}");\n{css}</style>',
@@ -34,27 +30,23 @@ def inject_styles() -> None:
 
 
 def inject_page_styles(path) -> None:
-    """Load an extra stylesheet on top of main.css, so /analyse styles stay off the homepage."""
+    """Extra stylesheet on top of main.css, so /analyse styles stay off the homepage."""
     css = read_text(path)
     if css:
         st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
 
 
 def inject_behaviour() -> None:
-    """Install scripts/main.js into the parent document. Call it at the end of a
-    page, once the markup it enhances exists."""
+    """Install scripts/main.js. Call it at the end of the page, after the markup."""
     inject_script(MAIN_JS, element_id="formfix-behaviour", teardown="FormFixTeardown")
 
 
 def inject_script(path, element_id: str, teardown: str | None = None) -> None:
     """
-    Install a JavaScript file into the parent (Streamlit) document. element_id
-    names the injected script so a rerun replaces it rather than stacking
-    listeners; teardown is a window function the previous copy exposed.
-
-    The bootstrap carries a per-run nonce: without it the iframe content is
-    identical every rerun, Streamlit reuses the frame and the script never runs
-    again - which showed up as new feedback cards rendering invisible.
+    Install a JS file into the parent Streamlit page. element_id lets a rerun
+    replace the script instead of stacking listeners, and teardown is a function
+    the old copy exposed. A per-run nonce is needed, otherwise Streamlit reuses the
+    iframe, the script doesn't run again and new feedback cards stay invisible.
     """
     js = read_text(path)
     if not js:
@@ -63,8 +55,8 @@ def inject_script(path, element_id: str, teardown: str | None = None) -> None:
     nonce = st.session_state.get("_ff_script_nonce", 0) + 1
     st.session_state["_ff_script_nonce"] = nonce
 
-    # json.dumps gives a JS-safe string literal; the replace stops a literal
-    # "</script>" in the source from closing this tag early.
+    # json.dumps gives a safe JS string, and the replace stops a "</script>" in
+    # the source closing the tag early
     payload = json.dumps(js).replace("</", "<\\/")
     teardown_js = (
         f"""
@@ -99,16 +91,13 @@ def inject_script(path, element_id: str, teardown: str | None = None) -> None:
 
 
 def inject_analyse_styles() -> None:
-    """The /analyse stylesheet, loaded on that page only."""
     inject_page_styles(ANALYSE_CSS)
 
 
 def inject_analyse_behaviour() -> None:
-    """The /analyse behaviour layer. Goes in after main.js so the shared
-    scroll-reveal observers are already running."""
+    """The /analyse JS. Goes in after main.js so the scroll-reveal is already running."""
     inject_script(ANALYSE_JS, element_id="formfix-analyse", teardown="FormFixAnalyseTeardown")
 
 
 def html(markup: str) -> None:
-    """Shorthand for writing a block of custom markup."""
     st.markdown(markup, unsafe_allow_html=True)

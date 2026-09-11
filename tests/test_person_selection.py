@@ -1,13 +1,10 @@
 """
 Which person gets analysed when more than one is in shot.
 
-The case that drove this: filming in a real gym. Someone is almost always
-visible behind the athlete, and the old rule - reject when a second person
-appears in over half the frames - threw out recordings that had been tracked
-correctly from start to finish. The subtler failure was worse: a bounding box
-shrinks as its owner squats, so at the bottom of a rep a bystander standing
-still could become the tallest person in frame and take over the analysis
-silently, blending two bodies into one set of measurements.
+In a real gym someone is nearly always in the background, and the old rule
+(reject if a second person is in over half the frames) threw out videos that
+were tracked fine. Worse, at the bottom of a squat a bystander could become the
+tallest person and silently take over the analysis.
 """
 
 from __future__ import annotations
@@ -32,10 +29,7 @@ class LM:
 
 
 def person(hip_x: float, hip_y: float, torso: float = 0.18, height: float = 0.55) -> list:
-    """
-    A minimal 33-landmark body: hips at the given centre, shoulders one torso
-    above, and head/feet placed to give the bounding box a known height.
-    """
+    """Minimal 33-landmark body with a known hip position and box height."""
     lms = [LM(hip_x, hip_y) for _ in range(33)]
     lms[LEFT_HIP] = LM(hip_x - 0.02, hip_y)
     lms[RIGHT_HIP] = LM(hip_x + 0.02, hip_y)
@@ -58,7 +52,7 @@ def test_single_person_is_tracked():
 
 
 def test_first_frame_picks_the_tallest():
-    """No history yet, so nearest-to-camera (biggest in frame) decides."""
+    """No history yet, so the biggest person in frame wins."""
     t = _PersonTracker()
     athlete = person(0.5, 0.5, height=0.70)  # near the camera
     bystander = person(0.2, 0.45, height=0.30)  # further back
@@ -73,18 +67,14 @@ def test_empty_frame_returns_nothing():
 
 
 def test_bystander_cannot_steal_the_track_at_the_bottom_of_a_squat():
-    """
-    The athlete's box shrinks as they squat; the bystander's does not. Height
-    alone would hand the analysis to the bystander mid-rep. Continuity keeps
-    it on the athlete.
-    """
+    """The athlete's box shrinks as they squat, but tracking keeps it on them."""
     t = _PersonTracker()
     athlete_standing = person(0.5, 0.50, height=0.70)
     bystander = person(0.8, 0.45, height=0.55)
 
     assert t.select([athlete_standing, bystander], 0) is athlete_standing
 
-    # Bottom of the rep: hips drop, the box is now SHORTER than the bystander's.
+    # bottom of the rep: the box is now SHORTER than the bystander's
     athlete_squatting = person(0.5, 0.62, height=0.42)
     picked = t.select([athlete_squatting, bystander], 1)
 
@@ -108,7 +98,7 @@ def test_the_nearest_candidate_wins_not_the_tallest():
     t = _PersonTracker()
     athlete = person(0.5, 0.5, height=0.60)
     t.select([athlete], 0)
-    # A taller person appears, but further from where the athlete was.
+    # a taller person appears, but further from where the athlete was
     taller_elsewhere = person(0.62, 0.5, height=0.90)
     moved_slightly = person(0.51, 0.5, height=0.60)
     assert t.select([taller_elsewhere, moved_slightly], 1) is moved_slightly
@@ -120,7 +110,7 @@ def test_the_nearest_candidate_wins_not_the_tallest():
 def test_a_jump_across_the_room_counts_as_a_switch():
     t = _PersonTracker()
     t.select([person(0.2, 0.5)], 0)
-    # Nobody near where the athlete was: both candidates are far away.
+    # nobody near where the athlete was
     t.select([person(0.85, 0.5), person(0.9, 0.52)], 1)
     assert t.switches == 1
 
@@ -128,8 +118,7 @@ def test_a_jump_across_the_room_counts_as_a_switch():
 def test_track_is_dropped_after_a_long_absence():
     t = _PersonTracker()
     t.select([person(0.2, 0.5)], 0)
-    # Athlete gone for longer than the gap allowance; height decides again and
-    # a stale position is not held against the new pick.
+    # athlete gone longer than the allowed gap, so height decides again
     far_future = MAX_IDENTITY_GAP_FRAMES + 5
     tall = person(0.85, 0.5, height=0.80)
     short = person(0.88, 0.5, height=0.30)
@@ -152,7 +141,7 @@ def test_malformed_landmarks_do_not_raise():
     t = _PersonTracker()
     t.select([person(0.5, 0.5)], 0)
     broken = [LM(float("nan"), float("nan")) for _ in range(33)]
-    # Must fall back rather than crash the whole detection run.
+    # should fall back, not crash
     assert t.select([broken, person(0.5, 0.5)], 1) is not None
 
 
@@ -189,12 +178,7 @@ def _pose(frames: int, n_poses: int, switches: int):
 
 
 def _multi_person_outcome(frames=900, n_poses=2, switches=0, fps=30.0):
-    """
-    Run just the multi-person branch and report (rejected, warned).
-
-    Reproduces the logic under test against a pose track, without needing a
-    real video or the full validation stage.
-    """
+    """Run just the multi-person check and return (rejected, warned)."""
     from analysis.validation import MAX_SWITCH_RATE_PER_SECOND, MIN_SWITCHES_TO_REJECT
 
     pose = _pose(frames, n_poses, switches)
@@ -206,10 +190,7 @@ def _multi_person_outcome(frames=900, n_poses=2, switches=0, fps=30.0):
 
 
 def test_busy_gym_with_clean_tracking_is_accepted():
-    """
-    The case that mattered: someone visible in every single frame, but the
-    athlete tracked throughout. This used to be rejected outright.
-    """
+    """Someone in every frame but the athlete tracked the whole time - used to be rejected."""
     rejected, warned = _multi_person_outcome(n_poses=2, switches=0)
     assert not rejected
     assert warned, "a bystander should still be mentioned"
@@ -227,7 +208,7 @@ def test_a_couple_of_switches_warns_but_does_not_reject():
 
 
 def test_a_track_that_keeps_coming_apart_is_rejected():
-    # 30 s clip, a switch roughly every second: no longer one person's movement.
+    # 30 s clip with a switch about every second - not one person any more
     rejected, _ = _multi_person_outcome(frames=900, switches=25)
     assert rejected
 
@@ -246,6 +227,6 @@ def test_switch_rate_is_length_independent():
 
 
 def test_a_few_switches_in_a_very_short_clip_still_rejects_only_if_frequent():
-    # 4 switches over 20 s is 0.2/s - under the rate, so not a rejection.
+    # 4 switches over 20 s is 0.2/s, under the limit
     rejected, _ = _multi_person_outcome(frames=600, switches=4)
     assert not rejected

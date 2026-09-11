@@ -3,13 +3,10 @@ Press phase detection and rep counting:
 
     READY (at the shoulders) -> PRESSING -> TOP -> LOWERING -> READY
 
-The state machine is the shared one in exercises/common/phases.py, run on elbow
-flexion (180 - elbow angle), which is high at the shoulders and falls towards
-zero overhead. Framing it that way is what lets the press reuse the machine
-unchanged even though this movement travels up where the other two go down.
-
-The thresholds are adaptive, fixed margins below the flexion this person rests
-at between presses.
+Uses the shared state machine (exercises/common/phases.py) on elbow flexion
+(180 - elbow angle), which is high at the shoulders and near zero overhead.
+That way the press can reuse it even though it moves up instead of down.
+Thresholds are margins below the person's own resting flexion.
 """
 
 from __future__ import annotations
@@ -26,7 +23,7 @@ from exercises.common.phases import (
 
 from .config import PressConfig
 
-# Generic phase -> what the press calls it.
+# generic phase -> press phase
 PHASE_NAMES: dict[MovementPhase, PressPhase] = {
     MovementPhase.REST: PressPhase.READY,
     MovementPhase.TOWARDS: PressPhase.PRESSING,
@@ -37,8 +34,8 @@ PHASE_NAMES: dict[MovementPhase, PressPhase] = {
 
 
 def resting_flexion(flexion: np.ndarray, config: PressConfig) -> float:
-    """The elbow flexion this person rests at between presses. A high percentile
-   , not the maximum, then clamped, so one over-flexed frame can't set it."""
+    """Resting elbow flexion between presses. A high percentile instead of the max,
+    then clamped, so one odd frame can't set it."""
     finite = flexion[np.isfinite(flexion)]
     if finite.size < 5:
         return config.READY_ELBOW_FLEXION
@@ -47,7 +44,7 @@ def resting_flexion(flexion: np.ndarray, config: PressConfig) -> float:
 
 
 def detection_config(config: PressConfig, reference: float) -> RepDetectionConfig:
-    """The press's thresholds in the shared machine's vocabulary."""
+    """The press thresholds in the format the shared state machine expects."""
     return RepDetectionConfig(
         rest_level=reference - config.REST_MARGIN,
         start_level=reference - config.PRESS_START_MARGIN,
@@ -69,13 +66,11 @@ def detect_reps(
     config: PressConfig,
     reference: float | None = None,
 ) -> RepDetectionResult:
-    """Run the state machine over a smoothed elbow-flexion series. A NaN reaching
-    here means the frame really had no measurement."""
+    """Run the state machine over the smoothed elbow flexion."""
     if reference is None:
         reference = resting_flexion(flexion, config)
     return detect_repetitions(flexion, timestamps, detection_config(config, reference))
 
 
 def named_phases(phases: list[MovementPhase]) -> list[PressPhase]:
-    """Rename the generic per-frame phases for the press."""
     return [PHASE_NAMES.get(phase, PressPhase.UNKNOWN) for phase in phases]

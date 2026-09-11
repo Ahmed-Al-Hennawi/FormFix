@@ -1,7 +1,7 @@
 /* ==========================================================================
    FormFix - Streamlit stylesheet
-   Direct port of the original prototype stylesheet.
-   Palette: "Cyber Pulse" - dark, restrained, cyan + lime as controlled accents
+   Ported from the original prototype.
+   Palette: "Cyber Pulse" - dark, with cyan + lime as accents
 
    Contents
      0.  Streamlit reset          - removing the default Streamlit look
@@ -29,9 +29,8 @@
 
 /* ==========================================================================
    0 - Streamlit reset
-   Strip the app-shell chrome so the page reads as a product website rather
-   than a Streamlit demo. Both the modern class names and the older
-   data-testid hooks are targeted, so this survives Streamlit upgrades.
+   Hides Streamlit's default chrome so it looks like a website, not a demo.
+   Targets both the new class names and the older data-testid ones.
    ========================================================================== */
 header[data-testid="stHeader"],
 .stAppHeader,
@@ -43,15 +42,14 @@ header[data-testid="stHeader"],
 #MainMenu,
 .stApp > footer,
 [data-testid="stAppViewContainer"] > footer,
-/* The app declares its own navigation in app.py (st.navigation, hidden), so
-   Streamlit's page list never renders. Belt and braces for older versions. */
+/* app.py hides st.navigation already, this is just for older versions */
 [data-testid="stSidebarNav"] {
   display: none !important;
   height: 0 !important;
   visibility: hidden !important;
 }
 
-/* Let the fixed atmosphere layer show through every shell element. */
+/* let the background show through */
 .stApp,
 [data-testid="stAppViewContainer"],
 [data-testid="stMain"],
@@ -60,7 +58,7 @@ header[data-testid="stHeader"],
   background: transparent !important;
 }
 
-/* Full-bleed: our own .container elements control width from here on. */
+/* full width - .container handles the width from here */
 [data-testid="stMainBlockContainer"],
 .stMainBlockContainer,
 .block-container {
@@ -68,8 +66,7 @@ header[data-testid="stHeader"],
   max-width: 100% !important;
 }
 
-/* Streamlit inserts a flex gap between every element; the sections manage
-   their own vertical rhythm. */
+/* remove Streamlit's gap between elements, the sections handle spacing */
 [data-testid="stVerticalBlock"],
 .stVerticalBlock {
   gap: 0 !important;
@@ -82,7 +79,7 @@ header[data-testid="stHeader"],
   width: 100% !important;
 }
 
-/* Zero-height helper iframes (the behaviour bootstrap) must not reserve space. */
+/* the zero-height JS iframes shouldn't take up space */
 [data-testid="stIFrame"][height="0"],
 iframe[height="0"] {
   display: block;
@@ -90,12 +87,11 @@ iframe[height="0"] {
   border: 0;
 }
 
-/* The original set overflow-x: hidden on <body>; here the equivalent lives on
-   whichever element Streamlit uses as the scroll container. */
+/* overflow-x: hidden goes on Streamlit's scroll container instead of <body> */
 .stMain,
 [data-testid="stMain"] { overflow-x: hidden; }
 
-/* Streamlit's own scrollbar, in FormFix colours. */
+/* scrollbar in FormFix colours */
 .stMain::-webkit-scrollbar,
 [data-testid="stMain"]::-webkit-scrollbar { width: 10px; }
 
@@ -179,9 +175,8 @@ html, body, .stApp {
 .ff-page p { margin: 0; }
 .ff-page h1, .ff-page h2, .ff-page h3 { margin: 0; padding: 0; font-weight: inherit; }
 
-/* Streamlit styles bare elements at class-level specificity, which would beat
-   a plain class selector, so rules here are written element-qualified
-   (p.eyebrow, h2.display, a.btn) to win on source order. */
+/* Streamlit's element styles beat plain class selectors, so these are written
+   as p.eyebrow, h2.display, a.btn etc. */
 .ff-page a,
 .nav-wrap a,
 .mobile-menu a {
@@ -191,9 +186,8 @@ html, body, .stApp {
 
 .ff-page a:hover { text-decoration: none; }
 
-/* Streamlit adds anchor ids and a hover link icon to any heading it renders.
-   Section ids are namespaced (ff-*) so they cannot collide with those
-   generated anchors, and the icon itself is hidden. */
+/* Streamlit adds anchor links to headings - section ids use ff-* so they don't
+   clash, and the link icon is hidden */
 .ff-page [data-testid="stHeaderActionElements"],
 .ff-page .headerlink,
 .ff-page a.anchor-link,
@@ -208,10 +202,8 @@ html, body, .stApp {
 
 /* ==========================================================================
    2 - Scroll progress
-   A 2px hairline pinned to the very top of the viewport, above the nav.
-   The bar is full width and scaled on the X axis from main.js - transform
-   only, so it never triggers layout and stays smooth during fast scrolling.
-       top of page -> 0%      halfway -> ~50%      bottom -> 100%
+   2px line at the top of the viewport. main.js scales it on the X axis
+   (transform only, so it stays smooth).
    ========================================================================== */
 .scroll-progress {
   position: fixed;
@@ -285,7 +277,7 @@ html, body, .stApp {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.024'/%3E%3C/svg%3E");
 }
 
-/* The page content sits above the atmosphere. */
+/* content sits above the background */
 [data-testid="stAppViewContainer"] { position: relative; z-index: 1; }
 
 
@@ -330,11 +322,8 @@ h1.display--md, h2.display--md, .display--md { font-size: clamp(2.1rem, 4.6vw, 3
 .line-mask .line { display: inline-block; will-change: transform; }
 
 /* ---------- Buttons ----------
-   The modifiers below are element-qualified for the same reason as the rest
-   of this file (see the note near the top): a bare `.btn--primary` loses to
-   `.ff-page a { color: inherit }`, which is (0,1,1). Unqualified, the primary
-   call to action rendered as white text on Electric Cyan - about 1.6:1
-   contrast, effectively unreadable. */
+   Written as a.btn--primary etc, otherwise `.ff-page a { color: inherit }`
+   wins and the main button was white text on cyan (about 1.6:1 contrast). */
 .btn {
   display: inline-flex;
   align-items: center;
@@ -572,9 +561,7 @@ a.mobile-menu__cta, .mobile-menu__cta { color: var(--cyan); border: 1px solid rg
   width: min(1320px, 94vw);
   margin-inline: auto;
   display: grid;
-  /* The copy column takes the larger share: the headline is three deliberate
-     lines that must never wrap (see below), so it needs the width more than
-     the figure does. */
+  /* the text column is wider because the three headline lines must not wrap */
   grid-template-columns: minmax(320px, 1.2fr) minmax(360px, 0.85fr);
   align-items: center;
   gap: clamp(1rem, 4vw, 4rem);
@@ -590,13 +577,9 @@ h1.hero__title, .hero__title {
   margin-bottom: 1.6rem;
 }
 
-/* Three lines, three rows - always.
-
-   The headline is revealed one line at a time, so a wrapped line breaks both
-   the rhythm and the animation. Viewport units can't prevent that: the column
-   caps at 1320px while `3.5vw` keeps climbing. Sizing the type from the column
-   instead (`6.1cqw`) is the largest size at which the longest line still fits.
-   Below 900px the hero is a single column and wrapping is fine. */
+/* Always three lines. Each line animates in separately, so wrapping breaks it.
+   Sized from the column (6.1cqw) instead of vw, since the column stops at
+   1320px. Below 900px it's one column and wrapping is fine. */
 @media (min-width: 901px) {
   .hero__copy { container-type: inline-size; }
 
@@ -677,15 +660,14 @@ figure.hero__figure {
 
 
 /* ==========================================================================
-   7 - FormFix landmark system
-   One overlay language shared by every exercise figure:
-     * spine        - dashed structural centre line, almost subliminal
-     * links        - cyan hairlines between joints
-     * links--focus - the limb the rules engine is reading, cyan -> lime
-     * flow         - a single light travelling along the focus limb
+   7 - FormFix landmark system (same for every exercise figure)
+     * spine        - faint dashed centre line
+     * links        - cyan lines between joints
+     * links--focus - the limb the rules read, cyan -> lime
+     * flow         - a light moving along the focus limb
      * arc          - the measured joint angle
-     * nodes        - ringed tracking nodes; lime for the joint under analysis
-   Strokes use non-scaling-stroke so hairlines stay crisp at every figure size.
+     * nodes        - ringed joints, lime for the one being analysed
+   non-scaling-stroke keeps the lines crisp at any size.
    ========================================================================== */
 .pose {
   position: absolute;
@@ -731,7 +713,7 @@ figure.hero__figure {
   stroke-opacity: 0.9;
 }
 
-/* the travelling read-out light - one soft pass, then a long pause */
+/* the moving light - one pass, then a long pause */
 .pose__flow line {
   stroke: rgba(234, 255, 255, 0.75);
   stroke-width: 1.7;
@@ -782,7 +764,7 @@ figure.hero__figure {
   opacity: 0.92;
 }
 
-/* a slow, barely-there breathe so the set feels alive but never busy */
+/* slow subtle pulse */
 .pn {
   animation: poseBreathe 4.4s ease-in-out infinite;
 }
@@ -964,12 +946,10 @@ a.hero__scroll-hint, .hero__scroll-hint {
 
 
 /* ==========================================================================
-   7b - What this is (orientation block)
+   7b - What this is
    ==========================================================================
-   Sits directly under the hero. A statement on the left, two scannable
-   panels on the right: the "what it does not do" half is a list by nature,
-   and a reader deciding whether a tool is for them scans rather than reads.
-   Deliberately quieter than a full section, hence the tighter rhythm. */
+   Under the hero: statement on the left, two lists on the right (people scan
+   this rather than read it). Quieter than a full section on purpose. */
 .section--tight { padding: clamp(64px, 8vw, 116px) 0; }
 
 .about__grid {
@@ -989,11 +969,10 @@ h2.about__title, .about__title {
   max-width: 19ch;
 }
 
-/* Same emphasis the hero headline uses, so the two read as one voice. */
+/* same highlight as the hero headline */
 .about__title em { font-style: normal; color: var(--cyan); }
 
-/* A short bar of the brand gradient - the same ramp as the scroll progress
-   indicator. It gives the column a beat between the claim and the detail. */
+/* short gradient bar between the statement and the detail */
 .about__rule {
   display: block;
   width: 56px;
@@ -1012,7 +991,7 @@ p.about__text, .about__text {
   margin-top: clamp(1.2rem, 2.4vw, 1.6rem);
 }
 
-/* The pills need a reason to be there, or they read as stray buttons. */
+/* label so the pills don't look like random buttons */
 p.about__chips-label, .about__chips-label {
   font-family: var(--font-mono);
   font-size: 0.62rem;
@@ -1023,7 +1002,7 @@ p.about__chips-label, .about__chips-label {
   margin-bottom: 0.85rem;
 }
 
-/* The three movements, as pills - faster to take in than a clause. */
+/* the three exercises as pills */
 ul.about__chips, .about__chips {
   display: flex;
   flex-wrap: wrap;
@@ -1045,8 +1024,7 @@ ul.about__chips, .about__chips {
   background: rgba(28, 37, 65, 0.4);
 }
 
-/* Closes the column, and earns its place: both halves are literally true of
-   the build, so this is scope information rather than decoration. */
+/* "no account, video deleted" note at the bottom of the column */
 p.about__aside, .about__aside {
   position: relative;
   padding-left: 1.15rem;
@@ -1057,8 +1035,7 @@ p.about__aside, .about__aside {
   margin-top: clamp(1.7rem, 3.2vw, 2.4rem);
 }
 
-/* Absolute, not inline, so a second line hangs under the first rather than
-   tucking back under the dot. */
+/* absolute so a wrapped line lines up with the text, not the dot */
 .about__aside::before {
   content: "";
   position: absolute;
@@ -1083,9 +1060,7 @@ p.about__aside, .about__aside {
   padding: clamp(1.4rem, 2.8vw, 1.9rem);
 }
 
-/* The two panels are not equals. "Built for you if" is the one that answers
-   the reader's actual question, so it carries the lime the rest of the page
-   uses for a positive verdict; the exclusions sit back in neutral hairline. */
+/* "Built for you if" gets the lime accent, the other panel stays neutral */
 .about__panel--yes {
   border-color: rgba(57, 255, 20, 0.22);
   background:
@@ -1124,8 +1099,7 @@ ul.about__list, .about__list {
   line-height: 1.55;
 }
 
-/* The marker is a badge rather than a bare glyph: it holds the line's left
-   edge steady when an item wraps, and gives the two panels one geometry. */
+/* marker is a badge so wrapped lines stay aligned */
 .about__list li::before {
   position: absolute;
   left: 0;
@@ -1552,9 +1526,7 @@ p.verdict__caption, .verdict__caption {
 
 .verdict--formfix { border-color: rgba(57, 255, 20, 0.25); background: rgba(57, 255, 20, 0.045); }
 
-/* The FormFix card mirrors the real correction card on the analysis page:
-   title, what happened, why it matters, what to try. Keeping the two in step
-   means this section previews the product rather than advertising it. */
+/* same layout as the real correction card on the analysis page */
 p.verdict__title, .verdict__title {
   font-family: var(--font-mono);
   font-size: 0.72rem;
@@ -1600,8 +1572,7 @@ p.verdict__fix, .verdict__fix {
   transform: translateY(-1px);
 }
 
-/* The trace heading - the three nodes below are more technical than the rest
-   of the page, so they are introduced rather than dropped on the reader. */
+/* intro for the three nodes, the most technical part of the page */
 .explain__trace-head { margin-bottom: clamp(1.6rem, 3vw, 2.4rem); }
 
 h3.explain__trace-title, .explain__trace-title {
@@ -1985,7 +1956,7 @@ p.analyse__lede, .analyse__lede { color: var(--ink-60); max-width: 56ch; margin-
 
 .st-key-ff_analyse [role="radiogroup"] label:hover { color: var(--white) !important; }
 
-/* hide the default radio dot - the pill itself is the affordance */
+/* hide the radio dot, the pill is the button */
 .st-key-ff_analyse [data-testid="stRadioOption"] > span { display: none !important; }
 
 .st-key-ff_analyse [data-testid="stRadioOption"] > div > div > div:first-child,
@@ -2041,8 +2012,7 @@ p.analyse__lede, .analyse__lede { color: var(--ink-60); max-width: 56ch; margin-
   color: var(--cyan) !important;
 }
 
-/* Stack the drop zone and lead with a FormFix instruction rather than
-   Streamlit's default left-aligned button + caption arrangement. */
+/* stack the drop zone with our own instruction instead of Streamlit's layout */
 .st-key-ff_analyse [data-testid="stFileUploaderDropzone"] {
   display: flex !important;
   flex-direction: column-reverse !important;
@@ -2103,9 +2073,8 @@ p.analyse__lede, .analyse__lede { color: var(--ink-60); max-width: 56ch; margin-
               background-color 0.35s var(--ease-out), transform 0.35s var(--ease-out);
 }
 
-/* Same label-centring fix as /analyse: Streamlit's markdown wrapper inside a
-   button carries a paragraph margin, which lifts the label off the pill's
-   optical centre. */
+/* same fix as analyse.css - the <p> margin inside the button pushes the label
+   off centre */
 .st-key-ff_analyse .stButton button > *,
 .st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button > *,
 .st-key-ff_analyse [data-testid="stFileUploader"] button > *,
@@ -2145,9 +2114,8 @@ p.analyse__lede, .analyse__lede { color: var(--ink-60); max-width: 56ch; margin-
   transform: translateY(-2px);
 }
 
-/* keep the browse button's icon and label apart even before the icon font
-   has loaded */
-/* Centre the label on both axes - see the matching note in analyse.css. */
+/* keep the icon and label apart even before the icon font loads */
+/* centre the label (see analyse.css) */
 .st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button > div,
 .st-key-ff_analyse [data-testid="stFileUploader"] button > div {
   display: flex;
@@ -2321,10 +2289,9 @@ p.footer__disclaimer, .footer__disclaimer { color: var(--ink-40); font-size: 0.8
 
 /* ==========================================================================
    17 - Scroll-reveal animation states
-   These replace the GSAP/ScrollTrigger timelines from the original script.js
-   with IntersectionObserver-driven classes. Every rule is scoped to
-   html.ff-motion, which main.js adds - so if JavaScript never runs, nothing
-   is ever hidden and the page degrades to fully visible content.
+   Replace the GSAP timelines from the prototype with IntersectionObserver
+   classes. Everything is under html.ff-motion (added by main.js), so without
+   JS nothing is hidden.
    ========================================================================== */
 
 /* --- generic fade-up --- */
@@ -2340,8 +2307,7 @@ html.ff-motion [data-animate="fade-up"].is-inview {
 }
 
 /* --- masked line reveal ---
-   The hook sits on the mask, because the line inside it starts fully clipped
-   and would never register as visible to an IntersectionObserver. */
+   hook is on the mask because the line starts fully hidden */
 html.ff-motion .line-mask[data-animate="line"] > .line { transform: translateY(115%); }
 
 html.ff-motion .line-mask[data-animate="line"].is-inview > .line {
@@ -2445,7 +2411,7 @@ html.ff-motion [data-animate="report"].is-inview .report__feedback {
   transition: opacity 0.6s var(--ease-out) 0.75s, transform 0.6s var(--ease-out) 0.75s;
 }
 
-/* Without JavaScript the meters still need to read as filled. */
+/* without JS the meters should still look filled */
 html:not(.ff-motion) .report__bar { transform: scaleX(1); }
 html:not(.ff-motion) .how__line-progress { transform: scaleY(1); }
 html:not(.ff-motion) .ex-figure.is-current { opacity: 1; visibility: visible; transform: none; filter: none; }
@@ -2587,10 +2553,7 @@ html.ff-motion .hero__scroll-hint { animation: fadeIn 0.6s ease 1.3s backwards; 
 
   .hud--br { bottom: 8%; }
 
-  /* The scroll cue is hidden on a phone. At this width it crowds the hero
-     content it sits under, and a touch screen makes the page obviously
-     scrollable without being told. The selector carries the `a.` from the
-     base rule so it wins on specificity rather than on order. */
+  /* hide the scroll hint on phones, it crowds the hero (a. prefix for specificity) */
   a.hero__scroll-hint, .hero__scroll-hint { display: none; }
 
   .st-key-ff_analyse { padding: 1.2rem; }
@@ -2619,6 +2582,6 @@ html.ff-motion .hero__scroll-hint { animation: fadeIn 0.6s ease 1.3s backwards; 
   .pn, .pn__ping, .pn__orbit { animation: none; }
   .pn__ping { opacity: 0; }
 
-  /* the progress line is information, not decoration - it stays */
+  /* keep the progress line, it's useful */
   .scroll-progress__bar { transition: none; }
 }

@@ -1,8 +1,6 @@
 """
-Lat-pulldown rules, driven from hand-built repetitions. A rule only compares a
-measured value against a configured range, so setting the value directly keeps
-these independent of the measurement layer and makes the false-positive cases
-easy to write.
+Lat pulldown rules tested with hand-built reps, so they don't depend on the
+measurement code and false-positive cases are easy to write.
 """
 
 from __future__ import annotations
@@ -121,8 +119,7 @@ class TestRangeOfMotionClassification:
         assert status is RuleStatus.NOT_EVALUABLE
 
     def test_the_top_criterion_does_not_demand_a_locked_elbow(self):
-        # 152 deg is short of straight but inside the configured range. No
-        # point asking anyone to hyperextend under load.
+        # 152 deg isn't straight but is inside the range - no need to hyperextend
         _, status = classify_rom(make_rep(top_elbow=152.0), CONFIG)
         assert status is RuleStatus.PASS
 
@@ -175,8 +172,7 @@ class TestTorsoRule:
         assert result.correction == ""
 
     def test_a_modest_natural_lean_is_not_flagged(self):
-        # The rule isn't asking for a vertical trunk - a seated pulldown is
-        # done with some recline and a few degrees of movement in it.
+        # not asking for a vertical trunk, some lean and movement is normal
         result = rule_torso_movement(
             [make_rep(1, torso_excursion=9.0, torso_at_bottom=22.0)], CONFIG, SPECS["pulldown_torso"]
         )
@@ -201,8 +197,7 @@ class TestTorsoRule:
         assert "driving your elbows" in result.correction
 
     def test_an_extreme_absolute_posture_is_flagged_even_with_a_small_change(self):
-        # 50 deg from vertical the whole way through isn't the exercise we
-        # think we're analysing, however still it stayed.
+        # 50 deg from vertical the whole time isn't really a pulldown
         result = rule_torso_movement(
             [make_rep(1, torso_excursion=4.0, torso_at_bottom=50.0)],
             CONFIG,
@@ -285,6 +280,6 @@ class TestScoringExcludesUnassessedChecks:
             side_view_confidence=0.0,
         )
         score, _, evaluable = transparent_score(results)
-        # Only the two range-of-motion checks had evidence, both passed.
+        # only the two ROM checks had evidence, and both passed
         assert evaluable == 2
         assert score == 100

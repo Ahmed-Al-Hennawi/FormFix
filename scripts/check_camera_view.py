@@ -1,14 +1,12 @@
 """
 Prints the frontality ratio for one or more clips, using the app's own detector
-and heuristic. Read-only, not used by the app at runtime.
+and heuristic. Not used by the app itself.
 
     python scripts/check_camera_view.py clip.mp4 [clip2.mp4 ...]
 
-validation.py calls a recording SIDE / DIAGONAL_SIDE / FRONTAL from
-max(shoulder sep, hip sep) / torso length, with the band edges in each
-exercise's config. Those edges came from a synthetic fixture and the unit tests
-build their "frontal" pose to match, so the tests can't tell you a band is
-wrong. Run this over clips labelled by eye and compare the groups.
+The SIDE / DIAGONAL_SIDE / FRONTAL band edges came from a synthetic test pose,
+so the unit tests can't show a band is wrong. I use this on clips labelled by
+eye to check them.
 """
 
 from __future__ import annotations
@@ -46,7 +44,7 @@ def _load_config(exercise: str):
 
 
 class _Bands:
-    """The two band edges, in the shape classify_orientation expects."""
+    """The two band edges in the format classify_orientation expects."""
 
     def __init__(self, good: float, frontal: float) -> None:
         self.side_view_good_ratio = good

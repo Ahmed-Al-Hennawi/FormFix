@@ -1,7 +1,6 @@
 """
-Persistent-violation filtering: the gap between the threshold being crossed
-and the lifter actually doing something. A one-frame spike is a jittery
-landmark; a violation that holds, or keeps recurring across the phase, isn't.
+Tests for persistence filtering: a one-frame spike is just a jittery landmark,
+but a violation that holds or keeps coming back is real.
 """
 
 from __future__ import annotations
@@ -63,7 +62,7 @@ class TestMissingData:
     def test_unmeasurable_frames_are_not_evidence_either_way(self):
         series = [np.nan] * 10 + [70.0] * 5
         ev = evidence(series, 45.0)
-        # NaN frames count neither as violations nor as clean frames.
+        # NaN frames count as neither violations nor clean frames
         assert ev.measurable_frames == 5
         assert ev.violating_frames == 5
         assert ev.ratio == 1.0

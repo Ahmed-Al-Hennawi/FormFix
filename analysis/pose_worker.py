@@ -15,7 +15,7 @@ import argparse
 import sys
 from pathlib import Path
 
-# so the app packages import whatever directory this is run from
+# so the app packages import from any working directory
 APP_ROOT = Path(__file__).resolve().parent.parent
 if str(APP_ROOT) not in sys.path:
     sys.path.insert(0, str(APP_ROOT))
@@ -26,7 +26,6 @@ from analysis.models import AnalysisFailure  # noqa: E402
 from analysis.pose_detector import detect_poses_inprocess  # noqa: E402
 from analysis.video_processor import probe_video  # noqa: E402
 
-# progress line every N frames
 PROGRESS_EVERY = 5
 
 

@@ -1,14 +1,14 @@
 """
-URL helpers for the two pages. Streamlit owns the URLs, but the components emit
-plain HTML, so the "Analyse Form" and "Back Home" links need a real href rather
-than a widget. These build one and honour server.baseUrlPath.
+URL helpers for the two pages. The components are plain HTML, so links like
+"Analyse Form" and "Back Home" need a real href. These respect
+server.baseUrlPath.
 """
 
 from __future__ import annotations
 
 import streamlit as st
 
-# The url_path values app.py declares the pages with.
+# url_path values used in app.py
 HOME_PATH = "home"
 ANALYSE_PATH = "analyse"
 
@@ -24,7 +24,6 @@ def _prefix() -> str:
 
 
 def page_url(path: str = "") -> str:
-    """Root-relative URL for one of the app's pages."""
     path = path.strip("/")
     prefix = _prefix()
     if not path:
@@ -33,12 +32,10 @@ def page_url(path: str = "") -> str:
 
 
 def home_url() -> str:
-    """The homepage, which Streamlit serves from the app root."""
     return page_url()
 
 
 def analyse_url() -> str:
-    """The upload / analysis page."""
     return page_url(ANALYSE_PATH)
 
 

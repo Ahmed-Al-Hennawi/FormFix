@@ -1,14 +1,12 @@
 """
-Recording rejection codes -> the failure screens the interface can render.
-Validation speaks in RejectionCode; the interface has a smaller set. The split
-is what keeps a recording problem from ever looking like a technique fault.
+Maps validation RejectionCodes to the smaller set of failure screens the UI
+has, so a recording problem never looks like a technique fault.
 """
 
 from __future__ import annotations
 
 from analysis.models import FailureCode, RejectionCode, ValidationResult
 
-# Recording problem -> the screen the interface shows for it.
 FAILURE_CODES: dict[RejectionCode, FailureCode] = {
     RejectionCode.VIDEO_READ_ERROR: FailureCode.INVALID_VIDEO,
     RejectionCode.VIDEO_TOO_SHORT: FailureCode.INVALID_VIDEO,
@@ -27,7 +25,7 @@ FAILURE_CODES: dict[RejectionCode, FailureCode] = {
 
 
 def failure_code_for(checks: ValidationResult) -> FailureCode:
-    """First rejection code we recognise wins; unknown codes fall back."""
+    """First known rejection code wins, unknown ones fall back."""
     for code in checks.reason_codes:
         mapped = FAILURE_CODES.get(code)
         if mapped is not None:

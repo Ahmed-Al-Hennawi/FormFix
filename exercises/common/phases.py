@@ -1,7 +1,7 @@
 """
-The rep state machine, shared by all three exercises. They have the same
-temporal shape - leave rest, travel to an extreme, turn around, come back - so
-each hands in a 1-D signal that is high at rest and falls into the rep:
+The rep state machine shared by all three exercises. They all have the same
+shape (leave rest, go to an extreme, turn, come back), so each passes in a 1-D
+signal that is high at rest and drops into the rep:
 
     squat        knee angle          high standing   -> low at depth
     lat pulldown elbow angle         high extended   -> low contracted
@@ -10,13 +10,11 @@ each hands in a 1-D signal that is high at rest and falls into the rep:
 
     REST -> TOWARDS -> EXTREME -> RETURN -> REST
 
-Counting threshold crossings would turn a signal fluttering around one number
-into several reps, so there are five guards: hysteresis (four levels, never
-one), a transition holding for min_phase_frames, a reversal delta, a minimum
-range of motion, and duration bounds from timestamps rather than frame counts.
-
-The machine won't start mid-movement either: until it has seen the signal at
-rest the state stays UNKNOWN.
+Just counting threshold crossings turned a jittery signal into several reps,
+so there are five guards: hysteresis (four levels), min_phase_frames, a
+reversal delta, a minimum range of motion, and duration limits in seconds.
+It stays UNKNOWN until it has seen the person at rest, so it never starts
+mid-rep.
 """
 
 from __future__ import annotations
@@ -43,8 +41,8 @@ class MovementPhase(str, Enum):
 @dataclass(frozen=True)
 class RepDetectionConfig:
     """
-    Engineering settings for the state machine. None of these say anything about
-    technique. Signal convention is high at rest, falling into the rep:
+    Engineering settings for the state machine (nothing about technique). The
+    signal is high at rest and drops into the rep:
 
         rest_level  >  start_level  >  extreme_level
         start_level <  end_level    <= rest_level
@@ -69,7 +67,7 @@ class RepDetectionConfig:
 
 @dataclass
 class RawRep:
-    """A detected rep as frame indices. Measuring it happens later."""
+    """A detected rep as frame indices, measured later."""
 
     start_frame: int
     extreme_frame: int
@@ -97,8 +95,8 @@ def detect_repetitions(
     timestamps: np.ndarray,
     config: RepDetectionConfig,
 ) -> RepDetectionResult:
-    """Run the state machine over a smoothed movement signal. A NaN reaching here
-    means the data really is missing - short gaps are filled upstream."""
+    """Run the state machine over a smoothed signal. Short gaps are already filled,
+    so a NaN here means the data really is missing."""
     signal = np.asarray(signal, dtype=np.float64)
     n = len(signal)
     phases = [MovementPhase.UNKNOWN] * n
@@ -152,8 +150,7 @@ def detect_repetitions(
         if state is MovementPhase.UNKNOWN:
             if value >= config.rest_level:
                 state = MovementPhase.REST
-            # Otherwise stay UNKNOWN: the clip might start mid-rep, and we can't
-            # count a movement whose beginning we never saw.
+            # otherwise stay UNKNOWN - the clip might start mid-rep
 
         elif state is MovementPhase.REST:
             if value < config.start_level:
@@ -176,7 +173,7 @@ def detect_repetitions(
                 min_value = value
                 min_frame = i
             if value > min_value + config.reversal_delta:
-                # Rising again - did it go deep enough for a real turning point?
+                # rising again - was it deep enough to be a real turning point?
                 if min_value <= config.extreme_level:
                     state = MovementPhase.RETURN
                     above_end_streak = 0
@@ -190,7 +187,7 @@ def detect_repetitions(
 
         elif state is MovementPhase.RETURN:
             if value < min_value:
-                # Deeper than before, so that "return" was a bounce.
+                # deeper than before, so that "return" was just a bounce
                 state = MovementPhase.TOWARDS
                 min_value = value
                 min_frame = i

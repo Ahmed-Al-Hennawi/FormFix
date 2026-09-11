@@ -1,11 +1,10 @@
 """
-Exercise analysers - squat, lat pulldown and dumbbell shoulder press. Each is
-its own package on top of the shared machinery in exercises/common/.
+Exercise analysers - squat, lat pulldown and dumbbell shoulder press, each built
+on the shared code in exercises/common/.
 
-The registries below are where the interface looks up an analyser and its
-feedback wording, so a fourth exercise is a new package plus one entry here.
-They are built lazily: importing an analyser pulls in OpenCV and the whole CV
-stack, and several modules only want an exercise's config.
+The UI looks up analysers and feedback here, so adding an exercise means a new
+package plus one entry. They load lazily because importing an analyser pulls in
+OpenCV, and some modules only need the config.
 """
 
 from __future__ import annotations
@@ -14,8 +13,7 @@ from collections.abc import Callable
 from types import ModuleType
 from typing import Any
 
-# exercise id -> display name, needed for failure messages raised before any
-# analysis result exists. Plain data, so never lazy.
+# exercise id -> display name, needed for failure messages before any result exists
 DISPLAY_NAMES: dict[str, str] = {
     "squat": "Squat",
     "pulldown": "Lat Pulldown",
@@ -26,7 +24,7 @@ _CACHE: dict[str, Any] = {}
 
 
 def _analysers() -> dict[str, Callable]:
-    """exercise id -> analyser entry point. All three share a signature."""
+    """exercise id -> analyser function (all three have the same signature)."""
     from .press.analyser import analyse_shoulder_press
     from .pulldown.analyser import analyse_lat_pulldown
     from .squat.analyser import analyse_squat
@@ -39,10 +37,7 @@ def _analysers() -> dict[str, Callable]:
 
 
 def _feedback() -> dict[str, ModuleType]:
-    """exercise id -> the module that turns rule results into sentences.
-
-    Each exposes build_findings(rule_results) and FEEDBACK_TEMPLATES.
-    """
+    """exercise id -> its feedback module (build_findings and FEEDBACK_TEMPLATES)."""
     from .press import feedback as press_feedback
     from .pulldown import feedback as pulldown_feedback
     from .squat import feedback as squat_feedback
@@ -74,5 +69,4 @@ def __dir__() -> list[str]:
 
 
 def has_analyser(exercise_id: str) -> bool:
-    """True when this exercise has a real computer-vision analyser."""
     return exercise_id in DISPLAY_NAMES

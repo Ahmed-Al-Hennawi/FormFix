@@ -1,7 +1,4 @@
-"""
-The page footer. It sits inside the outro section, so the useful entry point
-is markup(); render() is there for using it standalone.
-"""
+"""The footer. It's inside the outro section, so markup() is what's normally used."""
 
 from __future__ import annotations
 

@@ -6,13 +6,10 @@ What the UI calls to get a video analysed, and what it gets back.
                                 rep detection, rules, feedback, video
     process_uploaded_video() -> AnalysisResult for the results view
 
-The UI only ever calls analyse() / process_uploaded_video() and renders an
-AnalysisResult, so no page knows which exercise it is showing. demo_analysis()
-is the fallback when the CV dependencies aren't installed; it sets is_demo so
-the figures get labelled as samples.
-
-The score is the share of rule checks passed across the detected reps, and the
-formula travels with the result so it can be checked.
+The UI only calls analyse() / process_uploaded_video() and shows an
+AnalysisResult, so the pages don't need to know which exercise it is.
+demo_analysis() is the fallback if the CV libraries aren't installed, and it is
+labelled as a sample.
 """
 
 from __future__ import annotations
@@ -31,12 +28,12 @@ Status = Literal["good", "attention", "successful"]
 # gentle wording on purpose - this is for people still learning the lift
 Severity = Literal["minor", "moderate", "important"]
 
-# score band. Drives the wording as well as the colour.
+# score band, sets the wording and the colour
 Band = Literal["good", "moderate", "poor"]
 
 SUPPORTED_VIDEO_TYPES: tuple[str, ...] = ("mp4", "mov", "avi")
 
-# Score thresholds. Every band, colour and verdict in the UI follows these.
+# score thresholds used for every band, colour and verdict in the UI
 BAND_THRESHOLDS: tuple[tuple[int, Band, str], ...] = (
     (80, "good", "Good Form"),
     (60, "moderate", "Needs Improvement"),
@@ -49,13 +46,12 @@ SEVERITY_LABELS: dict[str, str] = {
     "important": "Important",
 }
 
-# how many corrections the first screen shows; the rest appear further down
+# how many corrections are shown first, the rest go further down
 MAX_VISIBLE_CORRECTIONS = 3
 MAX_VISIBLE_POSITIVES = 4
 
 
 def band_for(score: float) -> Band:
-    """Map a 0-100 score onto its band."""
     for threshold, band, _ in BAND_THRESHOLDS:
         if score >= threshold:
             return band
@@ -63,7 +59,7 @@ def band_for(score: float) -> Band:
 
 
 def verdict_for(score: float) -> str:
-    """The plain-English verdict that accompanies the score."""
+    """Plain-English verdict for the score."""
     for threshold, _, verdict in BAND_THRESHOLDS:
         if score >= threshold:
             return verdict
@@ -75,7 +71,7 @@ class RuleResult:
     """One row of the analysis report."""
 
     label: str
-    # 0-100, drives the meter width. Share of reps this check passed.
+    # 0-100, share of reps that passed (sets the meter width)
     score: float
     status: Status
     badge: str
@@ -87,10 +83,7 @@ class RuleResult:
 
 @dataclass
 class RepFeedback:
-    """
-    One repetition's verdict, ready to render. The page lists these per rep
-    because a single overall grade hides which rep actually went wrong.
-    """
+    """One rep's verdict, ready to show."""
 
     number: int
     status: str
@@ -105,7 +98,7 @@ class RepFeedback:
 
 @dataclass
 class NotAssessed:
-    """A check that was skipped, plus the reason it was skipped."""
+    """A skipped check and the reason."""
 
     title: str
     reason: str
@@ -113,8 +106,8 @@ class NotAssessed:
 
 @dataclass
 class Improvement:
-    """One detected issue, written twice: the three plain lines the page shows, and
-    the rest, which fills the "How did FormFix detect this?" panel."""
+    """One detected issue: the three plain lines shown on the page, plus the detail
+    for the "How did FormFix detect this?" panel."""
 
     title: str
     issue: str
@@ -145,7 +138,7 @@ class Improvement:
 
     @property
     def headline_issue(self) -> str:
-        """The plain sentence if there is one, otherwise the rule's wording."""
+        """The plain sentence if there is one, otherwise the rule wording."""
         return self.simple_issue or self.issue
 
     @property
@@ -156,7 +149,7 @@ class Improvement:
 
 @dataclass
 class AnalysisResult:
-    """Everything the results section needs to render."""
+    """Everything the results section needs."""
 
     exercise_id: str
     exercise_name: str
@@ -165,7 +158,7 @@ class AnalysisResult:
     reps: int
     rows: list[RuleResult] = field(default_factory=list)
     feedback: str = ""
-    # overall technique score, 0-100. Formula is in the module docstring.
+    # overall score, 0-100 (formula in exercises/common/feedback.py)
     score: int = 0
     positives: list[str] = field(default_factory=list)
     improvements: list[Improvement] = field(default_factory=list)
@@ -195,8 +188,7 @@ class AnalysisResult:
     rep_results: list[RepFeedback] = field(default_factory=list)
     # one line per evaluated check, e.g. "Depth: 3 of 4 reps acceptable"
     overview: list[str] = field(default_factory=list)
-    # checks that weren't judged, in their own block so a measurement we
-    # couldn't take doesn't read as a failed one
+    # checks that weren't judged, kept separate so they don't look like failures
     not_assessed: list[NotAssessed] = field(default_factory=list)
     reliability: str = ""
     headline: str = ""
@@ -211,20 +203,17 @@ class AnalysisResult:
 
     @property
     def key_improvements(self) -> list[Improvement]:
-        """
-        The top three corrections. The list arrives sorted by priority already
-        (severity, share of the set affected, evidence level).
-        """
+        """Top three corrections (the list is already sorted by priority)."""
         return self.improvements[:MAX_VISIBLE_CORRECTIONS]
 
     @property
     def further_improvements(self) -> list[Improvement]:
-        """The rest, which only appear in the details panel."""
+        """The rest, only shown in the details panel."""
         return self.improvements[MAX_VISIBLE_CORRECTIONS:]
 
     @property
     def key_positives(self) -> list[str]:
-        """What went well, trimmed to what fits at a glance."""
+        """What went well, trimmed to fit."""
         return self.positives[:MAX_VISIBLE_POSITIVES]
 
 
@@ -232,10 +221,7 @@ class AnalysisResult:
 
 
 def save_upload(uploaded_file) -> Path | None:
-    """
-    Write a Streamlit UploadedFile out to a temp path. cv2.VideoCapture
-    needs a real file on disk, not a buffer.
-    """
+    """Save the upload to a temp file, since cv2.VideoCapture needs a real file."""
     if uploaded_file is None:
         return None
 
@@ -250,15 +236,14 @@ def save_upload(uploaded_file) -> Path | None:
 
 @dataclass(frozen=True)
 class Stage:
-    """One reported step of a run. One Stage per pipeline stage."""
+    """One step of the progress bar."""
 
     key: str
     label: str
 
 
-# the stages the user sees. The keys match what the pipeline reports through
-# its progress callback, so the bar tracks real work.
-# through its progress callback, so the bar tracks real work.
+# stages the user sees - the keys match the pipeline's progress callback so the
+# bar follows the real work
 ANALYSIS_STAGES: tuple[Stage, ...] = (
     Stage("prepare", "Preparing video"),
     Stage("validate", "Checking recording"),
@@ -272,7 +257,7 @@ ANALYSIS_STAGES: tuple[Stage, ...] = (
 
 STAGE_INDEX: dict[str, int] = {stage.key: i for i, stage in enumerate(ANALYSIS_STAGES)}
 
-# callback(stage_key, fraction_0_to_1, message) - see analysis pipeline.
+# callback(stage_key, fraction_0_to_1, message)
 ProgressCallback = Callable[[str, float, str], None]
 
 
@@ -285,8 +270,8 @@ def process_uploaded_video(
     progress: ProgressCallback | None = None,
     export_root: Path | None = None,
 ) -> AnalysisResult | None:
-    """The upload page's entry point. None means no analyser or no CV dependencies,
-    and the UI reads that as "show the labelled sample instead"."""
+    """Entry point for the upload page. Returns None if there is no analyser or the
+    CV libraries are missing, and the UI then shows the sample instead."""
     try:
         from analysis.models import AnalysisFailure
         from exercises import ANALYSERS
@@ -310,14 +295,12 @@ def process_uploaded_video(
         logger.info("Analysis stopped: %s - %s", failure.code.value, failure.message)
         return _failure_result(failure, exercise_id, filename)
     finally:
-        # the uploaded copy has done its job; the annotated clip is elsewhere
-        # its own session directory.
+        # the upload isn't needed any more, the annotated clip is saved separately
         video_path.unlink(missing_ok=True)
 
 
 def _to_ui_result(result, exercise_id: str, filename: str) -> AnalysisResult:
-    """Map an ExerciseAnalysisResult onto the UI's AnalysisResult. The only
-    per-exercise lookup is which module writes the sentences."""
+    """Convert an ExerciseAnalysisResult into the UI's AnalysisResult."""
     from analysis.models import RuleStatus
     from exercises import FEEDBACK
     from exercises.common.feedback import format_timestamp
@@ -446,8 +429,8 @@ def _to_ui_result(result, exercise_id: str, filename: str) -> AnalysisResult:
 
 def summary_sentence(result: AnalysisResult) -> str:
     """
-    The sentence under the verdict, built from the score band, the rep count
-    and the titles of the top findings, so it can only say what this run found.
+    The sentence under the verdict, built from the score band, rep count and top
+    findings, so it only says what this run actually found.
     """
     name = (result.exercise_name or "movement").lower()
     reps = result.reps
@@ -475,7 +458,7 @@ def summary_sentence(result: AnalysisResult) -> str:
 
 
 def _failure_result(failure, exercise_id: str, filename: str) -> AnalysisResult:
-    """Turn an AnalysisFailure into something the results page can render."""
+    """Turn an AnalysisFailure into something the results page can show."""
     from exercises import DISPLAY_NAMES
 
     return AnalysisResult(
@@ -496,9 +479,8 @@ def _failure_result(failure, exercise_id: str, filename: str) -> AnalysisResult:
 
 
 def unexpected_failure(filename: str, exercise_id: str) -> AnalysisResult:
-    """What to show when the pipeline stops in a way nobody planned for. Foreseen
-    problems come back as an AnalysisFailure instead; without this the page sits on
-    "analysing" and re-runs the crash on every rerun."""
+    """Result for an unexpected crash. Without this the page gets stuck on
+    "analysing" and repeats the crash on every rerun."""
     from exercises import DISPLAY_NAMES
 
     return AnalysisResult(
@@ -536,10 +518,7 @@ def analyse(
     progress: ProgressCallback | None = None,
     export_root: Path | None = None,
 ) -> AnalysisResult:
-    """
-    Hands off to process_uploaded_video, falling back to
-    demo_analysis only when that returns None.
-    """
+    """Runs process_uploaded_video, or demo_analysis if that returns None."""
     result = process_uploaded_video(
         uploaded_file, exercise_id=exercise_id, progress=progress, export_root=export_root
     )
@@ -757,9 +736,9 @@ _DEMO_ANALYSES: dict[str, AnalysisResult] = {
 
 def demo_analysis(exercise_id: str = "squat", filename: str = "your-video.mp4") -> AnalysisResult:
     """
-    A plausible-looking sample analysis, only reached when OpenCV or MediaPipe is
-    missing. The UI labels it "Sample output". The rule ids mirror the real rule
-    sets and tests/test_exercise_registry.py checks they still do.
+    Sample analysis, only used when OpenCV or MediaPipe is missing (labelled
+    "Sample output"). tests/test_exercise_registry.py checks the rule ids still
+    match the real ones.
     """
     from dataclasses import replace
 
@@ -775,10 +754,7 @@ def demo_analysis(exercise_id: str = "squat", filename: str = "your-video.mp4") 
 
 
 def demo_result() -> AnalysisResult:
-    """
-    The worked example on the homepage. Made up rather than measured, but the
-    check names and rule ids are the real squat ones.
-    """
+    """The example on the homepage - made up, but with the real squat rule ids."""
     return AnalysisResult(
         exercise_id="squat",
         exercise_name="Squat",

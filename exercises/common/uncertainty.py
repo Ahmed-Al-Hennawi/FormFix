@@ -1,21 +1,16 @@
 """
-How big a deviation has to be before it is worth calling a finding.
+How big a deviation has to be before it counts as a finding.
 
-Every rule compares a measured value against a threshold, and both sides used
-to be treated as exact. They aren't: the measurement comes from a monocular
-pose estimator whose error is published and is large next to some of these
-thresholds. A squat is flagged as shallow above 115 degrees of knee angle, and
-Dill et al. (2023) put MediaPipe's knee-angle RMSE during squats at 9.14
-degrees with a good camera angle - so a rep measured at 118 is not
-distinguishable from one at 108.
+The measurements come from a single-camera pose estimator with a known error
+that is large next to some thresholds. E.g. a squat is shallow above 115 deg of
+knee angle, but Dill et al. (2023) report a knee-angle RMSE of 9.14 deg even
+with a good camera angle, so 118 and 108 can't really be told apart.
 
-This carries each measurement's published error through to the verdict and
-marks any finding whose margin sits inside that error as indicative rather than
-established. By default it only annotates; strict=True also downgrades those
-findings a step, so both policies can be run over the same evaluation set.
+So a finding whose margin is inside the error is marked as indicative, not
+certain. By default it only annotates; strict=True also downgrades it a step.
 
-Everything in PUBLISHED_BANDS traces to a figure in a paper. Anything derived
-rather than quoted is marked derived=True with the working written out.
+Every band in PUBLISHED_BANDS comes from a paper. Ones I derived myself are
+marked derived=True with the working shown.
 """
 
 from __future__ import annotations
@@ -38,16 +33,14 @@ __all__ = [
 ]
 
 
-# --- The published error figures. ---
+# --- Published error figures ---
 
 
 @dataclass(frozen=True)
 class UncertaintyBand:
     """
-    One measurement's error, in that measurement's own units. sigma is an RMSE
-   , not a standard deviation, since RMSE is what the source studies report,
-    and it is used as a scale, not a probability: a margin of one sigma counts as
-    indistinguishable from zero.
+    One measurement's error in its own units. sigma is an RMSE (what the papers
+    report), used as a scale: a margin within one sigma counts as zero.
     """
 
     metric: str
@@ -56,16 +49,13 @@ class UncertaintyBand:
     source: str
     derived: bool = False
     derivation: str = ""
-    # Extra term for a known systematic bias, e.g. filter lag.
+    # known systematic bias, e.g. filter lag
     systematic: float = 0.0
     systematic_source: str = ""
 
     @property
     def total(self) -> float:
-        """
-        Random and systematic error, added in quadrature as usual for independent
-        sources, so a small systematic term next to a large random one barely moves it.
-        """
+        """Random and systematic error added in quadrature."""
         return math.hypot(self.sigma, self.systematic)
 
     def as_dict(self) -> dict:
@@ -76,11 +66,9 @@ class UncertaintyBand:
         return out
 
 
-# the bars this literature uses. Mercadal-Baudart et al. (2024) evaluated a
-# single-camera pose model against VICON: under 12 degrees is "good" (better
-# than a physiotherapist by eye), under 6 "very good". FormFix reads about
-# +/-10.7 for a knee angle, which is why 3 degrees is not a finding here.
-# evaluated a single-camera 3D pose model against VICON: under 12 degrees is
+# Mercadal-Baudart et al. (2024) tested a single-camera pose model against
+# VICON: under 12 deg is "good" (better than a physio by eye), under 6 "very
+# good". FormFix is about +/-10.7 for a knee angle, so 3 deg isn't a finding.
 ACCEPTABILITY_THRESHOLDS: dict[str, float] = {
     "good": 12.0,
     "very_good": 6.0,
@@ -94,10 +82,7 @@ ACCEPTABILITY_SOURCE = (
 
 
 def acceptability(sigma: float) -> str:
-    """
-    "very good" / "good" / "worse than by-eye assessment", so a band in the debug
-    view is never a bare number with nothing to compare it against.
-    """
+    """Label for a band so the debug view doesn't show a bare number."""
     if sigma < ACCEPTABILITY_THRESHOLDS["very_good"]:
         return "very good"
     if sigma < ACCEPTABILITY_THRESHOLDS["good"]:
@@ -105,8 +90,8 @@ def acceptability(sigma: float) -> str:
     return "worse than by-eye assessment"
 
 
-# Hancock et al. (2018), via Dill et al. (2024): the smallest knee-angle
-# difference clinical goniometry can call significant, on a stationary subject
+# Hancock et al. (2018), via Dill et al. (2024): smallest knee-angle difference
+# clinical goniometry can call significant, on a stationary subject
 GONIOMETRY_REFERENCE: dict[str, float] = {
     "digital_inclinometer": 6.0,
     "long_arm_goniometer": 10.0,
@@ -119,7 +104,7 @@ GONIOMETRY_SOURCE = (
 )
 
 
-# Sagittal joint flexion (knee, hip, elbow) from one camera, limb NEAREST the camera.
+# side-view joint flexion (knee, hip, elbow), limb NEAREST the camera
 _KNEE_NEAR = UncertaintyBand(
     metric="sagittal_joint_angle",
     sigma=10.7,
@@ -131,9 +116,8 @@ _KNEE_NEAR = UncertaintyBand(
     ),
 )
 
-# same for the limb FURTHEST from the camera. The biggest view-dependent
-# effect in the literature, and why we pick the more visible side.
-# correction - the biggest view-dependent effect in the literature, and why we
+# same for the limb FURTHEST from the camera - over twice the error, which is
+# why I analyse the more visible side
 _KNEE_FAR = UncertaintyBand(
     metric="sagittal_joint_angle_far_side",
     sigma=25.1,
@@ -145,9 +129,7 @@ _KNEE_FAR = UncertaintyBand(
     ),
 )
 
-# squat knee angle with the camera at its best angle. Separate from the one
-# above because it is a different study with a different setup.
-# figure above because it is a different study with a different setup.
+# squat knee angle at the best camera angle (different study and setup to above)
 _KNEE_OPTIMAL = UncertaintyBand(
     metric="sagittal_joint_angle_optimal_view",
     sigma=9.14,
@@ -158,8 +140,7 @@ _KNEE_OPTIMAL = UncertaintyBand(
     ),
 )
 
-# trunk inclination. Not reported directly anywhere, so it comes from the
-# positional error of the landmarks behind it.
+# trunk lean isn't reported anywhere, so it's derived from the landmark error
 _TRUNK = UncertaintyBand(
     metric="trunk_inclination",
     sigma=6.5,
@@ -179,9 +160,7 @@ _TRUNK = UncertaintyBand(
     ),
 )
 
-# left-vs-right comparison of the same angle. Two independent measurements,
-# so the difference carries sqrt(2) times the error of one.
-# measurements, so the difference carries sqrt(2) times the error of one.
+# left vs right difference: two independent measurements, so sqrt(2) x the error
 _BILATERAL = UncertaintyBand(
     metric="bilateral_angle_difference",
     sigma=15.1,
@@ -197,9 +176,8 @@ _BILATERAL = UncertaintyBand(
     ),
 )
 
-# lengths normalised by another body dimension. The uncertainty is mostly
-# the instability of the normalising dimension, which Dill et al. measured.
-# length, wrist offset over shoulder width). The uncertainty is mostly the
+# lengths divided by a body dimension - the error mostly comes from that
+# dimension being unstable, which Dill et al. measured
 _NORMALISED_LENGTH = UncertaintyBand(
     metric="normalised_length",
     sigma=0.15,
@@ -219,9 +197,7 @@ _NORMALISED_LENGTH = UncertaintyBand(
     ),
 )
 
-# timing. Frame timestamps are exact to a frame interval, so this is pure
-# quantisation; it exists so no rule ends up with no band at all.
-# is pure quantisation; it exists so no rule ends up with no band at all.
+# timing - just frame quantisation, so no rule is left without a band
 _DURATION = UncertaintyBand(
     metric="duration",
     sigma=0.067,
@@ -249,8 +225,8 @@ PUBLISHED_BANDS: dict[str, UncertaintyBand] = {
 }
 
 
-# which band applies to which metric. Written out rather than inferred, so a
-# new metric with no error figure is a visible gap and not a silent zero.
+# which band applies to which metric. Written out so a new metric without one
+# is an obvious gap, not a silent zero
 METRIC_BANDS: dict[str, str] = {
     # squat
     "squat_depth": "sagittal_joint_angle",
@@ -280,12 +256,12 @@ MEASURED_KEYS: dict[str, str] = {
     # shoulder press
     "press_symmetry": "max_elbow_angle_difference",
     "press_alignment": "max_alignment_offset",
-    # the two range-of-motion rules are missing on purpose: each combines three
-    # criteria in different units, so there is no single value to compare
+    # the two ROM rules are left out on purpose - they combine three criteria in
+    # different units, so there's no single value to compare
 }
 
 
-# --- Picking the band that applies to one measurement in one recording. ---
+# --- Picking the band for one measurement in one recording ---
 
 
 def band_for(
@@ -298,13 +274,10 @@ def band_for(
     systematic_source: str = "",
 ) -> UncertaintyBand | None:
     """
-    The band for one metric, adjusted for this recording. view_support is the same
-    0-1 number the reliability layer computes: Dill et al. saw knee-angle RMSE go
-    from 9.14 to 14.48 degrees between a good and a bad camera angle, a factor of
-    1.58, so the band is scaled linearly between 1.0 and that as support falls.
-    That interpolation is derived, not the paper's, and is marked as such.
-
-    far_side picks the occluded-limb figure, which is over twice the near-limb one.
+    The band for one metric, adjusted for this recording. Dill et al. saw the
+    knee RMSE go from 9.14 to 14.48 deg between a good and bad camera angle
+    (x1.58), so I scale the band linearly up to that as view_support drops. The
+    linear scaling is my own, not the paper's. far_side uses the far-limb figure.
     """
     key = METRIC_BANDS.get(rule_id) or METRIC_BANDS.get(metric) or metric
     band = PUBLISHED_BANDS.get(key)
@@ -314,7 +287,7 @@ def band_for(
     if far_side and key == "sagittal_joint_angle":
         band = replace(PUBLISHED_BANDS["sagittal_joint_angle_far_side"], metric=key)
 
-    # 14.48 / 9.14, from Dill et al. (2023) Tab. 3, squat right knee.
+    # 14.48 / 9.14, Dill et al. (2023) Tab. 3, squat right knee
     worst_case_factor = 1.584
     support = min(max(float(view_support), 0.0), 1.0)
     if band.unit == "deg" and support < 1.0:
@@ -342,7 +315,7 @@ def band_for(
 
 @dataclass(frozen=True)
 class UncertaintyNote:
-    """What the measurement error says about one rule's verdict."""
+    """What the measurement error means for one rule's verdict."""
 
     rule_id: str
     band: UncertaintyBand
@@ -365,8 +338,7 @@ class UncertaintyNote:
 
 
 def _thresholds(spec) -> tuple[float | None, float | None, bool]:
-    """(pass_bar, fail_bar, higher_is_worse) for one rule spec. A rule with
-    acceptable_max is broken by being too high, one with acceptable_min too low."""
+    """(pass_bar, fail_bar, higher_is_worse) for one rule spec."""
     if spec.acceptable_max is not None:
         return spec.acceptable_max, spec.acceptable_max + spec.tolerance, True
     if spec.acceptable_min is not None:
@@ -375,7 +347,7 @@ def _thresholds(spec) -> tuple[float | None, float | None, bool]:
 
 
 def _margin(value: float, bar: float, higher_is_worse: bool) -> float:
-    """Distance past bar, positive when the value is in violation."""
+    """Distance past the bar, positive when it's a violation."""
     return (value - bar) if higher_is_worse else (bar - value)
 
 
@@ -389,9 +361,9 @@ def annotate_uncertainty(
     strict: bool = False,
 ) -> list[UncertaintyNote]:
     """
-    Attach an uncertainty note to every evaluable rule result. Mutates
-    rule_results in place and returns the notes for the debug export.
-    strict=True also downgrades marginal verdicts a step.
+    Attach an uncertainty note to every evaluable rule result (in place) and
+    return the notes for the debug export. strict=True also downgrades
+    borderline verdicts a step.
     """
     view_support = view_support or {}
     systematic = systematic or {}
@@ -426,8 +398,7 @@ def annotate_uncertainty(
             raw = outcome.evidence.get(measured_key) if measured_key else None
             if raw is None or not isinstance(raw, (int, float)) or not math.isfinite(raw):
                 continue
-            # always the pass bar, never the fail bar - the question is whether there
-            # is a finding at all
+            # always the pass bar - the question is whether there's a finding at all
             if pass_bar is None:
                 continue
             margin = _margin(float(raw), float(pass_bar), higher_is_worse)
@@ -477,9 +448,8 @@ def annotate_uncertainty(
 
 
 def _downgrade(result, inconclusive: tuple[int, ...]) -> None:
-    """Soften the reps whose margin stayed inside the band: FAIL -> WARNING,
-    WARNING -> PASS. The rule's overall status is recomputed from its reps, so the
-    aggregate can't contradict them."""
+    """Soften reps whose margin stayed inside the band (FAIL -> WARNING, WARNING ->
+    PASS), then recompute the rule's status from its reps."""
     step = {RuleStatus.FAIL: RuleStatus.WARNING, RuleStatus.WARNING: RuleStatus.PASS}
     for outcome in result.per_rep:
         if outcome.rep_number in inconclusive and outcome.status in step:

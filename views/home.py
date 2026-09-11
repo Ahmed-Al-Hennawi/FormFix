@@ -10,8 +10,8 @@ from utils.styling import inject_behaviour
 
 
 def _warn_about_missing_assets() -> None:
-    """Quiet note at the bottom of the page if an image is missing. Missing assets
-    render as a transparent pixel, so without this you would never notice."""
+    """Small note at the bottom if an image is missing - otherwise it just shows as a
+    transparent pixel and you'd never notice."""
     missing = missing_assets()
     if missing:
         with st.container(key="ff_asset_warning"):
@@ -23,11 +23,10 @@ def _warn_about_missing_assets() -> None:
 
 
 def render() -> None:
-    # Fixed layers first; scripts/main.js moves them up to <body>.
+    # fixed layers first, scripts/main.js moves them up to <body>
     components.background.render()
     components.navbar.render()
 
-    # Sections in the order of the original prototype.
     components.hero.render()
     components.about.render()
     components.problem.render()
@@ -41,5 +40,5 @@ def render() -> None:
 
     _warn_about_missing_assets()
 
-    # Behaviour last, so everything it hooks into is already in the DOM.
+    # JS last so everything it hooks into already exists
     inject_behaviour()

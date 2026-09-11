@@ -1,10 +1,8 @@
 """
-Which of MediaPipe's 33 landmarks the squat reads. The face, fingers and most
-of the upper limb contribute nothing to depth or trunk lean, and counting them
-as evidence would make the reliability figures meaningless.
-
-This is the only place landmark numbers become squat vocabulary.
-METRIC_REQUIREMENTS is what makes per-measurement reliability possible.
+Which of MediaPipe's 33 landmarks the squat uses. Face, fingers and arms add
+nothing to depth or trunk lean, and counting them would make the reliability
+figures meaningless. METRIC_REQUIREMENTS is what per-measurement reliability
+is based on.
 """
 
 from __future__ import annotations
@@ -32,7 +30,7 @@ from analysis.models import (
     RIGHT_SHOULDER,
 )
 
-# The subset we use, with official MediaPipe Pose ids (33-landmark topology).
+# the ones I use, with their MediaPipe Pose ids
 SQUAT_LANDMARKS: dict[str, int] = {
     "left_shoulder": LEFT_SHOULDER,
     "right_shoulder": RIGHT_SHOULDER,
@@ -51,10 +49,7 @@ SQUAT_LANDMARKS: dict[str, int] = {
 
 @dataclass(frozen=True)
 class SideChain:
-    """
-    One body side's chain, in anatomical order. The tuple ordering matches
-    analysis.models.SIDE_LANDMARKS.
-    """
+    """One side's chain, in the same order as analysis.models.SIDE_LANDMARKS."""
 
     name: str
     shoulder: int
@@ -100,10 +95,9 @@ SIDE_CHAINS: dict[str, SideChain] = {
     ),
 }
 
-# The other side, for symmetry comparisons.
 OPPOSITE_SIDE = {"left": "right", "right": "left"}
 
-# Without these a squat cannot be measured at all, on any camera view.
+# without these a squat can't be measured at all
 CORE_LANDMARK_NAMES: tuple[str, ...] = (
     "left_shoulder",
     "right_shoulder",
@@ -115,45 +109,40 @@ CORE_LANDMARK_NAMES: tuple[str, ...] = (
     "right_ankle",
 )
 
-# what each measurement depends on. Reliability comes from exactly these
-# points, not the average over all 33.
+# what each measurement depends on - reliability uses exactly these points
 METRIC_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     METRIC_DEPTH: ("hip", "knee", "ankle"),
     METRIC_TORSO_LEAN: ("shoulder", "hip"),
     METRIC_HEEL_LIFT: ("heel", "ankle", "knee"),
     METRIC_EXTENSION: ("hip", "knee", "ankle"),
     METRIC_DESCENT_CONTROL: ("hip", "knee", "ankle"),
-    # Symmetry is the only one needing both legs, so it drops out first.
+    # the only one that needs both legs, so it drops out first
     METRIC_KNEE_SYMMETRY: ("hip", "knee", "ankle"),
 }
 
-# Metrics that compare the two sides and therefore need both chains visible.
+# metrics comparing both sides, so both need to be visible
 BILATERAL_METRICS: frozenset[str] = frozenset({METRIC_KNEE_SYMMETRY})
 
-# metrics measured ACROSS the body rather than along it. side_view_confidence
-# measures how side-on the camera is, which is backwards for a left/right
-# comparison, so these take the complement.
-# side_view_confidence measures how side-on the camera is, which is right
+# metrics measured ACROSS the body. These use 1 - side_view_confidence, since
+# a side view is the wrong angle for a left/right comparison
 FRONTAL_PLANE_METRICS: frozenset[str] = frozenset({METRIC_KNEE_SYMMETRY})
 
 
 def is_frontal_plane(metric: str) -> bool:
-    """True when a metric is measured across the body rather than along it."""
     return metric in FRONTAL_PLANE_METRICS
 
 
 def landmark_ids(side: str, roles: tuple[str, ...]) -> tuple[int, ...]:
     """
-    Turn ("hip", "knee") on a side into MediaPipe indices. KeyError on an
-    unknown side or role, on purpose - a typo should blow up at test time.
+    ("hip", "knee") on a side -> MediaPipe indices. Raises KeyError on a typo
+    on purpose, so it shows up in the tests.
     """
     chain = SIDE_CHAINS[side]
     return tuple(getattr(chain, role) for role in roles)
 
 
 def required_ids(metric: str, side: str) -> tuple[int, ...]:
-    """The landmark indices metric needs on side (both sides for
-    bilateral metrics)."""
+    """Landmark indices a metric needs on a side (both sides if bilateral)."""
     roles = METRIC_REQUIREMENTS.get(metric, ())
     if not roles:
         return ()

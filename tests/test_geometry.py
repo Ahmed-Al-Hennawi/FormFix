@@ -36,13 +36,12 @@ class TestCalculateAngle:
         assert math.isnan(calculate_angle((float("nan"), 0), (0, 0), (1, 1)))
 
     def test_identical_points_return_nan(self):
-        # Zero-length arm, so the angle is undefined rather than 0.
+        # zero-length arm, so the angle is undefined, not 0
         assert math.isnan(calculate_angle((0, 0), (0, 0), (1, 1)))
         assert math.isnan(calculate_angle((1, 1), (0, 0), (0, 0)))
 
     def test_floating_point_cosine_clamped(self):
-        # Collinear points whose cosine comes out just over 1.0 in floating
-        # point, which acos would reject.
+        # collinear points where float error puts the cosine just over 1.0
         a, b, c = (0.1, 0.1), (0.2, 0.2), (0.30000000000000004, 0.3)
         result = calculate_angle(a, b, c)
         assert not math.isnan(result)
@@ -68,7 +67,7 @@ class TestInclination:
         assert inclination_from_vertical((0, 10), (10, 0)) == pytest.approx(45.0)
 
     def test_direction_independent(self):
-        # Leaning left and right read the same, so a mirrored clip is fine.
+        # leaning left or right gives the same value, so a mirrored clip is fine
         left = inclination_from_vertical((0, 10), (-4, 0))
         right = inclination_from_vertical((0, 10), (4, 0))
         assert left == pytest.approx(right)

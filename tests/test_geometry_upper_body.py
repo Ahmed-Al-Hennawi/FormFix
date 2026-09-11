@@ -1,8 +1,7 @@
 """
-Geometry the upper-body exercises added: signed inclination and angular rate.
-Coordinates are built so the answer is known by hand, degenerate cases
-included. A sign error here wouldn't crash, it would just report a backward
-lean as a forward one.
+Tests for the geometry added for the upper-body exercises (signed inclination
+and angular rate), with hand-worked answers. A sign error wouldn't crash, it
+would just report a backward lean as forward.
 """
 
 from __future__ import annotations
@@ -21,7 +20,7 @@ from analysis.geometry import (
 
 class TestSignedInclination:
     def test_vertical_segment_is_zero(self):
-        # y grows downward, so "upper" is the smaller y.
+        # y grows downward, so "upper" is the smaller y
         assert signed_inclination_from_vertical((0.0, 100.0), (0.0, 0.0)) == pytest.approx(0.0)
 
     def test_leaning_towards_positive_x_is_positive(self):
@@ -47,12 +46,12 @@ class TestSignedInclination:
         assert math.isnan(signed_inclination_from_vertical((0.0, 0.0), None))
 
     def test_coincident_points_are_not_measured(self):
-        # NaN, not 0 - a zero-length segment has no direction.
+        # NaN, not 0 - a zero-length segment has no direction
         assert math.isnan(signed_inclination_from_vertical((5.0, 5.0), (5.0, 5.0)))
 
 
 class TestElbowAngleCases:
-    """Elbow angle, which both upper-body exercises are built on."""
+    """Elbow angle, used by both upper-body exercises."""
 
     def test_straight_arm_is_one_eighty(self):
         assert calculate_angle((0.0, 0.0), (0.0, 100.0), (0.0, 200.0)) == pytest.approx(180.0)
@@ -61,8 +60,7 @@ class TestElbowAngleCases:
         assert calculate_angle((0.0, 0.0), (0.0, 100.0), (100.0, 100.0)) == pytest.approx(90.0)
 
     def test_forty_five_degrees(self):
-        # Vertex at (0, 100), one ray straight up to (0, 0) and the other up
-        # and out to (100, 0).
+        # vertex at (0, 100), rays to (0, 0) and (100, 0)
         assert calculate_angle((0.0, 0.0), (0.0, 100.0), (100.0, 0.0)) == pytest.approx(45.0)
 
     def test_one_thirty_five_degrees(self):

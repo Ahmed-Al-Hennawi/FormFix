@@ -3,16 +3,14 @@ Runs FormFix over labelled recordings and writes the evaluation tables.
 
     python scripts/evaluate_videos.py evaluation/labels.csv
 
-The manifest is a CSV of video,exercise,expected - the video path, one of
-squat / pulldown / press, and either "correct" or the rule ids of the faults it
-was performed with, separated by ";".
+The manifest is a CSV of video,exercise,expected: the video path, squat /
+pulldown / press, and either "correct" or the faulty rule ids separated by ";".
 
-Output goes beside the manifest: results.csv (one row per video), 
+Output goes beside the manifest: results.csv (one row per video),
 error_matrix.csv (TP/FP/FN/TN per rule) and summary.md.
 
-It counts what happened rather than computing an accuracy figure, and a
-recording that couldn't be analysed gets its own outcome rather than being
-dropped or scored as a miss.
+It counts outcomes instead of giving one accuracy number, and a video that
+couldn't be analysed gets its own outcome instead of counting as a miss.
 """
 
 from __future__ import annotations
@@ -39,16 +37,14 @@ from exercises.squat.config import rule_specs as squat_rules  # noqa: E402
 from exercises.squat.literature_config import LITERATURE_CONFIG  # noqa: E402
 from exercises.squat.literature_config import PROVENANCE as LITERATURE_PROVENANCE  # noqa: E402
 
-# Every rule each exercise can report, so a row can record a true negative
-# (rule ran, correctly stayed quiet) and not just the firings.
+# every rule per exercise, so true negatives can be counted too
 RULES: dict[str, tuple[str, ...]] = {
     "squat": tuple(spec.rule_id for spec in squat_rules(SQUAT_CONFIG)),
     "pulldown": tuple(spec.rule_id for spec in pulldown_rules(PULLDOWN_CONFIG)),
     "press": tuple(spec.rule_id for spec in press_rules(PRESS_CONFIG)),
 }
 
-# A rule counts as having fired if it warned or failed; NOT_EVALUABLE is
-# tallied on its own.
+# a rule "fired" if it warned or failed (NOT_EVALUABLE is counted separately)
 FIRED = (RuleStatus.WARNING, RuleStatus.FAIL)
 
 
@@ -81,7 +77,6 @@ class Row:
 
 
 def load_manifest(path: Path) -> list[tuple[Path, str, list[str]]]:
-    """Read the labelled-video manifest."""
     entries: list[tuple[Path, str, list[str]]] = []
     with path.open(newline="", encoding="utf-8") as handle:
         for record in csv.DictReader(handle):
@@ -111,9 +106,8 @@ def analyse(
     export_root: Path | None,
     config=None,
 ) -> Row:
-    """Run one recording through its analyser and record what came out. config
-    overrides the defaults, which is how the same manifest runs under the
-    operational thresholds and the literature preset."""
+    """Run one video through its analyser. config lets the same manifest run with
+    my thresholds or the literature preset."""
     row = Row(video=video.name, exercise=exercise, expected=expected)
     kwargs = {"export_root": export_root}
     if config is not None:
@@ -145,9 +139,8 @@ def analyse(
 
 
 def outcome_for(row: Row, rule: str) -> str:
-    """The confusion-matrix cell for one rule on one recording. NOT_ASSESSED is its
-    own outcome, not a miss - counting it as one would penalise the system
-    for declining to judge what the recording couldn't support."""
+    """Confusion-matrix cell for one rule on one video. NOT_ASSESSED is its own
+    outcome, not a miss."""
     if not row.analysed:
         return "NOT_ANALYSED"
     status = row.statuses.get(rule)
@@ -311,9 +304,8 @@ def write_summary(rows: list[Row], tally: dict[str, dict[str, int]], out_dir: Pa
 
 
 def _configs(args) -> dict:
-    """Which config each exercise runs under. Only the squat has a literature
-    preset, since it is the only movement the reviewed papers publish joint-angle
-    ranges for."""
+    """Config for each exercise. Only the squat has a literature preset, since it's
+    the only one the papers give joint-angle ranges for."""
     from dataclasses import replace
 
     base = {
@@ -332,7 +324,7 @@ def _configs(args) -> dict:
 
 
 def _announce(args) -> None:
-    """Print which settings the run used, before any of its results."""
+    """Print which settings the run used."""
     print(f"Threshold preset : {args.preset}")
     print(
         f"Uncertainty policy: {'strict (downgrades)' if args.strict_uncertainty else 'annotate only'}"

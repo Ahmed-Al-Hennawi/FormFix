@@ -1,8 +1,7 @@
 """
-Shoulder-press rules, driven from hand-built repetitions so each test isolates
-one comparison between a measured value and a configured range. The clean
-cases matter as much as the faulty ones: a rule set only ever tested on faults
-will happily flag everything.
+Shoulder press rules tested with hand-built reps, one comparison per test. The
+clean cases matter as much as the faulty ones, otherwise the rules could flag
+everything and still pass.
 """
 
 from __future__ import annotations
@@ -99,8 +98,8 @@ class TestSymmetryClassification:
         assert signals == []
 
     def test_a_small_natural_difference_is_not_flagged(self):
-        # Nobody presses perfectly evenly, and a few degrees is inside
-        # MediaPipe's own error anyway, so the bar sits well above 0.
+        # nobody presses perfectly evenly and a few degrees is inside MediaPipe's
+        # error anyway
         _, status = classify_symmetry(make_rep(angle_difference=9.0), CONFIG)
         assert status is RuleStatus.PASS
 
@@ -114,8 +113,7 @@ class TestSymmetryClassification:
         assert status is RuleStatus.FAIL
 
     def test_a_height_difference_alone_is_enough_to_flag(self):
-        # Both elbows can sit at the same angle with the wrists at very
-        # different heights.
+        # same elbow angles but very different wrist heights
         signals, status = classify_symmetry(make_rep(height_difference=0.16), CONFIG)
         assert status is RuleStatus.WARNING
         assert signals == ["wrist height"]
@@ -132,7 +130,7 @@ class TestSymmetryClassification:
         assert set(signals) == {"elbow angle", "wrist height", "range of motion"}
 
     def test_one_hidden_arm_is_not_assessed_rather_than_passed(self):
-        # "Couldn't compare them" is not the same claim as "they were even".
+        # "couldn't compare" isn't the same as "they were even"
         _, status = classify_symmetry(make_rep(symmetry_reliable=False), CONFIG)
         assert status is RuleStatus.NOT_EVALUABLE
 
@@ -207,7 +205,7 @@ class TestAlignmentRule:
         assert result.per_rep[0].evidence["worst_side"] == "left"
 
     def test_the_tolerance_is_not_unrealistically_narrow(self):
-        # A forearm is never perfectly vertical, so a modest offset passes.
+        # a forearm is never perfectly vertical, so a small offset passes
         result = rule_alignment(
             [make_rep(1, left_offset=0.30, right_offset=0.28)], CONFIG, SPECS["press_alignment"]
         )
@@ -256,7 +254,7 @@ class TestRangeOfMotionClassification:
         assert category == ROM_LIMITED_OVERALL
 
     def test_a_locked_elbow_is_not_required(self):
-        # 157 deg is short of straight but inside the configured range.
+        # 157 deg isn't straight but is inside the range
         _, status = classify_rom(make_rep(top_elbow=157.0), CONFIG)
         assert status is RuleStatus.PASS
 
@@ -334,11 +332,8 @@ class TestViewGating:
 
 class TestFrontalPlaneViewSupport:
     def test_a_nearly_side_on_diagonal_weakens_a_left_right_comparison(self):
-        """
-        A nearly side-on diagonal scores high on side_view_confidence,
-        which is right for trunk lean and backwards for comparing two arms.
-        Frontal-plane metrics take the complement.
-        """
+        """A nearly side-on camera is bad for comparing arms, so front-on metrics use
+        1 - side_view_confidence."""
         from exercises.common.confidence import view_support
         from exercises.common.spec import FRONTAL_VIEWS
 

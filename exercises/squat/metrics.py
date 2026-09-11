@@ -1,18 +1,16 @@
 """
-Landmarks in, numbers out. Measurement only - nothing here decides whether a
-squat was any good.
+Landmarks in, numbers out. Only measuring here - nothing decides if the squat
+was good.
 
     landmarks -> per-frame metrics -> standing baseline -> heel displacement
               -> per-rep facts
 
-A knee angle alone can't describe a squat: two people can hit the same knee
-angle with very different hip, torso and shin positions. So we measure knee and
-hip flexion per leg, trunk and shin inclination, the depth relation, heel
-displacement, left/right symmetry, stance width and the phase durations.
+The knee angle alone isn't enough (same knee angle, very different hip, torso
+and shin positions), so I also measure hip flexion, trunk and shin angle,
+depth, heel lift, symmetry, stance width and phase durations.
 
-Conventions: image y grows downward, angles are interior angles in degrees,
-normalised distances are divided by a body dimension from the same frame, and
-anything unmeasurable is NaN rather than 0.
+Image y grows downward, angles are interior angles in degrees, and anything
+unmeasurable is NaN, not 0.
 """
 
 from __future__ import annotations
@@ -49,9 +47,7 @@ from .persistence import sustained_extreme
 
 logger = logging.getLogger(__name__)
 
-# --- Movement phases a rule can be scoped to. ---
-# rule phases, not the state machine's per-frame Phase enum - a rule asks
-# which part of the rep its check is about
+# --- Phases a rule can be scoped to (not the state machine's Phase enum) ---
 PHASE_STANDING = "standing"
 PHASE_DESCENT = "descent"
 PHASE_BOTTOM = "bottom"
@@ -70,8 +66,8 @@ PHASE_LABELS: dict[str, str] = {
 
 
 def phase_frames(rep: SquatRep, phase: str) -> range:
-    """Frame range a rule should read for phase on rep. A torso angle at the bottom
-    is meant to differ from a standing one, so checking everywhere invents findings."""
+    """Frame range a rule should read for this phase. A torso angle at the bottom is
+    supposed to differ from standing, so checking everywhere would invent faults."""
     if phase == PHASE_DESCENT:
         return range(rep.descent_start_frame, max(rep.bottom_start_frame, rep.descent_start_frame))
     if phase == PHASE_BOTTOM:
@@ -80,15 +76,12 @@ def phase_frames(rep: SquatRep, phase: str) -> range:
         return range(min(rep.ascent_start_frame, rep.end_frame), rep.end_frame + 1)
     if phase == PHASE_COMPLETION:
         return range(rep.end_frame, rep.end_frame + 1)
-    # PHASE_MOVEMENT and anything unrecognised: the whole rep.
+    # PHASE_MOVEMENT or anything unknown: the whole rep
     return range(rep.start_frame, rep.end_frame + 1)
 
 
 def series(metrics: list[FrameMetrics], attribute: str, frames: range | None = None) -> np.ndarray:
-    """
-    One measurement as a NaN-gapped float series over a frame range. Invalid
-    frames come back NaN, not 0.
-    """
+    """One measurement as a float series over a frame range, NaN where invalid."""
     frames = frames if frames is not None else range(len(metrics))
     values = []
     for i in frames:
@@ -105,8 +98,7 @@ def _median(values: list[float]) -> float:
 
 
 def _plausible(value: float, low: float, high: float) -> float:
-    """value if it is anatomically possible, else NaN. The bands are wide because
-    they reject tracking failures, not technique."""
+    """value if anatomically possible, else NaN (wide bands, only for tracking failures)."""
     if not np.isfinite(value):
         return float("nan")
     return float(value) if low <= value <= high else float("nan")
@@ -121,9 +113,8 @@ def compute_frame_metrics(
     side: str,
     config: SquatConfig,
 ) -> list[FrameMetrics]:
-    """Measure every frame, both legs, in pixel space. MediaPipe normalises x and y
-    separately, so an angle off the normalised values is skewed on any non-square
-    frame."""
+    """Measure every frame, both legs, in pixels (normalised coordinates skew angles
+    on non-square frames)."""
     chain = SIDE_CHAINS[side]
     metrics: list[FrameMetrics] = []
 
@@ -152,15 +143,14 @@ def compute_frame_metrics(
             p_sh, p_hip = px(other.shoulder), px(other.hip)
             p_knee, p_ankle = px(other.knee), px(other.ankle)
             per_side[name] = {
-                # plausibility gate: MediaPipe reports a confident position even for
-                # a limb it is extrapolating behind the body
+                # MediaPipe can be confident about a limb it's guessing behind the body
                 "knee": _plausible(
                     calculate_angle(p_hip, p_knee, p_ankle),
                     config.PLAUSIBLE_KNEE_ANGLE_MIN,
                     config.PLAUSIBLE_KNEE_ANGLE_MAX,
                 ),
                 "hip": calculate_angle(p_sh, p_hip, p_knee),
-                # ankle -> knee against vertical; larger means the knee is further forward
+                # ankle -> knee from vertical, larger = knee further forward
                 "shin": inclination_from_vertical(p_ankle, p_knee),
             }
             side_valid[name] = all(usable(lm) for lm in other.core)
@@ -191,8 +181,8 @@ def compute_frame_metrics(
         ]
         knee_offset = _median(knee_offsets)
 
-        # heel against the toe of the same foot, so camera drift can't look like a
-        # lift. Positive means heel above toe.
+        # heel vs toe of the same foot, so camera drift can't look like a lift.
+        # Positive = heel above toe
         p_heel, p_toe = px(chain.heel), px(chain.foot_index)
         foot_reliable = (
             pose.visibility[f, chain.heel] >= config.HEEL_MIN_VISIBILITY
@@ -266,9 +256,8 @@ def standing_baseline(
     config: SquatConfig,
 ) -> dict[str, float]:
     """
-    The lifter's own standing posture, measured rather than assumed - comparing a
-    finish to 180 degrees would penalise anyone whose stance isn't a locked knee.
-    A median over real standing frames, since people are still settling at frame 0.
+    The person's own standing posture, measured instead of assuming 180 degrees.
+    Median over real standing frames, since people are still settling at frame 0.
     """
     chain = SIDE_CHAINS[side]
     standing = [i for i, p in enumerate(phases) if p is Phase.STANDING and metrics[i].valid]
@@ -320,14 +309,11 @@ def apply_heel_metric(
     config: SquatConfig,
 ) -> None:
     """
-    Heel rise against this person's own standing foot. Each frame carries the
-    heel's height above the toe over lower-leg length; subtracting the standing
-    median gives how much higher the heel is than when standing.
-
-    Measured inside the foot rather than against an image position, so camera
-    distance and someone drifting across the frame can't look like a heel lift.
+    Heel rise compared to the person's own standing foot: heel-toe offset minus
+    the standing median. Measured within the foot so camera distance or drifting
+    across the frame can't look like a heel lift.
     """
-    del pose, video, side  # the per-frame offsets already carry the geometry
+    del pose, video, side  # not needed, the per-frame offsets already have it
     reference = baseline.get("heel_toe_offset", float("nan"))
     if not np.isfinite(reference):
         return
@@ -352,8 +338,8 @@ def build_reps(
     side: str,
     config: SquatConfig,
 ) -> list[SquatRep]:
-    """Turn detected rep boundaries into measured reps, taking each measurement
-    from the frames of the phase it belongs to. Peaks are sustained maxima."""
+    """Turn rep boundaries into measured reps, each value taken from its own phase.
+    Peaks are sustained maxima."""
     chain = SIDE_CHAINS[side]
     other = SIDE_CHAINS[OPPOSITE_SIDE[side]]
     timestamps = pose.timestamps
@@ -371,7 +357,7 @@ def build_reps(
 
         torso_series = series(metrics, "torso_lean", rep_frames)
         max_torso, torso_offset = sustained_extreme(torso_series, config.TORSO_LEAN_MIN_FRAMES)
-        if not np.isfinite(max_torso):  # never held for long enough to sustain
+        if not np.isfinite(max_torso):  # never held long enough
             max_torso = (
                 float(np.nanmax(torso_series)) if np.isfinite(torso_series).any() else float("nan")
             )
@@ -445,9 +431,7 @@ def build_reps(
 
 
 def _effective_fps(timestamps: np.ndarray) -> float:
-    """
-    Frames per second from the timestamps themselves - nothing assumes 30 fps.
-    """
+    """FPS from the timestamps, so nothing assumes 30 fps."""
     if len(timestamps) < 2:
         return 30.0
     step = float(np.median(np.diff(timestamps)))
@@ -473,9 +457,8 @@ def _finish_posture(
     fps: float,
 ) -> tuple[float, float]:
     """
-    Peak extension just after a rep commits. The state machine commits as soon as
-    the ascent clears its threshold, before the lifter has finished standing up, so
-    reading the angle at that frame under-reports every finish.
+    Peak extension just after the rep ends. The state machine ends the rep before
+    the person has fully stood up, so reading that exact frame under-reports it.
     """
     window_end = raw.end_frame + int(round(0.8 * fps))
     if number < len(raw_reps):

@@ -1,10 +1,9 @@
 """
-A second squat configuration, built from published biomechanics.
+A second squat config based on published biomechanics.
 
-FormFix's own thresholds are operational values. Rather than overwrite them
-with numbers from a paper, the literature values sit here alongside the
-defaults and scripts/evaluate_videos.py --preset literature runs the evaluation
-under them, so the two can be compared on the same recordings.
+Instead of overwriting my own thresholds, the literature values sit here next
+to them, and scripts/evaluate_videos.py --preset literature runs the evaluation
+with them so both can be compared on the same videos.
 
 Kotiuk et al. (2022), via Rao et al. (2025), for a parallel squat:
 
@@ -12,21 +11,18 @@ Kotiuk et al. (2022), via Rao et al. (2025), for a parallel squat:
     hip flexion     128 +/- 9 degrees
     ankle           23 +/- 6 degrees
 
-Watch the convention: they report flexion, we measure the interior hip-knee-
-ankle angle, so for the knee interior = 180 - flexion. That makes 113 of
-flexion 67 of interior angle, far deeper than our 100 degree pass bar - they
-measured a supervised parallel squat, and 67 would fail nearly every real
-recording. So the preset takes the upper end of the published range as its pass
-bar and mean + 1 SD as its warning bar. That reading is my judgement, and it is
-why this preset is here for comparison rather than adopted.
+They report flexion but I measure the interior angle (interior = 180 -
+flexion), so 113 flexion is 67 interior - much deeper than my 100 degree pass
+bar, and it would fail nearly every real video. So the pass bar uses the upper
+end of their range and the warning bar mean + 1 SD. That's my own judgement,
+which is why this preset is for comparison and not the default.
 
-Dill et al. (2024) define a correct squat much as these rules do, and give two
-usable numbers: correct reps reached a mean peak knee angle of 137.4 degrees,
-about 20 above the faulty variants. That 20-degree gap is the scale the
-warning band is built from.
+Dill et al. (2024): correct reps reached a mean peak knee angle of 137.4
+degrees, about 20 above the faulty ones. That 20 degree gap sets the warning
+band.
 
-Simoes et al. (2024) set acceptable angular deviation at 10 degrees for an
-experienced user and 20 for a beginner, which is why the bands below are wide.
+Simoes et al. (2024) allow 10 degrees of deviation for experienced users and
+20 for beginners, which is why the bands are wide.
 """
 
 from __future__ import annotations
@@ -38,9 +34,8 @@ from .config import DEFAULT_CONFIG, SquatConfig
 __all__ = ["LITERATURE_CONFIG", "PROVENANCE", "literature_config"]
 
 
-# Where each changed value came from and what I did to it. The evaluation
-# harness prints this, so a run can't be reported without the provenance of
-# the numbers behind it.
+# where each changed value came from and what I did to it. The evaluation
+# harness prints this with every run
 PROVENANCE: dict[str, str] = {
     "DEPTH_KNEE_ANGLE_PASS": (
         "Kotiuk et al. (2022) via Rao et al. (2025): knee flexion 113 +/- 7 deg for a "
@@ -78,22 +73,21 @@ PROVENANCE: dict[str, str] = {
 
 
 def literature_config(base: SquatConfig | None = None) -> SquatConfig:
-    """The default config with its technique thresholds swapped for the
-    literature-derived ones. Engineering thresholds stay as they are - no paper has
-    an opinion on EMA weights."""
+    """The default config with the technique thresholds swapped for the literature
+    ones. Engineering values stay the same."""
     base = base or DEFAULT_CONFIG
     return replace(
         base,
-        # Kotiuk et al. (2022), converted to interior angle, upper bound.
+        # Kotiuk et al. (2022), converted to interior angle, upper bound
         DEPTH_KNEE_ANGLE_PASS=81.0,
-        # Dill et al. (2024): 20 deg correct/incorrect separation.
+        # Dill et al. (2024): 20 deg gap between correct and incorrect
         DEPTH_KNEE_ANGLE_WARN=101.0,
-        # Dill et al. (2024) E2. Fail bar tightened, warn bar left alone.
+        # Dill et al. (2024) E2 - fail bar tightened, warn bar unchanged
         TORSO_LEAN_WARN=45.0,
         TORSO_LEAN_FAIL=55.0,
-        # Above the derived +/-0.15 band for a normalised length.
+        # above the derived +/-0.15 band for a normalised length
         HEEL_LIFT_THRESHOLD=0.16,
-        # Simoes et al. (2024) beginner allowance.
+        # Simoes et al. (2024) beginner allowance
         FULL_EXTENSION_TOLERANCE=20.0,
         notes={
             **base.notes,
@@ -108,5 +102,4 @@ def literature_config(base: SquatConfig | None = None) -> SquatConfig:
     )
 
 
-# The preset, ready to hand straight to the analyser.
 LITERATURE_CONFIG = literature_config()

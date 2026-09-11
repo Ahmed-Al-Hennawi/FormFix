@@ -1,17 +1,16 @@
 """
-Turning rule results into sentences. Last stage of every pipeline and the only
-one allowed to write prose - it measures nothing and decides nothing.
+Turns rule results into sentences. It's the last stage and the only place that
+writes text - it doesn't measure or decide anything.
 
-The audience is beginners in a gym: no internal vocabulary, no medical or
-injury claims, and always something that went well alongside the corrections.
+Written for beginners: no jargon, no medical or injury claims, and always
+something positive next to the corrections.
 
-The score is a plain formula, not a model output:
+The score is a simple formula, not a model:
 
     score = 100 * (pass = 1, warning = 0.5, fail = 0, summed) / evaluable checks
 
-with one check being one rule on one rep. Checks that couldn't be evaluated
-come out of both halves, so a measurement the recording couldn't support is
-never scored as a failure.
+where a check is one rule on one rep. Checks that couldn't be evaluated are
+left out, so a bad recording is never scored as a failure.
 """
 
 from __future__ import annotations
@@ -39,7 +38,7 @@ SCORE_FORMULA = (
 
 
 def format_timestamp(seconds: float) -> str:
-    """00:04.2 style timestamps for evidence lines."""
+    """00:04.2 style timestamp."""
     if not math.isfinite(seconds):
         return "-"
     minutes = int(seconds // 60)
@@ -49,12 +48,9 @@ def format_timestamp(seconds: float) -> str:
 @dataclass(frozen=True)
 class FeedbackTemplate:
     """
-    Fixed wording for one kind of finding. The numbers come from the measurements
-    but the phrasing never varies, so every sentence a user can see was reviewed
-    once instead of generated fresh.
-
-    simple_issue / why / simple_fix are the three short lines a beginner sees;
-    measures / measured_from feed the "how did we detect this" panel.
+    Fixed wording for one kind of finding, so every sentence a user sees has been
+    checked by me. simple_issue / why / simple_fix are the three lines a beginner
+    sees; measures / measured_from go in the "how did we detect this" panel.
     """
 
     title: str
@@ -65,8 +61,7 @@ class FeedbackTemplate:
     positive: str = ""
 
     # --- the beginner-facing correction ---
-    # what happened, one plain sentence. {flagged}, {total} and {reps} get
-    # filled in from the per-rep outcomes.
+    # {flagged}, {total} and {reps} are filled in from the per-rep outcomes
     simple_issue: str = ""
     why: str = ""
     simple_fix: str = ""
@@ -83,17 +78,14 @@ FALLBACK_TEMPLATE = FeedbackTemplate(
 
 
 def template_for(rule: RuleResult, templates: dict[str, FeedbackTemplate]) -> FeedbackTemplate:
-    """Look up a rule's wording by its declared feedback key."""
     return templates.get(rule.feedback_key, FALLBACK_TEMPLATE)
 
 
 @dataclass
 class FeedbackFinding:
     """
-    One correction at both levels of detail, with no Streamlit in it. simple_* is
-    what the results page shows straight away; the rest is the traceable record
-    behind it, which the interface tucks into an expander. One object rather than
-    two, so there is no second source of truth.
+    One correction at both levels of detail. simple_* is shown straight away, the
+    rest is the detail behind it that goes in an expander.
     """
 
     rule_id: str
@@ -103,7 +95,7 @@ class FeedbackFinding:
     severity: str
     # evidence lines ("Rep 2 - minimum elbow angle 116 deg - 00:04.2")
     evidence_lines: list[str] = field(default_factory=list)
-    # which template the wording came from - links a sentence back to its rule
+    # links the sentence back to its rule
     feedback_key: str = ""
     reliability: Reliability = Reliability.CANNOT_ASSESS
 
@@ -123,8 +115,7 @@ class FeedbackFinding:
 
     @property
     def priority(self) -> int:
-        """Ordering key for the corrections list. A fault that repeats beats a one-off,
-        and a finding from clear landmarks beats one from borderline landmarks."""
+        """Sort key: repeated faults beat one-offs, and clear landmarks beat borderline ones."""
         severity_rank = {"important": 3, "moderate": 2, "minor": 1}.get(self.severity, 1)
         share = self.flagged_reps / self.evaluable_reps if self.evaluable_reps else 0.0
         return int(severity_rank * 100 + share * 40 + self.reliability.rank * 3)
@@ -134,10 +125,7 @@ class FeedbackFinding:
 
 
 def transparent_score(rule_results: list[RuleResult]) -> tuple[int, int, int]:
-    """
-    (score 0-100, credits x2 as an int, evaluable check count). Pure function
-    so the tests can pin the formula down.
-    """
+    """(score 0-100, credits x2 as an int, evaluable check count)."""
     credits = 0.0
     evaluable = 0
     for rule in rule_results:
@@ -199,10 +187,7 @@ def evidence_lines(rule: RuleResult, formats: EvidenceFormats) -> list[str]:
 
 
 def count_phrase(flagged: int, total: int) -> str:
-    """
-    The countable fragment of a plain sentence: "2 of your 6 reps", "your rep".
-    Shared so all three exercises count the same way.
-    """
+    """E.g. "2 of your 6 reps" or "your rep", shared so all exercises word it the same."""
     if total <= 1:
         return "your rep"
     if flagged >= total:
@@ -215,8 +200,7 @@ def build_findings(
     templates: dict[str, FeedbackTemplate],
     formats: EvidenceFormats | None = None,
 ) -> list[FeedbackFinding]:
-    """The corrections, most important first, so the interface can take the top two
-    or three and know it is showing what matters."""
+    """The corrections, most important first, so the UI can just take the top few."""
     findings: list[FeedbackFinding] = []
     for rule in rule_results:
         if rule.status not in (RuleStatus.FAIL, RuleStatus.WARNING):
@@ -256,8 +240,8 @@ def build_findings(
 
 
 def _fill(sentence: str, counts: dict[str, Any]) -> str:
-    """Fill a template's {flagged} / {total} / {reps} placeholders. An unknown one
-    returns the sentence unchanged - a typo shouldn't kill a working analysis."""
+    """Fill the {flagged} / {total} / {reps} placeholders. A bad placeholder leaves
+    the sentence as it is rather than crashing."""
     if not sentence:
         return ""
     try:
@@ -272,7 +256,7 @@ def build_positives(
     templates: dict[str, FeedbackTemplate],
     opening: str = "",
 ) -> list[str]:
-    """What went well, limited to what the measurements support. Never "perfect
+    """What went well, only as far as the measurements support. Never "perfect
     form" - a 2D pose estimate can't prove that."""
     positives: list[str] = []
     if reps and opening:
@@ -300,8 +284,7 @@ def build_rep_summaries(
     rule_results: list[RuleResult],
     templates: dict[str, FeedbackTemplate],
 ) -> list[RepSummary]:
-    """One verdict per rep. A single grade for the whole set hides what a beginner
-    most wants to know, which is which rep went wrong."""
+    """One verdict per rep, so the user can see which rep went wrong."""
     summaries: list[RepSummary] = []
     for rep in reps:
         passed: list[str] = []
@@ -352,8 +335,8 @@ def build_rep_summaries(
 
 def build_overview(rule_results: list[RuleResult], templates: dict[str, FeedbackTemplate]) -> list[str]:
     """
-    One line per check: "Range of motion: 3 of 4 repetitions acceptable". How often
-    an issue occurred is what tells someone whether they have a habit or a one-off.
+    One line per check, e.g. "Range of motion: 3 of 4 repetitions acceptable", so
+    the user can tell a habit from a one-off.
     """
     lines: list[str] = []
     for rule in rule_results:
@@ -369,7 +352,7 @@ def build_overview(rule_results: list[RuleResult], templates: dict[str, Feedback
 def build_not_assessed(
     rule_results: list[RuleResult], templates: dict[str, FeedbackTemplate]
 ) -> list[NotAssessedItem]:
-    """The checks we did not judge, with the reason for each."""
+    """Checks that weren't judged, with the reason for each."""
     return [
         NotAssessedItem(
             metric=rule.metric or rule.rule_id,
@@ -388,7 +371,7 @@ def build_summary(
     templates: dict[str, FeedbackTemplate],
     positives_opening: str = "",
 ) -> SessionSummary:
-    """Everything the results page needs for the set as a whole."""
+    """Summary of the whole set for the results page."""
     score, _, _ = transparent_score(rule_results)
     reliabilities = [
         rule.reliability for rule in rule_results if rule.status is not RuleStatus.NOT_EVALUABLE

@@ -1,10 +1,9 @@
 """
-Every tunable value for squat analysis, in one place.
+All tunable values for the squat analysis in one place.
 
-The section headings mark each block as one of two kinds. ENGINEERING values
-control whether the system is stable and say nothing about how a squat should
-be performed. TECHNIQUE values do make claims about performance, and they are
-provisional calibration values rather than biomechanical constants.
+ENGINEERING values just keep the system stable and say nothing about how to
+squat. TECHNIQUE values do judge the squat, and they are my provisional
+calibration values, not biomechanical constants.
 
 Angle conventions (see analysis/geometry.py):
 
@@ -61,9 +60,8 @@ class SquatConfig:
     TRACKING_CONFIDENCE: float = 0.5
 
     # --- ENGINEERING - landmark reliability and gap handling ---
-    # relaxed after testing threw out gym recordings that were perfectly usable
-    # per-frame visibility floor. 0.5 was too strict - MediaPipe reports 0.3-0.6
-    # for a limb partly behind the body, which is what a side view looks like.
+    # per-frame visibility floor. I lowered it from 0.5 after it rejected usable gym
+    # videos - MediaPipe gives 0.3-0.6 for a limb partly behind the body side-on
     MIN_KEY_LANDMARK_VISIBILITY: float = 0.4
     # same floor under the name the measurement code uses
     MIN_REQUIRED_LANDMARK_VISIBILITY: float = 0.4
@@ -77,10 +75,8 @@ class SquatConfig:
     MAX_SHORT_GAP_FRAMES: int = 5
 
     # --- ENGINEERING - anatomical plausibility gates ---
-    # MediaPipe returns a confident position even when it is extrapolating a limb
-    # it can't see. These bands are wide - they catch tracking failures, not
-    # technique - and anything outside them is NaN, never a fault.
-    # a knee doesn't flex past about 25 degrees of interior angle
+    # MediaPipe can be confident about a limb it's guessing. These bands are wide
+    # and only catch tracking failures - anything outside becomes NaN, not a fault.
     PLAUSIBLE_KNEE_ANGLE_MIN: float = 25.0
     PLAUSIBLE_KNEE_ANGLE_MAX: float = 190.0
     # a heel rising more than half a lower leg is tracking failure, not a fault
@@ -89,7 +85,7 @@ class SquatConfig:
     KNEE_SYMMETRY_MAX_PLAUSIBLE: float = 45.0
 
     # --- ENGINEERING - smoothing ---
-    # EMA weight for the landmark coordinates. Higher follows the raw signal.
+    # EMA weight for the landmark coordinates, higher follows the raw signal more
     EMA_ALPHA: float = 0.45
     # EMA weight for the derived knee-angle series
     ANGLE_EMA_ALPHA: float = 0.5
@@ -124,11 +120,11 @@ class SquatConfig:
     # --- ENGINEERING - video suitability ---
     VIDEO_MIN_DURATION: float = 3.0
     VIDEO_MAX_DURATION: float = 120.0
-    # Multi-person ratios: warn above the first, reject above the second.
+    # multi-person ratios: warn above the first, reject above the second
     MULTI_PERSON_WARN_RATIO: float = 0.10
     MULTI_PERSON_FAIL_RATIO: float = 0.50
-    # frontality bands (shoulder-or-hip separation / torso length): small side-on,
-    # towards 1 front or rear on. Provisional heuristics.
+    # frontality bands (shoulder or hip gap / torso length), small side-on and
+    # close to 1 front-on
     #   <= GOOD          clean side view, full confidence
     #   GOOD..FRONTAL    diagonal, analysed with a warning
     #   >= FRONTAL       front-on, sagittal angles not assessed
@@ -136,75 +132,72 @@ class SquatConfig:
     SIDE_VIEW_FRONTAL_RATIO: float = 1.00
     # spread above which the camera angle counts as changing mid-clip
     VIEW_STABILITY_SPREAD: float = 0.35
-    # edge margin counted as clipped, then the share of frames allowed inside it
-    # before we warn and before we stop
+    # edge margin that counts as clipped, then the share of frames allowed in it
+    # before warning / stopping
     FRAMING_MARGIN: float = 0.02
     FRAMING_WARN_TOLERANCE: float = 0.25
     FRAMING_FAIL_TOLERANCE: float = 0.70
 
     # --- ENGINEERING - standing baseline ---
-    # stable standing frames needed for a baseline; we take the median
+    # stable standing frames needed for a baseline (median is used)
     BASELINE_MIN_FRAMES: int = 5
 
     # --- TECHNIQUE (PROVISIONAL) - squat depth ---
-    # calibration values, still waiting on literature and testing
-    # minimum knee angle at or below which a rep passes on depth
+    # knee angle at or below which a rep passes on depth
     DEPTH_KNEE_ANGLE_PASS: float = 100.0
     # between PASS and this it warns, above it the rep fails
     DEPTH_KNEE_ANGLE_WARN: float = 115.0
     # alternative way to pass: hip reaches knee level within this tolerance
     DEPTH_HIP_KNEE_TOLERANCE: float = 0.12
 
-    # share of the bottom window that must break the condition before we call it
-    # shallow - a second guard on top of the window median
+    # share of the bottom window that must be too shallow before flagging it
     DEPTH_MIN_VIOLATION_RATIO: float = 0.5
 
     # --- TECHNIQUE (PROVISIONAL) - torso lean ---
-    # peak torso lean from vertical that flags a rep. Provisional: build and
-    # squat style move the right number around.
+    # peak torso lean from vertical that flags a rep. Build and squat style change
+    # the right number, so this is a rough value
     TORSO_LEAN_WARN: float = 45.0
     TORSO_LEAN_FAIL: float = 60.0
-    # also flag lean growing this far past the person's own standing baseline
+    # also flag lean this far past the person's own standing baseline
     TORSO_LEAN_DELTA_FAIL: float = 55.0
-    # persistence: the lean must hold this many frames and cover this share of
-    # the rep, so one jittery landmark can't produce a finding
+    # the lean has to hold this many frames and cover this share of the rep,
+    # so one jittery landmark can't cause a finding
     TORSO_LEAN_MIN_FRAMES: int = 4
     TORSO_LEAN_MIN_VIOLATION_RATIO: float = 0.15
 
     # --- TECHNIQUE (PROVISIONAL) - heel lift ---
-    # heel rise above the standing baseline, over lower-leg length. Provisional.
+    # heel rise above the standing baseline / lower-leg length
     HEEL_LIFT_THRESHOLD: float = 0.06
-    # consecutive frames the lift must hold
     HEEL_LIFT_MIN_FRAMES: int = 3
-    # below this visibility the heel rule says "cannot assess" instead of guessing
+    # below this the heel rule says "cannot assess" instead of guessing
     HEEL_MIN_VISIBILITY: float = 0.5
-    # Share of the rep's measurable frames the lift must cover.
+    # share of the rep's measurable frames the lift must cover
     HEEL_LIFT_MIN_VIOLATION_RATIO: float = 0.10
 
     # --- TECHNIQUE (PROVISIONAL) - return to standing / extension ---
-    # degrees of the person's own standing baseline a rep must finish within.
-    # Not 180, so nobody is asked to hyperextend. Provisional.
+    # a rep has to finish within this many degrees of the person's own standing
+    # angle - not 180, so nobody is told to hyperextend
     FULL_EXTENSION_TOLERANCE: float = 12.0
 
     # --- MEASUREMENT ONLY - left/right symmetry (frontal plane) ---
-    # still measured and exported but no longer graded - one camera can't separate
-    # a real asymmetry from the far leg's projection error
+    # measured and exported but not graded - one camera can't tell a real
+    # asymmetry apart from the far leg's projection error
     SYMMETRY_MIN_FRAMES: int = 4
-    # both legs must be usable on this share of the rep, and the far leg must
-    # clear this visibility floor, before they get compared
+    # both legs must be usable on this share of the rep, and the far leg above
+    # this visibility, before they're compared
     SYMMETRY_MIN_BOTH_SIDES_RATIO: float = 0.6
     SYMMETRY_MIN_VISIBILITY: float = 0.5
 
     # --- TECHNIQUE (PROVISIONAL) - movement control / tempo ---
-    # a descent taking a fraction of a second is a drop, not a controlled rep.
-    # Timing heuristics, and only ever a gentle warning.
+    # a descent in a fraction of a second is a drop, not a controlled rep. Only
+    # ever a gentle warning
     DESCENT_MIN_DURATION: float = 0.45
-    # Shorter than this and we say so more firmly.
+    # shorter than this and the warning is firmer
     DESCENT_FAST_DURATION: float = 0.25
 
     # --- ENGINEERING - reliability banding (see confidence.py) ---
-    # when a verdict is reported as HIGH / MEDIUM / LOW evidence. Nothing here is
-    # about technique, only about how well the recording supported it.
+    # when a verdict counts as HIGH / MEDIUM / LOW evidence (about the recording,
+    # not the technique)
     RELIABILITY_HIGH_VISIBILITY: float = 0.75
     RELIABILITY_HIGH_MEASURABLE_RATIO: float = 0.85
     RELIABILITY_HIGH_VIEW_SUPPORT: float = 0.85
@@ -212,24 +205,23 @@ class SquatConfig:
     RELIABILITY_MEDIUM_VISIBILITY: float = 0.55
     RELIABILITY_MEDIUM_MEASURABLE_RATIO: float = 0.6
     RELIABILITY_MEDIUM_VIEW_SUPPORT: float = 0.5
-    # subject size as median torso length in pixels. Someone filmed from far away
-    # carries more error per landmark than visibility shows. Provisional.
+    # median torso length in pixels. Someone filmed from far away has more error
+    # per landmark than visibility shows
     RELIABILITY_MIN_SUBJECT_PIXELS: float = 140.0
     RELIABILITY_POOR_SUBJECT_PIXELS: float = 70.0
 
     # --- ENGINEERING - which filter smooths the movement signal ---
     # "ema" (default), "butterworth" (Dill et al. 2024), "savgol" or
-    # "moving_average". docs/filter_selection.md has the measured trade-off - no
-    # filter won on every rep shape, which is why this is still a setting.
+    # "moving_average". No filter won on every rep shape, so it's a setting
+    # (see docs/filter_selection.md)
     ANGLE_FILTER: str = "ema"
 
     # --- ENGINEERING - measurement-uncertainty policy ---
-    # False (default): a finding is annotated with the published error of the
-    # quantity behind it and marked "indicative" if its margin falls inside that
-    # error. True also downgrades it a step. See exercises/common/uncertainty.py.
+    # False: findings inside the published error are marked "indicative".
+    # True: they are also downgraded a step. See exercises/common/uncertainty.py
     UNCERTAINTY_STRICT: bool = False
 
-    # Free-form notes shown in the debug view.
+    # notes shown in the debug view
     notes: dict[str, str] = field(
         default_factory=lambda: {
             "technique_thresholds": (
@@ -249,11 +241,8 @@ class SquatConfig:
         return asdict(self)
 
 
-# --- Rule specifications. ---
-# Each rule declares what it reads, when that reading is meaningful and how
-# much evidence it needs; rules.py evaluates it. SquatRule is RuleSpec renamed.
+# --- Rule specifications (evaluated in rules.py) ---
 
-# The view vocabulary and the rule shape are shared by all three exercises
 SquatRule = RuleSpec
 
 
@@ -328,7 +317,7 @@ def side_view_rules(config: SquatConfig) -> tuple[SquatRule, ...]:
 
 
 def view_independent_rules(config: SquatConfig) -> tuple[SquatRule, ...]:
-    """Checks one landmark's vertical movement can support from any angle."""
+    """Checks that work from any camera angle."""
     return (
         SquatRule(
             name="Heel stability",
@@ -349,7 +338,7 @@ def view_independent_rules(config: SquatConfig) -> tuple[SquatRule, ...]:
 
 
 def rule_specs(config: SquatConfig) -> tuple[SquatRule, ...]:
-    """Every squat rule, in the order the results page shows them."""
+    """All squat rules, in the order the results page shows them."""
     side = {rule.rule_id: rule for rule in side_view_rules(config)}
     any_view = {rule.rule_id: rule for rule in view_independent_rules(config)}
     order = (
@@ -365,18 +354,16 @@ def rule_specs(config: SquatConfig) -> tuple[SquatRule, ...]:
 
 # --- Recording guidance ---
 
-# The camera view this exercise is analysed from.
 RECOMMENDED_VIEW = "side-on"
 
-# shown before upload and attached to a rejection, so the advice matches
+# full tips, shown with the retry advice after a rejection
 RECORDING_TIPS: tuple[str, ...] = (
     *RETRY_TIPS,
     "Start standing, perform several full squats, and finish standing.",
 )
 
-# The three lines shown beside the camera diagram before upload. People skim
-# this panel, so it says only what changes whether the analysis can run; the
-# fuller RECORDING_TIPS above are kept for the retry advice after a rejection.
+# the three short lines next to the camera diagram before upload (testers
+# didn't read the longer version)
 QUICK_TIPS: tuple[str, ...] = (
     "Film from the side, level with your hips.",
     "Fit your whole body in frame, head to feet.",
@@ -384,10 +371,9 @@ QUICK_TIPS: tuple[str, ...] = (
 )
 
 
-# What the application actually runs with.
 DEFAULT_CONFIG = SquatConfig()
 
-# Default rule sets, exposed for the docs, the tests and the debug view.
+# default rule sets, used by the docs, tests and debug view
 SIDE_VIEW_RULES = side_view_rules(DEFAULT_CONFIG)
 VIEW_INDEPENDENT_RULES = view_independent_rules(DEFAULT_CONFIG)
 DEFAULT_RULES = rule_specs(DEFAULT_CONFIG)

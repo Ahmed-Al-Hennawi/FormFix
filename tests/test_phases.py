@@ -34,8 +34,7 @@ class TestCompleteReps:
         assert result.partial_movements == 0
 
     def test_brief_style_sequence(self):
-        # The sequence from the brief, stretched to a plausible speed. As
-        # given, its 13 values last 0.4s, shorter than any real squat.
+        # the example sequence, slowed down - as given its 13 values last 0.4s
         base = [175, 170, 160, 145, 130, 110, 95, 100, 115, 135, 155, 170, 175]
         seq = np.concatenate([standing(15)] + [np.full(4, v) for v in base] + [standing(15)])
         result = detect_reps(seq, ts(seq), CONFIG)
@@ -66,7 +65,7 @@ class TestRobustness:
         assert len(result.reps) == 1
 
     def test_hovering_at_threshold_is_not_reps(self):
-        # Oscillating +-3 deg around the rep-start threshold.
+        # +-3 deg around the rep-start threshold
         rng = np.random.default_rng(3)
         seq = CONFIG.REP_START_KNEE_ANGLE + rng.normal(0, 3.0, 300)
         result = detect_reps(seq, ts(seq), CONFIG)
@@ -81,7 +80,7 @@ class TestRobustness:
         assert result.partial_movements == 1
 
     def test_extremely_fast_movement_rejected(self):
-        # A 4-frame squat is 0.13s, so it's jitter.
+        # a 4-frame squat is 0.13s, so it's jitter
         blip = np.concatenate([standing(), [150, 95, 95, 150], standing()])
         result = detect_reps(np.asarray(blip, dtype=float), ts(np.asarray(blip)), CONFIG)
         assert len(result.reps) == 0
@@ -97,7 +96,7 @@ class TestPartialRecordings:
     def test_video_starting_mid_squat(self):
         seq = np.concatenate([np.linspace(95, 175, 25), standing(), one_rep(), standing()])
         result = detect_reps(seq, ts(seq), CONFIG)
-        # The half-seen first movement doesn't count, the full one does.
+        # the half-seen first movement doesn't count, the full one does
         assert len(result.reps) == 1
 
     def test_video_ending_mid_squat(self):

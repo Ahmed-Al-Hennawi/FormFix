@@ -1,9 +1,6 @@
 """
-The shared repetition state machine, which segments all three exercises.
-
-Sequences are written as the movement signal it consumes - high at rest,
-falling into the rep - so they stand in for a squat's knee angle, a pulldown's
-elbow angle and a press's elbow flexion alike.
+Tests for the shared rep state machine. The signals are high at rest and drop
+into the rep, so they work for all three exercises.
 """
 
 from __future__ import annotations
@@ -39,7 +36,7 @@ def timestamps(n: int) -> np.ndarray:
 
 
 def cycle(rest: float, extreme: float, hold: int = 12, travel: int = 21, pause: int = 5):
-    """One rest -> travel -> turning point -> return excursion."""
+    """One rest -> travel -> turning point -> return."""
     return (
         list(np.full(hold, rest))
         + list(np.linspace(rest, extreme, travel))
@@ -88,15 +85,15 @@ class TestFalsePositiveProtection:
     """Things that must not be counted as repetitions."""
 
     def test_noise_around_the_start_threshold_is_not_a_repetition(self):
-        # Flutters across start_level for the whole clip without going
-        # anywhere. Plain threshold counting would call this a dozen reps.
+        # jitters around start_level the whole clip - simple threshold counting
+        # would call this a dozen reps
         rng = np.random.default_rng(0)
         values = 150.0 + rng.normal(0, 3.0, 240)
         result = run(values)
         assert result.reps == []
 
     def test_a_shallow_dip_is_a_partial_not_a_repetition(self):
-        # Travels past the start level but never reaches the extreme level.
+        # passes the start level but never reaches the extreme
         result = run(signal(cycle(175.0, 135.0), np.full(12, 175.0)))
         assert result.reps == []
         assert result.partial_movements == 1
@@ -108,7 +105,7 @@ class TestFalsePositiveProtection:
         assert result.reps == []
 
     def test_a_movement_too_fast_to_be_controlled_is_a_partial(self):
-        # A whole excursion crammed into well under min_duration.
+        # a whole rep in well under min_duration
         result = run(
             signal(
                 np.full(10, 175.0), cycle(175.0, 90.0, hold=0, travel=3, pause=1), np.full(12, 175.0)
@@ -128,7 +125,7 @@ class TestFalsePositiveProtection:
 
 class TestIncompleteRecordings:
     def test_a_clip_starting_mid_movement_does_not_invent_a_repetition(self):
-        # Starts already at the extreme, so the machine never saw the descent.
+        # starts already at the extreme, so the descent was never seen
         values = signal(np.full(8, 90.0), np.linspace(90.0, 175.0, 21), np.full(12, 175.0))
         result = run(values)
         assert result.reps == []
@@ -154,16 +151,14 @@ class TestIncompleteRecordings:
 
 class TestMissingData:
     def test_a_short_tracking_gap_does_not_break_a_repetition(self):
-        # Five missing frames mid-travel. Brief occlusion is normal in a gym
-        # and shouldn't cost anyone a rep.
+        # five missing frames mid-rep - brief occlusion shouldn't cost a rep
         values = signal(cycle(175.0, 90.0), np.full(12, 175.0))
         values[22:27] = np.nan
         result = run(values)
         assert len(result.reps) == 1
 
     def test_a_long_tracking_gap_abandons_the_repetition(self):
-        # Seventeen missing frames, past max_tracking_loss_frames, so it gets
-        # reported as partial rather than bridged.
+        # 17 missing frames is past max_tracking_loss_frames, so it's partial
         values = signal(cycle(175.0, 90.0), np.full(12, 175.0))
         values[25:42] = np.nan
         result = run(values)
@@ -184,8 +179,7 @@ class TestMissingData:
 
 class TestHysteresisAndReversal:
     def test_a_bounce_at_the_turning_point_does_not_split_one_rep_in_two(self):
-        # Rises a little, then goes deeper again. One rep with a wobble at the
-        # bottom, not two.
+        # rises a bit then goes deeper - one rep with a wobble, not two
         values = signal(
             np.full(12, 175.0),
             np.linspace(175.0, 95.0, 18),
@@ -209,8 +203,7 @@ class TestHysteresisAndReversal:
         )
         result = run(values)
         assert len(result.reps) == 1
-        # Finished where the signal actually passed end_level, not where it
-        # first came close.
+        # ends where it actually passed end_level, not where it first got close
         assert result.reps[0].end_frame > 12 + 18 + 4 + 12
 
     def test_the_reported_excursion_is_measured_not_assumed(self):

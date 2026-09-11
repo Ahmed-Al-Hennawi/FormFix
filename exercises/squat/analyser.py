@@ -6,9 +6,8 @@ The squat pipeline, in order:
     standing baseline -> evaluate rules -> reliability -> feedback ->
     render annotated video -> export
 
-This module owns none of that logic, only the order. Measurement is in
-metrics.py, judgement in rules.py, wording in feedback.py, thresholds in
-config.py. Failures raise AnalysisFailure with a typed code.
+This file only runs the steps in order. Measuring is in metrics.py, judging in
+rules.py, wording in feedback.py and thresholds in config.py.
 """
 
 from __future__ import annotations
@@ -62,8 +61,7 @@ logger = logging.getLogger(__name__)
 # seconds either side of the evidence frame that a banner stays up
 EVENT_CONTEXT_SECONDS = 0.5
 
-# what the overlay says about a flagged rep. The part before the dash is the
-# small label by the joints; the whole line goes in the status pill.
+# overlay text for a flagged rep - the part before the dash is the short label
 BANNER_TEXT = {
     "squat_depth": "Depth - stopping high",
     "torso_lean": "Chest - leaning forward",
@@ -75,10 +73,9 @@ BANNER_TEXT = {
 
 def smooth_movement_signal(series, config, fps: float):
     """
-    Smooth the signal that drives rep segmentation and the turning-point
-    measurements. Which filter runs is a config choice (ANGLE_FILTER): an EMA lags
-    exactly where depth and lockout are read, but a 2 Hz Butterworth eats real
-    signal on a sharp turnaround. See docs/filter_selection.md. Default is "ema".
+    Smooth the signal used for rep detection and depth/lockout. The filter is set
+    by ANGLE_FILTER: an EMA lags at the turning points, but a 2 Hz Butterworth
+    cuts real signal on a sharp turnaround (see docs/filter_selection.md).
     """
     name = getattr(config, "ANGLE_FILTER", "ema")
     if name == "ema":
@@ -93,8 +90,7 @@ def analyse_squat(
     output_dir: Path | None = None,
     export_root: Path | None = None,
 ) -> SquatAnalysisResult:
-    """Analyse one squat video end to end. Raises AnalysisFailure if the recording
-    can't be analysed."""
+    """Analyse one squat video end to end. Raises AnalysisFailure if it can't."""
     started = time.monotonic()
     report = progress or (lambda stage, fraction, message: None)
 
@@ -224,8 +220,7 @@ def _run(
     reps = metrics_mod.build_reps(detection.reps, metrics, knee_smoothed, pose, side, config)
 
     # --- 8b. is this actually a squat? ---
-    # nothing so far has questioned the exercise the user picked, and everything
-    # below writes confident, specific squat feedback
+    # check the user picked the right exercise before giving squat feedback
     plausible = plausibility.check_squat(reps)
     if not plausible.plausible:
         checks.add_error(plausible.message, RejectionCode.EXERCISE_MISMATCH)
@@ -253,7 +248,7 @@ def _run(
     # anything the recording can't support comes back as "not assessed"
     _apply_recording_limitations(rule_results, checks)
 
-    # attach the published measurement error to every finding
+    # attach the published measurement error to each finding
     _specs = {spec.rule_id: spec for spec in rule_specs(config)}
     uncertainty_notes = uncertainty.annotate_uncertainty(
         rule_results,
@@ -267,7 +262,7 @@ def _run(
             )
             for rule_id, spec in _specs.items()
         },
-        # the filter's own bias is a systematic error on this measurement
+        # the filter's own bias counts as systematic error
         systematic={
             "squat_depth": (
                 filters.depth_bias_for(getattr(config, "ANGLE_FILTER", "ema")),
@@ -286,8 +281,6 @@ def _run(
 
     # --- 10. annotated video ---
     report("render", 0.0, "Rendering analysed video")
-    # cv2.VideoWriter doesn't create the folder and doesn't error if it can't
-    # open the file - it silently drops every frame
     session_dir = output_dir or new_session_dir()
     try:
         session_dir.mkdir(parents=True, exist_ok=True)
@@ -295,8 +288,7 @@ def _run(
         logger.warning("Output directory %s is unusable; using a scratch directory", session_dir)
         session_dir = new_session_dir()
     annotated_path = session_dir / "annotated.mp4"
-    # which frames to render. Frame numbers stay original, so the timestamps in
-    # the feedback still refer to the upload.
+    # which frames to render (frame numbers stay the original ones)
     render_window = trimming.compute_render_window(reps, pose.frame_count, video.fps)
     frame_states = _frame_states(detection, reps, pose.frame_count)
     events = _overlay_events(rule_results, video, pose.frame_count, side)
@@ -309,12 +301,11 @@ def _run(
             events,
             side,
             annotated_path,
-            # side-on, the overlay holds occluded limbs to a higher confidence bar
+            # side-on, hidden limbs need a higher confidence to be drawn
             camera_orientation=checks.orientation.value,
             on_frame=lambda i, n: report("render", (i + 1) / max(n, 1), "Rendering analysed video"),
             angle_joints=_angle_joints(side),
-            # torso and legs only: no squat rule reads the arms, and they are
-            # holding a bar or held out in front the whole time
+            # torso and legs only, no squat rule uses the arms
             drawn_landmarks=LOWER_BODY_DRAWN,
             frame_range=(render_window.start_frame, render_window.end_frame),
         )
@@ -359,10 +350,7 @@ def _run(
 
 
 def validation_config_for(config: SquatConfig) -> validation.ValidationConfig:
-    """
-    Squat recording requirements in the generic validation vocabulary - the seam
-    between generic validation (analysis/) and exercise requirements (here).
-    """
+    """Squat recording requirements in the format the generic validation expects."""
     return validation.ValidationConfig(
         min_duration=config.VIDEO_MIN_DURATION,
         max_duration=config.VIDEO_MAX_DURATION,
@@ -380,7 +368,7 @@ def validation_config_for(config: SquatConfig) -> validation.ValidationConfig:
     )
 
 
-# rejection code -> the coarse UI failure code
+# rejection code -> UI failure code
 _FAILURE_CODES: dict[RejectionCode, FailureCode] = {
     RejectionCode.VIDEO_READ_ERROR: FailureCode.INVALID_VIDEO,
     RejectionCode.VIDEO_TOO_SHORT: FailureCode.INVALID_VIDEO,
@@ -396,7 +384,7 @@ _FAILURE_CODES: dict[RejectionCode, FailureCode] = {
     RejectionCode.NO_SQUAT_MOVEMENT: FailureCode.NO_COMPLETE_SQUAT,
 }
 
-# what we say on a rule the recording couldn't support
+# message for a rule the recording couldn't support
 _LIMITATION_TEXT = {
     METRIC_DEPTH: "Depth needs a side view: knee and hip angles cannot be measured "
     "reliably from this camera position.",
@@ -410,7 +398,7 @@ _LIMITATION_TEXT = {
 
 
 def _failure_code_for(checks: ValidationResult) -> FailureCode:
-    """First rejection code we recognise wins; unknown codes fall back."""
+    """First known rejection code wins, unknown ones fall back."""
     for code in checks.reason_codes:
         mapped = _FAILURE_CODES.get(code)
         if mapped is not None:
@@ -419,8 +407,7 @@ def _failure_code_for(checks: ValidationResult) -> FailureCode:
 
 
 def _apply_recording_limitations(rule_results, checks: ValidationResult) -> None:
-    """Switch off the rules this recording can't support, and only those. The
-    affected rule becomes NOT_EVALUABLE with a reason."""
+    """Mark the rules this recording can't support as NOT_EVALUABLE, with a reason."""
     if not checks.limited_metrics:
         return
     limited = set(checks.limited_metrics)
@@ -438,8 +425,7 @@ def _apply_recording_limitations(rule_results, checks: ValidationResult) -> None
 
 
 def _angle_joints(side: str) -> tuple[JointAngle, ...]:
-    """Angles drawn on the video: only the two the rules read. Trunk lean is an
-    inclination from vertical, not a three-point angle, so it stays a HUD chip."""
+    """The two angles the rules use (trunk lean is from vertical, so it isn't one)."""
     chain = SIDE_CHAINS.get(side)
     if chain is None:
         return ()
@@ -465,9 +451,8 @@ def _frame_states(
             if rep.start_frame <= f <= rep.end_frame:
                 rep_number = rep.number
                 is_bottom = rep.bottom_start_frame <= f <= rep.bottom_end_frame
-                # inside a committed rep the caption comes from that rep's own segmentation -
-                # the raw state track can carry labels from an abandoned attempt
-                # segmentation: the raw state track can carry labels from an
+                # inside a rep use that rep's own segmentation, the raw state track
+                # can still have labels from an abandoned attempt
                 if f < rep.bottom_start_frame:
                     phase = Phase.DESCENDING
                 elif is_bottom:
@@ -486,8 +471,7 @@ def _frame_states(
 def _overlay_events(
     rule_results, video: VideoMetadata, frame_count: int, side: str
 ) -> list[OverlayEvent]:
-    """One banner per flagged rep, shown only around its evidence frame, with the
-    joints worth highlighting."""
+    """One banner per flagged rep, shown around its evidence frame."""
     context = max(int(EVENT_CONTEXT_SECONDS * video.fps), 3)
     events: list[OverlayEvent] = []
     for rule in rule_results:
@@ -531,10 +515,7 @@ def _debug_block(
     interpolated: int,
     started: float,
 ) -> dict:
-    """
-    Developer metrics for the evaluation write-up. Only appears in the "Technical
-    details" panel under FORMFIX_DEBUG=1, and in the export bundle.
-    """
+    """Debug metrics for the evaluation. Shown with FORMFIX_DEBUG=1 and in the export."""
     return {
         "config": config.as_dict(),
         "rule_specs": [spec.as_dict() for spec in rule_specs(config)],
@@ -594,5 +575,5 @@ def _run_id(video_path: Path) -> str:
     return f"{time.strftime('%Y%m%d-%H%M%S')}-{digest}"
 
 
-# kept for the calibration script, which calls it through the analyser
+# kept for the calibration script
 compute_frame_metrics = metrics_mod.compute_frame_metrics

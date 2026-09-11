@@ -1,8 +1,7 @@
 /* ==========================================================================
    FormFix - /analyse page stylesheet
-   Loaded on top of main.css, on the analysis page only, so nothing here can
-   affect the homepage. Same "Cyber Pulse" system: Electric Cyan for the
-   working state, Neon Lime for success, Deep Space Blue surfaces.
+   Only loaded on the analysis page, on top of main.css. Same "Cyber Pulse"
+   palette: cyan while working, lime for success, deep blue surfaces.
 
    Contents
      A.  Page tokens + shell
@@ -20,6 +19,9 @@
      M.  Reference card + lightbox
      N.  Responsive
      O.  Reduced motion
+     P.  Real analysis additions
+     Q.  Per-rep results + not assessed
+     R.  Analysis details
    ========================================================================== */
 
 
@@ -27,8 +29,7 @@
    A - Page tokens + shell
    ========================================================================== */
 :root {
-  /* Score bands. Amber and red are tuned to sit inside the existing palette
-     rather than introducing a second colour system. */
+  /* score bands - amber and red tuned to fit the palette */
   --good: var(--lime);
   --moderate: #F0A83C;
   --poor: #FF5A76;
@@ -41,21 +42,19 @@
   --ax-shadow: 0 30px 80px rgba(0, 0, 0, 0.34);
   --ax-width: min(1240px, 92vw);
 
-  /* One spacing scale for the whole results column: panel, card and row step
-     down predictably instead of each block carrying its own padding, which
-     read as cramped on a phone. Every block below uses these three values. */
+  /* one spacing scale (panel, card, row) for the whole results column, so it
+     doesn't get cramped on a phone */
   --ax-pad-panel: clamp(1.15rem, 2.4vw, 1.75rem);
   --ax-pad-card: clamp(1rem, 1.9vw, 1.3rem);
   --ax-pad-row: clamp(0.7rem, 1.3vw, 0.85rem);
   --ax-gap-rows: clamp(0.45rem, 1vw, 0.6rem);
   --ax-gap-cards: clamp(0.7rem, 1.4vw, 0.95rem);
 
-  /* Width of the severity edge on a correction, a repetition and a detection
-     card, so all three line up. */
+  /* severity edge width, shared so the cards line up */
   --ax-stripe: 3px;
 }
 
-/* Every full-width block on the page shares one measure. */
+/* shared max width for full-width blocks */
 .ax-topbar,
 .ax-head,
 .ax-track,
@@ -74,8 +73,7 @@
 
 /* ==========================================================================
    B - Top bar
-   A single quiet row: back to the site on the left, the mark on the right.
-   No full navigation - the page belongs to the analysis.
+   Back link on the left, logo on the right. No full nav, to keep it focused.
    ========================================================================== */
 .ax-topbar {
   display: flex;
@@ -158,8 +156,8 @@ p.ax-head__lede, .ax-head__lede {
 /* ==========================================================================
    D - Progress tracker
      [x] Upload Video --------- (o) Analyse Form --------- ( ) Feedback
-   Grid rather than flex, so the connectors get their own columns and the
-   nodes stay perfectly aligned at every width.
+   Grid instead of flex so the connectors get their own columns and the nodes
+   stay aligned.
    ========================================================================== */
 .ax-track {
   display: grid;
@@ -281,8 +279,7 @@ p.ax-head__lede, .ax-head__lede {
 
 /* ==========================================================================
    E - Two-column layout
-   Upload on the left, the analysis on the right; stacked on small screens in
-   the order the brief asks for.
+   Upload on the left, analysis on the right, stacked on small screens.
    ========================================================================== */
 .st-key-ff_ax { animation: axFade 0.7s var(--ease-out) 0.18s backwards; }
 
@@ -291,7 +288,7 @@ p.ax-head__lede, .ax-head__lede {
   align-items: flex-start;
 }
 
-/* main.css zeroes every vertical gap; the panels manage their own rhythm. */
+/* main.css removes the gaps, so the panels handle their own spacing */
 .st-key-ff_ax_upload,
 .st-key-ff_ax_state,
 .st-key-ff_ax_upload [data-testid="stVerticalBlock"],
@@ -349,9 +346,8 @@ h2.ax-panel__heading, .ax-panel__heading {
   letter-spacing: -0.01em;
 }
 
-/* Formats, accepted length, "one set per clip". Long enough to wrap on a
-   phone, so the tracking is eased off and it is allowed its own line rather
-   than being squeezed against the heading. */
+/* formats / length / "one set per clip" - gets its own line since it wraps on
+   a phone */
 .ax-panel__note {
   margin-left: auto;
   font-family: var(--font-mono);
@@ -368,9 +364,7 @@ h2.ax-panel__heading, .ax-panel__heading {
 
 h3.ax-panel__title, .ax-panel__title {
   display: flex;
-  /* centre, not baseline: the count is a small mono pill next to a large
-     display face, and sitting it on the text baseline dropped it visibly
-     below the heading. */
+  /* centre, not baseline - on the baseline the small pill sat too low */
   align-items: center;
   flex-wrap: wrap;
   gap: 0.6rem;
@@ -384,19 +378,15 @@ h3.ax-panel__title, .ax-panel__title {
 
 h3.ax-panel__title--sm, .ax-panel__title--sm { font-size: 0.98rem; color: var(--ink-90); }
 
-/* Streamlit re-wraps a heading's children in an extra <span>, which makes our
-   own spans grandchildren rather than flex items, so the heading's `gap` never
-   reached them. `display: contents` drops the wrapper out of the box tree; it
-   is a no-op when Streamlit hasn't added one. */
+/* Streamlit wraps heading children in an extra <span>, so `gap` didn't reach
+   our spans. display: contents removes the wrapper from the layout. */
 h3.ax-panel__title > span:not(.ax-count):not([data-testid]),
 h4.ax-ex__title > span:not(.ax-ex__minor):not([data-testid]),
 h4.ax-fix__title > span:not([data-testid]) {
   display: contents;
 }
 
-/* The count beside a section heading - "3 things", "6 checks", "3 reps".
-   A small Electric Cyan pill, so it reads as part of the heading rather than
-   as the grey outline the page uses for disabled states. */
+/* the count next to a heading ("3 things", "6 checks") as a small cyan pill */
 .ax-count {
   display: inline-flex;
   align-items: center;
@@ -424,9 +414,7 @@ p.ax-hint, .ax-hint {
   text-align: center;
 }
 
-/* The privacy note under the uploader. Same slot as .ax-hint but set as a
-   sentence, not a spec line - the uppercase mono treatment above is for
-   "DRAG & DROP - .MP4". */
+/* privacy note under the uploader - normal sentence style, not uppercase mono */
 p.ax-hint--privacy, .ax-hint--privacy {
   font-family: inherit;
   font-size: 0.78rem;
@@ -458,7 +446,7 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 
 /* ==========================================================================
    G - Upload column (Streamlit widgets)
-   Scoped to .st-key-ff_ax_upload so the homepage uploader is untouched.
+   Scoped to .st-key-ff_ax_upload so the homepage uploader isn't affected.
    ========================================================================== */
 .st-key-ff_ax_upload [data-testid="stWidgetLabel"] p {
   font-family: var(--font-mono) !important;
@@ -480,8 +468,7 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 }
 
 .st-key-ff_ax_upload [role="radiogroup"] label {
-  /* equal thirds with the name centred in each - left-aligned labels in
-     unequal pills read as a list rather than as a switch */
+  /* equal thirds with centred names, so it looks like a switch */
   flex: 1 1 0;
   min-width: 0;
   display: flex;
@@ -501,7 +488,7 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 
 .st-key-ff_ax_upload [role="radiogroup"] label:hover { color: var(--white) !important; }
 
-/* hide the default radio dot - the pill itself is the affordance */
+/* hide the radio dot, the pill is the button */
 .st-key-ff_ax_upload [data-testid="stRadioOption"] > span,
 .st-key-ff_ax_upload [data-testid="stRadioOption"] > div > div > div:first-child,
 .st-key-ff_ax_upload [role="radiogroup"] label > div:first-child { display: none !important; }
@@ -540,7 +527,7 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
     box-shadow 0.35s var(--ease-out);
 }
 
-/* a slow cyan sheen, so the zone reads as "alive" without moving anything */
+/* slow cyan sheen */
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"]::before {
   content: "";
   position: absolute;
@@ -568,12 +555,9 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
   font-family: var(--font-body) !important;
 }
 
-/* Streamlit writes its own "Limit 300MB per file - MP4, MOV, AVI" caption and
-   gives no way to change the words, so the original is collapsed to nothing and
-   a shorter line is put in its place. The formats are already stated twice on
-   this page - the panel note and the hint under the dropzone - so only the size
-   is repeated here. It has to stay in step with maxUploadSize in
-   .streamlit/config.toml. */
+/* Streamlit's "Limit 300MB per file - MP4, MOV, AVI" caption can't be changed,
+   so it's hidden and replaced with a shorter one. Keep it in sync with
+   maxUploadSize in .streamlit/config.toml. */
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzoneInstructions"] small {
   font-size: 0 !important;
   line-height: 0 !important;
@@ -598,8 +582,7 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"]:hover
   [data-testid="stIconMaterial"] { transform: translateY(-4px); }
 
-/* Lead with a FormFix instruction rather than Streamlit's default
-   left-aligned button + caption arrangement. */
+/* our own instruction instead of Streamlit's default layout */
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] {
   display: flex !important;
   flex-direction: column-reverse !important;
@@ -624,8 +607,8 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
   margin-bottom: 0.35rem;
 }
 
-/* Once a clip is selected the drop zone has done its job: the confirmation,
-   the preview and the two buttons replace it. "Remove video" brings it back. */
+/* once a clip is picked the drop zone is replaced by the confirmation, preview
+   and buttons ("Remove video" brings it back) */
 .st-key-ff_ax_upload:has(.ax-confirm) [data-testid="stFileUploader"] { display: none; }
 
 /* the selected-file chip */
@@ -659,13 +642,10 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
   border: 1px solid var(--hairline-strong) !important;
   background: rgba(255, 255, 255, 0.04) !important;
   color: var(--ink-90) !important;
-  /* rem, not em: the button's own font-size is zeroed below to kill a stray
-     icon ligature, and em would resolve against that zero and collapse the
-     padding to nothing. */
+  /* rem not em - the button's font-size is 0 (see below), so em would be 0 */
   padding: 0 1.6rem !important;
   min-height: 46px;
-  /* Height comes from min-height, not from vertical padding, so the label is
-     centred by flex rather than by two paddings that have to stay in step. */
+  /* min-height instead of padding so flex centres the label */
   transition:
     border-color 0.35s var(--ease-out),
     box-shadow 0.35s var(--ease-out),
@@ -674,8 +654,7 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
     transform 0.35s var(--ease-out);
 }
 
-/* Flatten Streamlit's markdown wrapper inside a button: it carries a
-   paragraph margin of its own, which fights the button's flex centring. */
+/* remove the <p> margin inside the button, it breaks the centring */
 .st-key-ff_ax_upload .stButton button > *,
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button > *,
 .st-key-ff_ax_upload [data-testid="stFileUploader"] button > *,
@@ -721,19 +700,14 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 .st-key-ff_ax_upload button:disabled,
 .st-key-ff_ax_upload button[disabled] { opacity: 0.45 !important; transform: none !important; }
 
-/* Centre the label on both axes. Streamlit wraps the button's text in a
-   full-width flex row, so without justify-content the label sits at its left
-   edge and the hidden Material icon leaves the gap behind. */
+/* centre the label - Streamlit's full-width flex row left-aligns it otherwise */
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button > div,
 .st-key-ff_ax_upload [data-testid="stFileUploader"] button > div {
   display: flex;
   align-items: center;
   justify-content: center;
   width: 100%;
-  /* No gap. The row was written for an icon + label pair, but the icon is
-     hidden below, and a gap beside a hidden item still occupies the row -
-     which centred the pair rather than the word, leaving the label sitting
-     visibly right of the pill's centre. */
+  /* no gap - the icon is hidden, and its gap pushed the label off centre */
   gap: 0 !important;
   line-height: 1;
 }
@@ -810,7 +784,7 @@ p.ax-empty-note, .ax-empty-note { color: var(--ink-60); font-size: 0.94rem; }
 /* ==========================================================================
    I - Waiting state
    ========================================================================== */
-/* the last preview row sat hard against the card edge */
+/* space so the last row isn't against the card edge */
 .ax-wait { display: flex; flex-direction: column; padding-bottom: 1.1rem; }
 
 p.ax-wait__title, .ax-wait__title {
@@ -867,7 +841,7 @@ li.ax-preview__row strong, .ax-preview__row strong {
 
 /* ==========================================================================
    J - Analysing state
-   The FormFix landmark language, moving - not a generic spinner.
+   Animated landmark figure instead of a generic spinner.
    ========================================================================== */
 .ax-scan { display: flex; flex-direction: column; gap: 0.9rem; }
 
@@ -878,8 +852,7 @@ li.ax-preview__row strong, .ax-preview__row strong {
   border: 1px solid rgba(0, 240, 255, 0.22);
   background: radial-gradient(120% 90% at 50% 0%, rgba(0, 240, 255, 0.07), transparent 60%),
               rgba(11, 19, 43, 0.55);
-  /* Matches the intrinsic ratio of the athlete photographs, so the landmark
-     overlay lines up with the figure exactly. */
+  /* same ratio as the photos so the overlay lines up */
   aspect-ratio: 1122 / 1402;
   margin-inline: auto;
   width: 100%;
@@ -975,7 +948,7 @@ li.ax-run__step, .ax-run__step {
 
 /* ==========================================================================
    K - Score
-   Colour is a second signal only: the verdict is always spelled out.
+   Colour is only a second signal, the verdict is always written out.
    ========================================================================== */
 .ax-score {
   --ring: var(--good);
@@ -1096,8 +1069,7 @@ p.ax-score__verdict-lg, .ax-score__verdict-lg {
   letter-spacing: -0.01em;
 }
 
-/* The one sentence under the verdict. Body-sized and light, because it is
-   meant to be read - the mono facts line underneath is the reference data. */
+/* the sentence under the verdict */
 p.ax-score__headline, .ax-score__headline {
   font-size: clamp(0.95rem, 1.5vw, 1.02rem);
   line-height: 1.5;
@@ -1120,15 +1092,9 @@ p.ax-score__facts, .ax-score__facts {
 /* ==========================================================================
    L - Feedback
 
-   NOTE on the `li.ax-fix, .ax-fix` selector shape used throughout this
-   section. Streamlit styles bare elements (p, li, ul, ol, h1-h6, a) from its
-   own runtime stylesheet at class-level specificity - `.st-emotion-cache-x li`
-   beats a plain `.ax-fix`, whatever the source order. A row written as
-   `.ax-fix { padding: ... }` therefore renders with Streamlit's padding and
-   not its own, which is exactly what happened here: every list row on this
-   page was drawing at 0 padding while the stylesheet said otherwise.
-   Element-qualifying the selector restores the intended specificity. main.css
-   documents the same rule for the homepage.
+   Selectors are written as `li.ax-fix, .ax-fix` because Streamlit's own
+   element styles (`.st-emotion-cache-x li`) beat a plain `.ax-fix` - every
+   list row here was getting 0 padding before. Same as in main.css.
    ========================================================================== */
 /* --- what you did well --- */
 .ax-panel--wins { border-color: rgba(57, 255, 20, 0.2); }
@@ -1175,9 +1141,7 @@ li.ax-fix, .ax-fix {
   transition: border-color 0.35s var(--ease-out), background-color 0.35s var(--ease-out);
 }
 
-/* The severity edge. As a `border-left` it followed the card's radius and
-   curled away from the corners; clipped by the card's own `overflow: hidden`
-   it sits flush instead. */
+/* severity edge - a border-left curled with the radius, so it's clipped instead */
 li.ax-fix::before, .ax-fix::before {
   content: "";
   position: absolute;
@@ -1214,8 +1178,7 @@ li.ax-fix--important, .ax-fix--important {
   margin-bottom: 0.7rem;
 }
 
-/* The correction's position in the list, as a small severity-tinted chip so
-   it aligns with the title instead of hanging under it in grey. */
+/* number chip, coloured by severity, in line with the title */
 .ax-fix__num {
   display: inline-grid;
   place-items: center;
@@ -1246,9 +1209,8 @@ p.ax-fix__issue, .ax-fix__issue {
   margin-bottom: 0.4rem;
 }
 
-/* Why it matters - one quiet line, and only when the finding has one. The
-   gap below it belongs to "Try this", which owns the divider; setting it in
-   both places stacked two full gaps on top of each other. */
+/* "why it matters" line - the gap below belongs to "Try this", otherwise the
+   gaps doubled up */
 p.ax-fix__why, .ax-fix__why {
   color: var(--ink-60);
   font-size: 0.88rem;
@@ -1287,8 +1249,7 @@ p.ax-fix__how, .ax-fix__how {
 }
 
 /* --- measured checks ---
-   Sits on the first screen next to "what you did well", so its rows use the
-   same padding, radius and hairline as those rows. */
+   same row style as "what you did well" */
 ul.ax-checks, .ax-checks { display: flex; flex-direction: column; gap: var(--ax-gap-rows); }
 
 li.ax-check, .ax-check {
@@ -1306,9 +1267,7 @@ li.ax-check, .ax-check {
 
 .ax-check__label { display: flex; flex-direction: column; gap: 0.15rem; }
 
-/* "4 of 6 reps · high reliability" was 0.58rem in --ink-25, which is below
-   the point where it can be read at all on a phone. It is evidence, so it
-   has to be legible. */
+/* "4 of 6 reps · high reliability" was too small to read on a phone */
 .ax-check__detail {
   font-family: var(--font-mono);
   font-size: 0.62rem;
@@ -1518,8 +1477,7 @@ button.ax-ref:hover .ax-ref__play {
 
 .ax-modal__video { display: block; width: 100%; max-height: 66dvh; background: #05080f; }
 
-/* The figure hugs the image so the landmark overlay, which is positioned
-   against the figure, lines up with the athlete rather than with the panel. */
+/* figure fits the image so the overlay lines up with the athlete */
 .ax-modal__still {
   position: relative;
   display: block;
@@ -1566,8 +1524,7 @@ p.ax-modal__meta, .ax-modal__meta {
 
 /* ==========================================================================
    N - Responsive
-   Mobile matters most here: people film a set on their phone and upload it
-   from the same device.
+   Mobile matters most here since people film and upload from their phone.
    ========================================================================== */
 @media (max-width: 900px) {
   .st-key-ff_ax [data-testid="stHorizontalBlock"],
@@ -1589,9 +1546,7 @@ p.ax-modal__meta, .ax-modal__meta {
   :root {
     --ax-width: 94vw;
 
-    /* Three levels of padding - panel, card, row - compound inside 390px and
-       squeeze the text column to nothing. Stepping the scale down here buys
-       back readable line lengths; every block picks it up. */
+    /* smaller spacing scale so three levels of padding don't squeeze the text */
     --ax-pad-panel: 1.05rem;
     --ax-pad-card: 0.95rem;
     --ax-pad-row: 0.7rem;
@@ -1613,13 +1568,10 @@ p.ax-modal__meta, .ax-modal__meta {
   .ax-step__full { display: none; }
   .ax-step__short { display: inline; }
 
-  /* the three exercise pills wrap into a tidy block rather than a
-     stretched lozenge */
+  /* exercise pills wrap into a neat block */
   .st-key-ff_ax_upload [role="radiogroup"] { border-radius: 18px; padding: 0.35rem; }
 
-  /* the type comes down a notch so all three names still sit on one row as
-     equal thirds - a lone "Lat Pulldown" wrapping onto a second row is the one
-     thing that made this control look untidy on a phone */
+  /* slightly smaller text so "Lat Pulldown" doesn't wrap onto a second row */
   .st-key-ff_ax_upload [role="radiogroup"] label {
     padding: 0.65em 0.35em !important;
     font-size: 0.7rem;
@@ -1635,8 +1587,7 @@ p.ax-modal__meta, .ax-modal__meta {
   .ax-score__ring-wrap { width: 104px; }
   .ax-score__num { font-size: 1.9rem; }
 
-  /* The meter drops to its own row under the label and value, so the label
-     keeps a readable width instead of being crushed into a third of 390px. */
+  /* meter on its own row so the label has room */
   li.ax-check, .ax-check {
     grid-template-columns: 1fr auto;
     gap: 0.45rem 0.7rem;
@@ -1646,9 +1597,7 @@ p.ax-modal__meta, .ax-modal__meta {
 
   .ax-fix__head { gap: 0.55rem; }
 
-  /* A long section name plus its count pill will not fit on one line at this
-     width; the heading already wraps, this keeps the pill readable when it
-     does. */
+  /* keeps the count pill readable when the heading wraps */
   h3.ax-panel__title, .ax-panel__title { font-size: 1.02rem; }
   .ax-count { font-size: 0.58rem; letter-spacing: 0.1em; }
 
@@ -1661,7 +1610,7 @@ p.ax-modal__meta, .ax-modal__meta {
   .ax-modal__still img { max-height: 54dvh; }
 }
 
-/* Comfortable tap targets on touch devices. */
+/* bigger tap targets on touch devices */
 @media (pointer: coarse) {
   .st-key-ff_ax_upload .stButton button { min-height: 52px; }
   .st-key-ff_ax_upload [role="radiogroup"] label { padding: 0.7em 1.15em !important; }
@@ -1698,10 +1647,8 @@ p.ax-modal__meta, .ax-modal__meta {
 }
 
 /* ==========================================================================
-   N - Real analysis additions
-   The validation-failure panel, the annotated-video section and the
-   analysis-details expander. These reuse the existing tokens - no new
-   palette is introduced.
+   P - Real analysis additions
+   Validation failure panel, annotated video and the details expander.
    ========================================================================== */
 
 /* --- validation failure --- */
@@ -1753,12 +1700,9 @@ p.ax-video-note { color: var(--ink-60); font-size: 0.9rem; }
 
 .st-key-ff_ax_annotated { margin-bottom: clamp(0.9rem, 1.8vw, 1.3rem); }
 
-/* --- technical details expander -----------------------------------------
-   Streamlit's own summary row puts a Material icon ligature next to the
-   label; when that icon font has not loaded it prints as raw text on top of
-   the label ("keyboard_arrow_right"). The icon is hidden and replaced with a
-   plain CSS chevron, and the row is laid out as a proper "open this for the
-   full detail" affordance rather than a tiny mono caption. */
+/* --- technical details expander ---
+   Streamlit's icon prints as "keyboard_arrow_right" if the icon font hasn't
+   loaded, so it's hidden and replaced with a CSS chevron. */
 .st-key-ff_ax_tech [data-testid="stExpander"] {
   border-radius: calc(var(--radius) + 4px);
   border: 1px solid rgba(0, 240, 255, 0.22);
@@ -1784,14 +1728,14 @@ p.ax-video-note { color: var(--ink-60); font-size: 0.9rem; }
   background: rgba(0, 240, 255, 0.06);
 }
 
-/* the native toggle icon (and its ligature text) never renders */
+/* hide the native toggle icon */
 .st-key-ff_ax_tech [data-testid="stExpander"] summary svg,
 .st-key-ff_ax_tech [data-testid="stExpander"] summary [data-testid="stIconMaterial"],
 .st-key-ff_ax_tech [data-testid="stExpander"] summary [data-testid="stExpanderToggleIcon"] {
   display: none !important;
 }
 
-/* our own chevron, on the right, rotating when the panel opens */
+/* our own chevron, rotates when open */
 .st-key-ff_ax_tech [data-testid="stExpander"] summary::after {
   content: "";
   margin-left: auto;
@@ -1820,11 +1764,8 @@ p.ax-video-note { color: var(--ink-60); font-size: 0.9rem; }
 
 .st-key-ff_ax_tech { margin-bottom: clamp(0.9rem, 1.8vw, 1.3rem); }
 
-/* --- uploader: no duplicated file row ------------------------------------
-   Streamlit's file uploader renders its own chip for the uploaded file
-   (name, size, delete cross). The page already shows the FormFix
-   confirmation card and its own "Remove video" button, so the native chip
-   duplicated both - hide it. */
+/* --- uploader: hide Streamlit's file chip ---
+   the page already has its own confirmation card and "Remove video" button */
 .st-key-ff_ax_upload [data-testid="stFileUploaderFile"],
 .st-key-ff_ax_upload [data-testid="stFileUploaderDeleteBtn"],
 .st-key-ff_ax_upload .uploadedFiles,
@@ -1832,13 +1773,11 @@ p.ax-video-note { color: var(--ink-60); font-size: 0.9rem; }
   display: none !important;
 }
 
-/* Hide the duplicated Material icon ligature ("upload") inside the browse
-   button, leaving only the white text label. */
+/* hide the "upload" icon in the browse button, just keep the label */
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button [data-testid="stIconMaterial"],
 .st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button [data-testid="stIconMaterial"],
-/* Streamlit has moved this icon between a testid span, a bare Material
-   ligature and an inline SVG across releases. Match all three, so an upgrade
-   cannot quietly put the ligature back and shunt the label sideways again. */
+/* Streamlit has used a testid span, a Material ligature and an SVG for this
+   icon in different versions, so all three are matched */
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button svg,
 .st-key-ff_analyse [data-testid="stFileUploaderDropzone"] button svg,
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button [class*="material"],
@@ -1848,13 +1787,8 @@ p.ax-video-note { color: var(--ink-60); font-size: 0.9rem; }
   display: none !important;
 }
 
-/* The named selectors above only cover the markup shapes Streamlit has used
-   so far, and a release that renames the icon puts it straight back: measured
-   on the rendered button, the leading icon was still occupying 48px, which
-   centred "icon + label" and left the word 24px right of the pill's centre.
-   Anything before the label is decoration - the button says what it does -
-   so hide every child except the last one, whichever level it sits at. That
-   holds regardless of what the icon element is called. */
+/* In case Streamlit renames the icon again (it was still taking 48px and
+   pushing the label 24px off centre), hide every child except the last one. */
 .st-key-ff_ax_upload [data-testid="stFileUploader"] button > *:not(:last-child),
 .st-key-ff_ax_upload [data-testid="stFileUploader"] button > div > *:not(:last-child),
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button > *:not(:last-child),
@@ -1866,14 +1800,9 @@ p.ax-video-note { color: var(--ink-60); font-size: 0.9rem; }
   display: none !important;
 }
 
-/* Shrink the button to its label, then centre the button itself.
-   Sizing the pill to the word rather than to the row means nothing invisible
-   beside the label can push it off centre: whatever the width ends up being,
-   the pill is that width and sits in the middle of the drop zone.
-   font-size: 0 on the button kills a stray icon ligature that is a bare text
-   node rather than an element (which no selector can hide); the label lives
-   in Streamlit's markdown wrapper, so restoring the size on descendants
-   brings the word back and nothing else. */
+/* Size the button to its label and centre it, so nothing hidden can push it
+   off centre. font-size: 0 hides a stray icon text node, and the label's size
+   is set back on the markdown wrapper inside. */
 .st-key-ff_ax_upload [data-testid="stFileUploader"] button,
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button,
 .st-key-ff_analyse [data-testid="stFileUploader"] button,
@@ -1900,7 +1829,7 @@ p.ax-video-note { color: var(--ink-60); font-size: 0.9rem; }
   white-space: nowrap !important;
 }
 
-/* Belt and braces: no pseudo-element can reintroduce the same offset. */
+/* just in case, no pseudo-elements either */
 .st-key-ff_ax_upload [data-testid="stFileUploader"] button::before,
 .st-key-ff_ax_upload [data-testid="stFileUploaderDropzone"] button::before,
 .st-key-ff_analyse [data-testid="stFileUploader"] button::before,
@@ -1910,10 +1839,7 @@ p.ax-video-note { color: var(--ink-60); font-size: 0.9rem; }
 
 
 /* ==========================================================================
-   R - Per-repetition results and "not assessed"
-   Added when the squat analyser began reporting each repetition separately.
-   Everything here reuses the existing Cyber Pulse tokens - no new palette,
-   no new typography - so the results column keeps one visual language.
+   Q - Per-rep results and "not assessed"
    ========================================================================== */
 
 ul.ax-reps, .ax-reps { display: flex; flex-direction: column; gap: var(--ax-gap-rows); }
@@ -1933,8 +1859,7 @@ li.ax-rep, .ax-rep {
   background: rgba(11, 19, 43, 0.42);
 }
 
-/* Same clipped severity edge as a correction card, so the two lists read as
-   one family rather than two different ideas of a coloured border. */
+/* same severity edge as the correction cards */
 li.ax-rep::before, .ax-rep::before {
   content: "";
   position: absolute;
@@ -1993,9 +1918,8 @@ li.ax-na__row, .ax-na__row {
 .ax-na__title { font-size: 0.9rem; line-height: 1.4; color: var(--ink-90); }
 .ax-na__reason { font-size: 0.82rem; line-height: 1.5; color: var(--ink-60); }
 
-/* On a phone the "REP 01" column held a third of the width for two words and
-   left the body wrapping in what was left. The label and the timestamp become
-   one header line instead, and the verdict gets the full width underneath. */
+/* on a phone the "REP 01" column took a third of the width, so the label and
+   timestamp become one header line with the verdict full width underneath */
 @media (max-width: 560px) {
   li.ax-rep, .ax-rep {
     grid-template-columns: 1fr auto;
@@ -2010,9 +1934,8 @@ li.ax-na__row, .ax-na__row {
 
 /* ---------------------------------------------------------------------------
    Recording guidance
-   Shown above the uploader, per exercise. Deliberately quiet - it is guidance,
-   not a warning - but the camera view is emphasised in Electric Cyan because
-   it is the one thing that most affects whether the analysis can run at all.
+   Above the uploader. Kept quiet since it's guidance, not a warning, but the
+   camera view is in cyan because it matters most.
    --------------------------------------------------------------------------- */
 
 .ax-guide {
@@ -2023,9 +1946,8 @@ li.ax-na__row, .ax-na__row {
   background: linear-gradient(180deg, rgba(28, 37, 65, 0.55), rgba(11, 19, 43, 0.35));
 }
 
-/* "How to record" on the left, the camera view on the right. Both are short
-   uppercase phrases, and at 320px they were each wrapping to two lines beside
-   each other; `wrap` lets the view drop onto its own line intact instead. */
+/* "How to record" left, camera view right - wraps onto its own line on small
+   screens instead of both breaking */
 p.ax-guide__head, .ax-guide__head {
   display: flex;
   align-items: baseline;
@@ -2081,16 +2003,15 @@ li.ax-guide__tip::before, .ax-guide__tip::before {
   opacity: 0.85;
 }
 
-/* Plan on the left, the three lines on the right. The plan holds its width at
-   the text's expense: it is the part people actually look at. */
+/* diagram left, three lines right. The diagram keeps its width since it's what
+   people actually look at */
 .ax-guide__body {
   display: flex;
   align-items: center;
   gap: 1.15rem;
 }
 
-/* the plan sits in its own tile, so it reads as a figure rather than as
-   loose artwork floating next to the text */
+/* diagram in its own tile */
 .ax-guide__plan {
   flex: 0 0 38%;
   max-width: 180px;
@@ -2106,12 +2027,11 @@ li.ax-guide__tip::before, .ax-guide__tip::before {
   min-width: 0;
 }
 
-/* Height and distance ride under the tips as chips rather than as two more
-   sentences - they are settings, not instructions. */
+/* height and distance as chips under the tips */
 .ax-guide__set {
   display: flex;
   flex-wrap: wrap;
-  /* the two chips read as one lozenge when they sit this close together */
+  /* the two chips look like one when this close */
   gap: 0.9rem;
   margin: 2.4rem 0 0.35rem;
   padding: 0;
@@ -2128,10 +2048,8 @@ li.ax-guide__chip, .ax-guide__chip {
   background: rgba(0, 240, 255, 0.05);
 }
 
-/* Below this the upload column is too narrow to hold a diagram and a sentence
-   side by side without the sentence breaking after two words, so the plan goes
-   on top. Most people upload from a phone, so this is the layout that matters:
-   the whole panel has to be readable without pinching or scrolling sideways. */
+/* narrower than this the diagram goes on top - most people upload from a
+   phone, so this layout matters most */
 @media (max-width: 900px) {
   .ax-guide {
     padding: 1rem 1rem 1.35rem;
@@ -2153,8 +2071,7 @@ li.ax-guide__chip, .ax-guide__chip {
     width: 100%;
   }
 
-  /* the view is the headline on a phone, so it gets its own line under the
-     label rather than being squeezed against it and wrapping mid-phrase */
+  /* camera view gets its own line on a phone */
   p.ax-guide__head, .ax-guide__head {
     display: block;
     margin-bottom: 0.8rem;
@@ -2183,9 +2100,8 @@ li.ax-guide__chip, .ax-guide__chip {
 
 /* ---------------------------------------------------------------------------
    Camera plan
-   The bird's-eye diagram inside the guidance panel, drawn by utils/camera_guide.
-   Lime is where to stand - the same lime the app uses for "this is right"
-   everywhere else - and cyan is what the camera can see from there.
+   The overhead diagram from utils/camera_guide. Lime = where to stand, cyan =
+   what the camera sees.
    --------------------------------------------------------------------------- */
 
 svg.cg-plan, .cg-plan {
@@ -2194,7 +2110,7 @@ svg.cg-plan, .cg-plan {
   height: auto;
 }
 
-/* every position the camera could take */
+/* all possible camera positions */
 .cg-orbit {
   fill: none;
   stroke: rgba(255, 255, 255, 0.16);
@@ -2203,7 +2119,7 @@ svg.cg-plan, .cg-plan {
   stroke-linecap: round;
 }
 
-/* the stretch of it this exercise can be measured from */
+/* where this exercise can be measured from */
 .cg-band {
   fill: none;
   stroke: var(--lime, #39ff14);
@@ -2212,7 +2128,7 @@ svg.cg-plan, .cg-plan {
   opacity: 0.85;
 }
 
-/* the mirror image, when the other side works just as well */
+/* the other side, when it works too */
 .cg-band--alt {
   opacity: 0.26;
   stroke-width: 4;
@@ -2239,7 +2155,7 @@ svg.cg-plan, .cg-plan {
   stroke-width: 1.8;
 }
 
-/* which way the person is facing - without it the plan is ambiguous */
+/* which way the person faces */
 .cg-figure__facing,
 .cg-figure__nose {
   fill: none;
@@ -2288,14 +2204,11 @@ svg.cg-plan, .cg-plan {
 
 
 /* ==========================================================================
-   S - Analysis details ("How did FormFix detect this?")
-   The explainability layer. It lives inside the expander, so it is allowed
-   to be denser than the first screen - but it still uses the same tokens,
-   the same radii and the same type scale as everything else.
+   R - Analysis details ("How did FormFix detect this?")
+   Inside the expander, so it can be denser than the first screen.
    ========================================================================== */
 
-/* the expander's own header sits directly above this, so it needs air at the
-   top or it reads as part of the header rather than as the first line inside */
+/* space at the top so it doesn't look like part of the expander header */
 p.ax-details__lede, .ax-details__lede {
   color: var(--ink-60);
   font-size: 0.9rem;
@@ -2356,7 +2269,7 @@ h4.ax-ex__title, .ax-ex__title {
   padding: 0.35em 0.7em;
 }
 
-/* landmark -> measurement -> phase -> rule -> evidence, one line each. */
+/* landmark -> measurement -> phase -> rule -> evidence, one line each */
 p.ax-ex__line, .ax-ex__line {
   font-size: 0.88rem;
   line-height: 1.55;
@@ -2401,8 +2314,7 @@ p.ax-ex__rule, .ax-ex__rule {
 
 p.ax-ex__rule, .ax-ex__rule { color: var(--ink-25); }
 
-/* The expander's own label carries the invitation, so it gets a little more
-   presence than a default Streamlit summary row. */
+/* make the expander label a bit more visible than Streamlit's default */
 .st-key-ff_ax_tech [data-testid="stExpander"] summary,
 .st-key-ff_ax_tech [data-testid="stExpander"] summary * {
   color: var(--cyan);

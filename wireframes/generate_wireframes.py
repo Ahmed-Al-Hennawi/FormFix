@@ -1,19 +1,13 @@
 #!/usr/bin/env python3
 """
-FormFix - wireframe generator.
-
-Writes the mid-fidelity wireframes as plain SVG, with the real interface copy
-in them, so every screen and state is documented without a design tool.
+FormFix wireframe generator. Writes the wireframes as plain SVG with the real
+UI text, so every screen and state is documented without a design tool.
 
     python3 wireframes/generate_wireframes.py
 
-The SVGs land next to this file and re-running regenerates all of them.
-
-Conventions in the output: a grey block is a container, stacked grey bars are
-body copy, a box with a cross is media, a dark button is a primary action, an
-outlined one secondary, a dashed outline is conditional on interface state, and
-italic grey is an annotation rather than part of the interface.
-
+The SVGs are saved next to this file. Key: grey block = container, grey bars =
+body text, box with a cross = media, dark button = primary, outlined =
+secondary, dashed outline = depends on state, italic grey = annotation.
 Standard library only.
 """
 
@@ -268,9 +262,9 @@ class Wire:
 
     @staticmethod
     def tag_width(label: str, size: float = 9.5, pad: float = 9) -> float:
-        """How wide tag will draw a pill, for right-aligning it first."""
-        # 0.67em is semibold uppercase. The tracking tag() applies counts
-        # towards the width too, or long labels spill out of their own pill.
+        """Width of a tag pill, so it can be right-aligned."""
+        # 0.67em for semibold uppercase, plus the letter spacing, or long labels
+        # spill out of the pill
         return len(label) * (size * 0.67 + 0.7) + pad * 2
 
     def tag(
@@ -307,7 +301,7 @@ class Wire:
         self.t(x, y, text, size=size, fill=fill, weight=weight)
 
     def note(self, x: float, y: float, text: str, w: float = 300, align: str = "left") -> None:
-        """An annotation about the design, not part of the interface itself."""
+        """A design annotation, not part of the UI."""
         lines = wrap(text, w, 10.5)
         self.line(x, y - 9, x, y - 9 + len(lines) * 14 + 2, stroke=FAINT, sw=1, dash="3 3")
         for index, line in enumerate(lines):
@@ -366,7 +360,7 @@ class Wire:
             )
 
     def fit(self, y: float, pad: float = 48) -> None:
-        """Trim the sheet to the content actually drawn on it."""
+        """Trim the sheet to the drawn content."""
         self.dh = max(140, y + pad)
         self.H = self.HEAD + self.ch + self.dh + self.FOOT
 
@@ -766,8 +760,7 @@ def sec_about(w: Wire, y: float) -> float:
     w.circle(M + 4, y + 334, 3, fill=DARK, stroke="")
     w.para(M + 18, y + 338, ABOUT_ASIDE, 420, size=11.5, lh=18, fill=MUTED)
 
-    # Both halves are lists, since someone deciding whether this is for them
-    # scans rather than reads. The first panel gets the emphasis.
+    # both halves are lists since people scan this, first panel emphasised
     px, py = M + 640, y + 96
     for index, (title, marker, lines) in enumerate(ABOUT_PANELS):
         lead = index == 0
@@ -922,8 +915,7 @@ def sec_explainable(w: Wire, y: float) -> float:
     w.r(M, cy, 580, 220, fill=BOX, stroke=LINE)
     w.t(M + 26, cy + 34, "What a black box tells you", size=11, fill=MUTED, weight="600")
     w.t(M + 26, cy + 82, "✕  Incorrect exercise.", size=20, weight="700", fill="#7a7a7f")
-    # Same shape as the real correction card: title, what happened, why it
-    # matters, what to try.
+    # same layout as the real correction card
     w.r(M + 620, cy, 580, 220, fill=PAPER, stroke=DARK, sw=1.4)
     w.t(M + 646, cy + 34, "What FormFix tells you", size=11, fill=MUTED, weight="600")
     w.t(M + 646, cy + 62, "SQUAT DEPTH", size=10, fill=MUTED, weight="700", spacing=1.3)
@@ -956,8 +948,7 @@ def sec_explainable(w: Wire, y: float) -> float:
         fill=INK,
     )
 
-    # The three nodes get an intro line - they are the most technical
-    # thing on the page.
+    # intro line for the three nodes, the most technical part of the page
     w.t(M, cy + 288, "The rule behind that message", size=19, weight="700", fill=INK)
     w.para(
         M,
@@ -2026,7 +2017,7 @@ def mobile_home_hero() -> None:
     w.eyebrow(MM, y + 16, "For people learning to lift")
     y += 50
     for line in HERO_HEADLINE:
-        # 25px, not the desktop's 27: "Understand the mistake." overran the column.
+        # 25px not 27, otherwise "Understand the mistake." overflows
         w.t(MM, y, line, size=25, weight="800")
         y += 34
     y += 8
@@ -2046,8 +2037,8 @@ def mobile_home_hero() -> None:
     y += 360
     w.t(MW / 2, y + 20, "SCROLL", size=9, fill=MUTED, weight="700", anchor="middle", spacing=1.6)
 
-    # The orientation block matters most here: on a phone the hero fills the
-    # screen, so this is the first thing a reader meets after scrolling once.
+    # on a phone the hero fills the screen, so this is the first thing after
+    # scrolling once
     y += 62
     w.divider(MM, y, MCW)
     w.eyebrow(MM, y + 40, "What this is")
@@ -2057,7 +2048,7 @@ def mobile_home_hero() -> None:
     y = w.para(MM, y + 140, ABOUT_LEDE, MCW, size=12.5, lh=20) + 22
     w.t(MM, y, ABOUT_CHIPS_LABEL.upper(), size=8.5, fill=MUTED, weight="700", spacing=1.4)
     y += 14
-    # Wrap the pills rather than letting them run off a 390px column.
+    # wrap the pills so they fit in 390px
     cx = MM
     for chip in ABOUT_CHIPS:
         label = chip.upper()

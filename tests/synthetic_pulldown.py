@@ -1,10 +1,7 @@
 """
-Synthetic seated lat pulldown.
-
-A 33-landmark pose track from a 2D linkage: fixed seat, a trunk that can lean
-back, an upper arm rotating from overhead to the side, a forearm hinged at a
-controlled elbow angle. Only the detector's output is replaced, so every
-number the rules see came through the real code paths. Faults you can dial in:
+Fake seated lat pulldown for testing: a 33-landmark pose track from a simple 2D
+stick model. Only the detector's output is replaced, so everything else runs
+through the real code. Faults you can set:
 
     top_elbow / bottom_elbow  the range each repetition covers
     torso_gain_deg            backward trunk lean during the pull
@@ -25,12 +22,8 @@ from analysis.models import NUM_LANDMARKS, FramePoseData
 WIDTH, HEIGHT = 720, 1280
 FPS = 30.0
 
-# Body segment lengths, normalised to frame height. MediaPipe normalises x to
-# the frame width and y to the frame height separately, so every horizontal
-# displacement below is multiplied by ASPECT to undo that - without it a
-# 90-degree elbow doesn't measure 90 once the pipeline converts back to pixels.
-# MediaPipe normalises x to the frame width and y to the frame height
-# separately, so equal normalised dx and dy is not 45 degrees in pixels, it is
+# MediaPipe normalises x and y separately, so horizontal distances are
+# multiplied by ASPECT - otherwise a 90 degree elbow wouldn't measure 90
 ASPECT = HEIGHT / WIDTH
 
 TORSO = 0.24
@@ -38,8 +31,7 @@ UPPER_ARM = 0.13
 FOREARM = 0.12
 HEAD = 0.06
 
-# Upper-arm rotation away from straight overhead, degrees, at each end of the
-# movement: nearly overhead at the top, beside the trunk when contracted.
+# upper arm angle from straight overhead at the top and bottom of the pull
 UPPER_ARM_TOP_DEG = 15.0
 UPPER_ARM_BOTTOM_DEG = 160.0
 
@@ -51,29 +43,24 @@ class PulldownSpec:
     top_seconds: float = 1.0
     rep_seconds: float = 2.4
     reps: int = 3
-    # Elbow angle at the extended and the contracted position, degrees.
+    # elbow angle at the top and bottom
     top_elbow: float = 172.0
     bottom_elbow: float = 80.0
-    # The seated trunk's own recline at the top, degrees from vertical. This
-    # is normal posture, not a fault.
+    # normal seated lean at the top, not a fault
     torso_base_deg: float = 12.0
-    # Extra backward lean added at the contracted position, degrees. This is
-    # the fault the torso rule looks for.
+    # extra backward lean at the bottom - the fault the torso rule looks for
     torso_gain_deg: float = 4.0
-    # +1 faces right (+x), -1 faces left.
+    # +1 faces right, -1 faces left
     facing: int = 1
     noise: float = 0.0
     visibility: float = 0.95
-    # Shoulders and hips. Lowering it hides the trunk reference while the
-    # arms stay measurable, which is the common seated case.
+    # shoulders and hips - lowering it hides the trunk but keeps the arms
     torso_visibility: float = 0.95
-    # Hips alone, which a bench or a thigh routinely occludes.
+    # hips only (often hidden by the seat or thigh)
     hip_visibility: float | None = None
     head_visibility: float = 0.9
-    # Horizontal offset between the near and far sides of the body, in normalised
-    # x. On this 720x1280 frame an offset of s gives a frontality ratio of
-    # roughly s * 2.34: ~0.012 side-on, ~0.20 diagonal, ~0.45 front-on.
-    # normalised x. Small is a side view, large means the camera is looking
+    # x offset between the near and far side. Frontality ratio is about
+    # offset * 2.34 (~0.012 side-on, ~0.20 diagonal, ~0.45 front-on)
     side_offset: float = 0.012
 
 
@@ -95,16 +82,13 @@ def skeleton_at(d: float, spec: PulldownSpec) -> dict[int, tuple[float, float]]:
     fx = spec.facing
     hip = (0.5, 0.72)
 
-    # A backward lean moves the shoulders away from the facing direction,
-    # which is what the analysis reads as posterior lean.
+    # leaning back moves the shoulders away from the facing direction
     lean = math.radians(spec.torso_base_deg + spec.torso_gain_deg * d)
     shoulder = (
         hip[0] - fx * ASPECT * TORSO * math.sin(lean),
         hip[1] - TORSO * math.cos(lean),
     )
 
-    # Upper arm rotates from overhead down to the side, forearm hinges at the
-    # requested elbow angle.
     theta = math.radians(UPPER_ARM_TOP_DEG + (UPPER_ARM_BOTTOM_DEG - UPPER_ARM_TOP_DEG) * d)
     elbow_angle = spec.top_elbow + (spec.bottom_elbow - spec.top_elbow) * d
     bend = math.radians(180.0 - elbow_angle)
@@ -124,8 +108,8 @@ def skeleton_at(d: float, spec: PulldownSpec) -> dict[int, tuple[float, float]]:
     knee = (hip[0] + fx * ASPECT * 0.07, hip[1] + 0.02)
     ankle = (knee[0] + fx * ASPECT * 0.012, knee[1] + 0.14)
 
-    # Both sides sit symmetrically about the mid-sagittal plane, so a larger
-    # offset rotates the subject instead of sliding them out of frame.
+    # symmetric about the middle, so a bigger offset rotates the person instead
+    # of moving them sideways
     half = spec.side_offset / 2.0
 
     def near(p):
@@ -153,7 +137,7 @@ def skeleton_at(d: float, spec: PulldownSpec) -> dict[int, tuple[float, float]]:
     }
 
 
-# Landmark groups, so a test can hide exactly one of them.
+# landmark groups, so a test can hide one of them
 HEAD_LANDMARKS = (0, 7, 8)
 TORSO_LANDMARKS = (11, 12, 23, 24)
 HIP_LANDMARKS = (23, 24)
@@ -161,7 +145,7 @@ ARM_LANDMARKS = (13, 14, 15, 16)
 
 
 def make_pose_data(spec: PulldownSpec, seed: int = 0) -> FramePoseData:
-    """The FramePoseData the detector would have returned for this spec."""
+    """What the detector would have returned for this spec."""
     profile = pull_profile(spec)
     n = len(profile)
     rng = np.random.default_rng(seed)

@@ -1,7 +1,7 @@
 """
-Developer calibration tool for the squat analyser. Runs the pipeline on one
-video and prints every metric a threshold decision rests on, optionally saving
-each rep's start / bottom / end as annotated stills.
+Calibration tool for the squat. Runs the pipeline on one video and prints the
+metrics behind each threshold decision, and can save each rep's start / bottom
+/ end as stills.
 
     python scripts/calibrate_squat.py path/to/video.mp4 [--frames] [--csv]
 
@@ -127,7 +127,7 @@ def main() -> int:
 
 
 def _save_key_frames(result) -> None:
-    """Grab each rep's start, bottom and end frame out of the annotated clip."""
+    """Save each rep's start, bottom and end frame from the annotated clip."""
     import cv2
 
     export_dir = Path(result.debug.get("export_dir", result.annotated_video_path.parent))

@@ -77,11 +77,11 @@ class TestEmaSmoothing:
         pose = make_pose(30)
         for f in range(10):
             set_landmark(pose, f, 25, 0.1, 0.1)
-        # Long untracked gap, then it reappears somewhere else entirely.
+        # long gap, then it reappears somewhere else
         for f in range(25, 30):
             set_landmark(pose, f, 25, 0.9, 0.9)
         ema_smooth(pose, alpha=0.4)
-        # First frame back is the observation itself, not a blend with 0.1.
+        # first frame back is the raw value, not blended with 0.1
         assert pose.xy[25, 25, 0] == pytest.approx(0.9)
         assert np.isnan(pose.xy[15, 25, 0])
 

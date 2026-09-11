@@ -1,7 +1,6 @@
 """
-The squat measurement layer: per-frame measurements, phase segmentation and
-frame-rate independence. Nothing here asserts a verdict, only that the numbers
-describe the movement and keep doing so when the recording changes.
+Tests for the squat measurements, phases and frame-rate independence. No
+verdicts here, just that the numbers describe the movement correctly.
 """
 
 from __future__ import annotations
@@ -41,7 +40,7 @@ def video_meta(frames: int, fps: float = FPS) -> VideoMetadata:
     )
 
 
-# Three clean reps, which is what most of these measure against.
+# three clean reps, used by most of these
 CLEAN = SyntheticSpec(noise=0.001)
 
 
@@ -75,7 +74,7 @@ class TestMultiFeatureMeasurement:
         bottom = metrics[rep.bottom_frame]
         assert standing
         assert math.isfinite(bottom.shin_inclination)
-        # The synthetic linkage tilts the shank forward on the way down.
+        # the synthetic shin tilts forward on the way down
         assert bottom.shin_inclination > standing[-1].shin_inclination
         del detection
 
@@ -164,8 +163,7 @@ class TestBaseline:
             pose, metrics, detection.phases, reps[0].start_frame, video, "left", CONFIG
         )
         assert baseline["standing_frames"] >= CONFIG.BASELINE_MIN_FRAMES
-        # The synthetic stance is upright, so near-straight knee and near-
-        # vertical torso.
+        # synthetic stance is upright, so straight knee and vertical torso
         assert baseline["knee_angle"] > 160.0
         assert baseline["torso_lean"] < 15.0
         assert math.isfinite(baseline["lower_leg_px"])
@@ -184,15 +182,13 @@ class TestBaseline:
 
 
 class TestFrameRateIndependence:
-    """
-    Nothing temporal is allowed to assume 30 fps. Same movement at 24, 30 and
-    60 fps, same rep count and same durations in seconds.
-    """
+    """Nothing should assume 30 fps - same movement at 24, 30 and 60 fps gives the
+    same reps and durations."""
 
     @staticmethod
     def knee_trace(fps: float) -> tuple[np.ndarray, np.ndarray]:
         seconds = np.arange(0, 8.0, 1.0 / fps)
-        # One 3-second squat with standing either side of it.
+        # one 3-second squat with standing either side
         angle = np.where(
             (seconds < 2.0) | (seconds > 5.0),
             175.0,

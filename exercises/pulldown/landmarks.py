@@ -1,10 +1,7 @@
 """
-Which of MediaPipe's 33 landmarks the pulldown reads. Nothing else in the
-package has a bare landmark number, so a typo is an import error rather than a
-silently wrong joint.
-
-Note what isn't here: the bar. MediaPipe tracks a body, not equipment, so a
-rule waiting for the bar to touch the chest couldn't be implemented honestly.
+Which MediaPipe landmarks the pulldown uses. All landmark numbers live here, so
+a typo is an import error instead of a silently wrong joint. MediaPipe doesn't
+track the bar, so there's no "bar to chest" rule.
 """
 
 from __future__ import annotations
@@ -27,7 +24,7 @@ from analysis.models import (
     RIGHT_WRIST,
 )
 
-# The subset we use, with official MediaPipe Pose ids (33-landmark topology).
+# the ones I use, with their MediaPipe Pose ids
 PULLDOWN_LANDMARKS: dict[str, int] = {
     "left_shoulder": LEFT_SHOULDER,
     "right_shoulder": RIGHT_SHOULDER,
@@ -39,9 +36,8 @@ PULLDOWN_LANDMARKS: dict[str, int] = {
     "right_hip": RIGHT_HIP,
 }
 
-# head landmarks, used only to work out which way the person faces, so a
-# backward trunk lean can be told from a forward one
-# facing, so a backward trunk lean can be told from a forward one. When they
+# head landmarks, only used to work out which way the person faces, so a
+# backward lean can be told apart from a forward one
 FACING_LANDMARKS: tuple[int, ...] = (NOSE, LEFT_EAR, RIGHT_EAR)
 
 
@@ -57,7 +53,6 @@ class ArmChain:
 
     @property
     def arm(self) -> tuple[int, int, int]:
-        """Shoulder/elbow/wrist, which is all the elbow angle needs."""
         return (self.shoulder, self.elbow, self.wrist)
 
     @property
@@ -74,7 +69,7 @@ ARM_CHAINS: dict[str, ArmChain] = {
 
 OPPOSITE_SIDE = {"left": "right", "right": "left"}
 
-# Without these a lat pulldown cannot be measured at all, on any camera view.
+# without these the pulldown can't be measured at all
 CORE_LANDMARK_NAMES: tuple[str, ...] = (
     "left_shoulder",
     "right_shoulder",
@@ -84,31 +79,30 @@ CORE_LANDMARK_NAMES: tuple[str, ...] = (
     "right_wrist",
 )
 
-# The trunk reference - mid-shoulder against mid-hip.
+# trunk reference - mid-shoulder to mid-hip
 TORSO_LANDMARKS: tuple[int, ...] = (LEFT_SHOULDER, RIGHT_SHOULDER, LEFT_HIP, RIGHT_HIP)
 
-# what each measurement depends on. Reliability comes from exactly these
-# points, not the mean over all 33.
+# what each measurement depends on - reliability uses exactly these points
 METRIC_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     METRIC_PULLDOWN_ROM: ("shoulder", "elbow", "wrist"),
     METRIC_PULLDOWN_TORSO: ("shoulder", "hip"),
 }
 
-# Measured from the trunk, so they need both sides of the body.
+# trunk metrics need both sides of the body
 TORSO_METRICS: frozenset[str] = frozenset({METRIC_PULLDOWN_TORSO})
 
 
 def landmark_ids(side: str, roles: tuple[str, ...]) -> tuple[int, ...]:
     """
-    Turn ("shoulder", "elbow") on a side into MediaPipe indices. KeyError
-    on an unknown side or role, on purpose - a typo should blow up at test time.
+    ("shoulder", "elbow") on a side -> MediaPipe indices. Raises KeyError on a
+    typo on purpose, so it shows up in the tests.
     """
     chain = ARM_CHAINS[side]
     return tuple(getattr(chain, role) for role in roles)
 
 
 def required_ids(metric: str, side: str) -> tuple[int, ...]:
-    """The landmark indices metric needs on side."""
+    """Landmark indices a metric needs on a side."""
     roles = METRIC_REQUIREMENTS.get(metric, ())
     if not roles:
         return ()

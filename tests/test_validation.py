@@ -1,5 +1,5 @@
 """
-The validation layer and its three states:
+Tests for validation and its three states:
 
     GOOD      enough evidence, clean side view      -> analyse
     LIMITED   enough evidence, imperfect recording  -> analyse and warn
@@ -60,12 +60,9 @@ def tracked_pose(
     hip_sep: float = 0.02,
 ) -> FramePoseData:
     """
-    A fully tracked, side-on pose track. shoulder_sep and hip_sep
-    drive the frontality heuristic: small is side-on, large is front-on.
-
-    Torso length here is 0.25 of the frame height and the heuristic works in
-    pixels, so on this 720x1280 frame a normalised separation of s gives a
-    frontality ratio of s * 720 / (0.25 * 1280) = s * 2.25.
+    Fully tracked side-on pose. shoulder_sep and hip_sep set the frontality
+    (small = side-on). On this 720x1280 frame the ratio is
+    s * 720 / (0.25 * 1280) = s * 2.25.
     """
     pose = empty_pose(n)
     pose.pose_found[:] = True
@@ -175,11 +172,8 @@ class TestPoseEvidence:
         assert RejectionCode.IMPORTANT_LANDMARKS_MISSING in result.reason_codes
 
     def test_bystanders_warn_but_do_not_reject(self):
-        """
-        A second person in shot is normal in a gym. As long as the tracker
-        stayed on one person, the recording is analysable and only carries a
-        note - rejecting these threw out perfectly good clips.
-        """
+        """Someone else in shot is normal in a gym - as long as tracking stayed on one
+        person it only gets a note."""
         pose = tracked_pose()
         pose.n_poses[:] = 2
         pose.identity_switches = 0
@@ -189,10 +183,7 @@ class TestPoseEvidence:
         assert any("person" in w.lower() for w in result.warnings)
 
     def test_a_track_that_keeps_coming_apart_is_rejected(self):
-        """
-        What does stop a run: the tracker repeatedly losing which body it is
-        following, so the measurements no longer describe one person.
-        """
+        """The tracker keeps losing which person it's following, so reject it."""
         pose = tracked_pose()
         pose.n_poses[:] = 3
         pose.identity_switches = 60
@@ -250,7 +241,7 @@ class TestCameraOrientation:
         assert unknown is CameraOrientation.UNKNOWN and conf == 0.0
 
     def test_diagonal_view_is_analysed_with_a_warning(self):
-        """A diagonal used to be rejected outright. It warns now."""
+        """A diagonal view gets a warning, not a rejection."""
         pose = tracked_pose(shoulder_sep=0.29, hip_sep=0.20)  # ~0.65 frontality
         result = validation.validate_pose_track(video_meta(), pose, VCONFIG)
         assert result.valid
@@ -262,7 +253,7 @@ class TestCameraOrientation:
     def test_frontal_view_is_analysed_but_limits_sagittal_metrics(self):
         pose = tracked_pose(shoulder_sep=0.53, hip_sep=0.36)  # ~1.2 frontality
         result = validation.validate_pose_track(video_meta(), pose, VCONFIG)
-        assert result.valid  # front-on used to be a rejection too
+        assert result.valid  # front-on isn't a rejection either
         assert result.orientation is CameraOrientation.FRONTAL
         assert set(result.limited_metrics) == {"squat_depth", "torso_lean", "return_to_standing"}
         assert RejectionCode.UNSUPPORTED_CAMERA_ANGLE not in result.reason_codes
@@ -288,7 +279,7 @@ class TestSideSelection:
         assert scores[side] == pytest.approx(1.0)
 
     def test_hidden_far_side_does_not_block_analysis(self):
-        """A side view hides half the body by definition, so it can't fail."""
+        """A side view always hides half the body, so that can't fail it."""
         pose = tracked_pose()
         pose.visibility[:, [12, 24, 26, 28, 30, 32]] = 0.15  # far side occluded
         result = validation.validate_pose_track(video_meta(), pose, VCONFIG)
@@ -325,10 +316,8 @@ def test_merge_keeps_codes_and_orientation():
 
 
 class TestViewStability:
-    """
-    The camera angle is estimated once for the whole video, so a clip that
-    cuts between shots can't be described by one label. Say so, don't average.
-    """
+    """The camera angle is estimated once per video, so a clip that changes angle
+    gets a warning instead of an average."""
 
     def test_a_steady_camera_is_stable(self):
         pose = tracked_pose()
@@ -339,7 +328,7 @@ class TestViewStability:
 
         pose = tracked_pose()
         half = pose.frame_count // 2
-        # Second half of the clip is shot from the front.
+        # second half is filmed from the front
         pose.xy_raw[half:, 11, 0] -= 0.30
         pose.xy_raw[half:, 12, 0] += 0.30
         assert validation.view_stability(pose) > C.VIEW_STABILITY_SPREAD

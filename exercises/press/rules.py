@@ -1,16 +1,11 @@
 """
-The shoulder-press technique rules, three of them. Each asks one narrow
-question about one measurement, in the phase where that means something, and
-only when the camera view supports it.
+The three shoulder press rules. Same setup as the other exercises: one
+measurement per rule, in the phase where it matters, only if the camera view
+supports it. Thresholds are ranges, since nobody moves perfectly symmetrically
+and anything tighter would just be measuring MediaPipe's error.
 
-Same shape as the other two: numbers arrive measured from metrics.py, every
-threshold crossing goes through persistence.py, and thresholds are ranges
-rather than exact targets - human movement is naturally a bit asymmetric and no
-forearm is perfectly vertical, so anything tighter would measure MediaPipe's
-error instead.
-
-Deliberately not implemented: sagittal trunk lean, which happens in the plane a
-front-on camera can't see, and any shoulder-mobility or impingement claim.
+Left out on purpose: trunk lean (can't be seen from the front) and anything
+about shoulder mobility or impingement.
 """
 
 from __future__ import annotations
@@ -47,14 +42,14 @@ from .config import PressConfig, rule_specs
 from .landmarks import ARM_CHAINS, landmark_ids, required_ids
 from .metrics import PressFrameMetrics, phase_frames
 
-# Joints to highlight in the annotated video when a rule fires.
+# joints to highlight in the video when a rule fires
 HIGHLIGHT_ROLES: dict[str, tuple[str, ...]] = {
     "press_symmetry": ("shoulder", "elbow", "wrist"),
     "press_alignment": ("elbow", "wrist"),
     "press_rom": ("shoulder", "elbow", "wrist"),
 }
 
-# Rules whose findings are about both arms at once.
+# rules about both arms at once
 BILATERAL_RULES: frozenset[str] = frozenset({"press_symmetry", "press_rom"})
 
 _EMPTY_EVIDENCE = PersistenceEvidence(0, 0, 0, 0.0, -1, float("nan"))
@@ -91,7 +86,7 @@ def _persistence(
     exceeds: float,
     absolute: bool = False,
 ) -> PersistenceEvidence:
-    """How persistently attribute broke exceeds during the phase."""
+    """How persistently the value broke the limit during the phase."""
     if spec is None or metrics is None:
         return _EMPTY_EVIDENCE
     frames = phase_frames(rep, spec.phase)
@@ -115,16 +110,15 @@ def _with_persistence(outcome: RepRuleOutcome, evidence: PersistenceEvidence) ->
 
 def classify_symmetry(rep: PressRep, config: PressConfig) -> tuple[list[str], RuleStatus]:
     """
-    Which symmetry signals fired on this rep, and how firmly. Three signals rather
-    than one combined index, because a beginner can act on "your left arm stayed
-    lower" and can't act on "symmetry score 0.72":
+    Which symmetry signals fired on this rep, and how badly. Three signals instead
+    of one index, because "your left arm stayed lower" is useful to a beginner
+    and "symmetry score 0.72" isn't:
 
         angle    |left - right| elbow angle           degrees
         height   |left - right| wrist height          shoulder widths
         rom      |left ROM - right ROM|               degrees
 
-    The first two describe the movement as it happens; the third describes the rep
-    as a whole, and catches an arm travelling the same way but not as far.
+    The third one catches an arm moving the same way but not as far.
     """
     if not rep.symmetry_reliable:
         return [], RuleStatus.NOT_EVALUABLE
@@ -178,10 +172,9 @@ def rule_symmetry(
     metrics: list[PressFrameMetrics] | None = None,
 ) -> RuleResult:
     """
-    Did both arms do the movement reasonably together? Judged over the whole working
-    phase and only when both arms were individually visible for enough of it. One
-    arm is never inferred from the other: a recording where one is hidden says
-    "cannot assess", which is not the same as "your arms were even".
+    Did both arms move reasonably together? Only judged when both arms were
+    visible for enough of the working phase - if one is hidden it says "cannot
+    assess" rather than guessing.
     """
     outcomes: list[RepRuleOutcome] = []
     for rep in reps:
@@ -197,8 +190,8 @@ def rule_symmetry(
             config.SYMMETRY_HEIGHT_WARN,
             absolute=True,
         )
-        # either in-movement signal can carry the persistence - an arm sitting
-        # lower without much angle difference is still asymmetric
+        # either signal can count - an arm sitting lower with a similar angle is
+        # still uneven
         best = max((evidence, height_evidence), key=lambda e: (e.longest_run, e.ratio))
         if (
             status in (RuleStatus.WARNING, RuleStatus.FAIL)
@@ -209,7 +202,7 @@ def rule_symmetry(
                 math.isfinite(rep.rom_difference) and rep.rom_difference >= config.SYMMETRY_ROM_WARN
             )
         ):
-            # never lasted long enough to be movement rather than noise
+            # didn't last long enough to be more than noise
             status = RuleStatus.PASS
             signals = []
 
@@ -314,12 +307,8 @@ def rule_alignment(
     metrics: list[PressFrameMetrics] | None = None,
 ) -> RuleResult:
     """
-    Did each wrist stay reasonably stacked over its own elbow? Measured in the
-    frontal plane as |wrist_x - elbow_x| / shoulder width, so the same movement
-    gives the same value at any camera distance or body size.
-
-    The sides are assessed independently and the worse one reported, since a drift
-    usually belongs to one arm and averaging would hide it.
+    Did each wrist stay roughly over its elbow? |wrist_x - elbow_x| / shoulder
+    width, per arm, reporting the worse one (averaging would hide a one-arm drift).
     """
     outcomes: list[RepRuleOutcome] = []
     for rep in reps:
@@ -435,8 +424,8 @@ def rule_alignment(
 
 
 def classify_rom(rep: PressRep, config: PressConfig) -> tuple[str, RuleStatus]:
-    """Which end of the press fell short. The top criterion is not 180 degrees - a
-    locked-out elbow is neither required nor desirable under load."""
+    """Which end of the press fell short. The top isn't 180 - a fully locked elbow
+    under load isn't the goal."""
     top, bottom = rep.top_elbow_angle, rep.bottom_elbow_angle
     if not (math.isfinite(top) and math.isfinite(bottom)):
         return ROM_NOT_ASSESSABLE, RuleStatus.NOT_EVALUABLE
@@ -465,12 +454,11 @@ def rule_range_of_motion(
     metrics: list[PressFrameMetrics] | None = None,
 ) -> RuleResult:
     """
-    Did each press cover the configured range at the top and the bottom? Reported
-    as which end fell short, because "limited range of motion" tells a beginner
-    nothing - stopping short of overhead and never lowering the dumbbells back are
-    different habits needing different corrections.
+    Did each press cover enough range at the top and bottom? Says which end fell
+    short, since stopping short overhead and not lowering fully need different
+    corrections.
     """
-    del metrics  # per-rep extremes, so no frame series to filter
+    del metrics  # uses per-rep values, no frame series needed
     outcomes: list[RepRuleOutcome] = []
     for rep in reps:
         category, status = classify_rom(rep, config)
@@ -589,7 +577,7 @@ def _result(
     feedback_key: str,
     limitation: str = "",
 ) -> RuleResult:
-    """Bolt the declared spec metadata onto a computed rule outcome."""
+    """Add the spec metadata to a computed rule outcome."""
     return RuleResult(
         rule_id=rule_id,
         title=spec.title if spec else title,
@@ -632,7 +620,7 @@ VIEW_LIMITATION_TEXT: dict[str, str] = {
 
 
 def not_evaluable(spec: RuleSpec, reps: list[PressRep], reason: str) -> RuleResult:
-    """A rule the recording can't support: reported, not guessed at."""
+    """A rule the recording can't support."""
     return RuleResult(
         rule_id=spec.rule_id,
         title=spec.title,
@@ -660,8 +648,8 @@ _EVALUATORS = {
 
 
 def _subject_scale(metrics: list[PressFrameMetrics] | None) -> float:
-    """Median shoulder width in pixels, scaled to be comparable with the trunk-length
-    figure the other two exercises use, so one set of ceilings covers all three."""
+    """Median shoulder width in pixels, scaled to match the trunk length the other
+    exercises use."""
     if not metrics:
         return float("nan")
     values = [m.shoulder_width for m in metrics if m.valid and np.isfinite(m.shoulder_width)]
@@ -678,8 +666,7 @@ def evaluate_all(
     side: str = "left",
     recording_quality: str = "good",
 ) -> list[RuleResult]:
-    """Run every declared rule, gate it by camera view, attach reliability. View
-    gating happens before any threshold is compared."""
+    """Run every rule, check the camera view first, then attach reliability."""
     results: list[RuleResult] = []
     subject_scale = _subject_scale(metrics)
     if side not in ARM_CHAINS:
@@ -729,7 +716,6 @@ def evaluate_all(
 
 
 def highlight_ids(rule_id: str, side: str) -> tuple[int, ...]:
-    """A rule's highlight roles -> MediaPipe landmark indices."""
     roles = HIGHLIGHT_ROLES.get(rule_id, ())
     if not roles:
         return ()

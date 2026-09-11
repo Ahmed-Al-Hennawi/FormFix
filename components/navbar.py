@@ -1,7 +1,6 @@
 """
-The floating pill navigation. Markup only - main.js does the glass effect,
-smooth scrolling with an offset, the active-section observer and the overlay
-menu below 900px. "Analyse Form" is the only link that leaves the page.
+Floating pill navbar. Just the markup - main.js handles the glass effect,
+smooth scrolling, active section and the mobile menu below 900px.
 """
 
 from __future__ import annotations

@@ -1,18 +1,16 @@
 #!/usr/bin/env python3
 """
-How much depth each smoothing filter costs us.
+How much depth each smoothing filter loses.
 
-Depth and extension are both read at turning points of the knee-angle signal,
-which is where a causal filter behaves worst: it rounds the extreme off and
-reports it late. Dill et al. (2024) picked a 4th-order Butterworth at 2 Hz, but
-they optimised overall landmark RMSE and what matters here is the bias in one
-number at one instant per rep, so this runs each filter over traces whose true
-minimum is known by construction.
+Depth and extension are read at the turning points, where a causal filter is
+worst - it rounds the peak off and reports it late. Dill et al. (2024) chose a
+4th-order Butterworth at 2 Hz, but they optimised overall landmark RMSE, while I
+care about one value per rep. So this runs each filter on traces with a known
+true minimum.
 
     python scripts/compare_filters.py [--noise 2.5] [--csv out.csv]
 
-Nothing consumes the output. It is the evidence for why ANGLE_FILTER is a
-setting, not a hard-coded choice.
+The results are why ANGLE_FILTER is a setting and not hard-coded.
 """
 
 from __future__ import annotations
@@ -50,10 +48,9 @@ def knee_trace(
     cusped: bool,
 ) -> np.ndarray:
     """
-    A synthetic knee-angle trace with a known minimum. The two shapes bracket real
-    reps: cusped=False is a sinusoid, a controlled rep that pauses at the bottom,
-    almost all of it below 2 Hz; cusped=True is a triangle, a sharp reversal whose
-    corner has energy at every frequency, so any low-pass has to round it off.
+    Synthetic knee-angle trace with a known minimum. cusped=False is a sine (a
+    controlled rep, mostly below 2 Hz), cusped=True is a triangle (a sharp bounce
+    that any low-pass filter will round off).
     """
     t = np.arange(0.0, seconds, 1.0 / fs)
     amplitude = (standing - bottom) / 2.0
@@ -67,10 +64,7 @@ def knee_trace(
 def measure(
     truth: np.ndarray, filtered: np.ndarray, fs: float, reps_per_second: float
 ) -> tuple[float, float]:
-    """
-    (depth_bias_deg, lag_ms) measured over the third rep - the third rather than
-    the first, so no filter gets judged on its start-up transient.
-    """
+    """(depth_bias_deg, lag_ms) on the third rep, so start-up effects don't count."""
     period = 1.0 / reps_per_second
     lo = int(2.0 * period * fs)
     hi = int(3.0 * period * fs)

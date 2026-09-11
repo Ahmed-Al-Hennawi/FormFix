@@ -1,10 +1,9 @@
 """
-Wrapper around the MediaPipe Pose Landmarker (Tasks API, VIDEO mode). The old
-mp.solutions.pose isn't in current wheels. VIDEO mode with increasing
-timestamps lets the tracker use temporal continuity.
+Wrapper around the MediaPipe Pose Landmarker (Tasks API, VIDEO mode, since the
+old mp.solutions.pose isn't in current wheels).
 
-num_poses is above one so a gym background doesn't get analysed instead of the
-athlete; _PersonTracker picks which person is which.
+It looks for more than one person so someone in the gym background doesn't get
+analysed instead of the athlete - _PersonTracker picks which one to follow.
 """
 
 from __future__ import annotations
@@ -50,16 +49,14 @@ MODEL_DOWNLOAD_URL = (
 
 
 def default_model_path() -> Path:
-    """<project root>/static/assets/models/pose_landmarker_full.task."""
     return Path(__file__).resolve().parent.parent / MODEL_RELATIVE_PATH
 
 
 def check_runtime_compatibility() -> None:
     """
-    Refuse the one library combination known to segfault. MediaPipe 0.10.14, the
-    last macOS build, is built against the NumPy 1.x ABI; with NumPy 2.x the
-    process dies natively and no exception is raised, so this has to be checked
-    before we start.
+    Stop early on the one combination that segfaults: MediaPipe 0.10.14 (last
+    macOS build) with NumPy 2.x. The process just dies with no exception, so it
+    has to be checked up front.
     """
     if sys.platform != "darwin":
         return
@@ -92,9 +89,8 @@ MIN_MODEL_BYTES = 1_000_000
 
 def fetch_model(target: Path | None = None, timeout: float = 120.0) -> Path | None:
     """
-    Download the model if it isn't on disk. The 9 MB binary isn't in the repo, so
-    a fresh checkout starts without it. Writes to a temp file and renames, so an
-    interrupted download can't leave something that looks valid. None on failure.
+    Download the model if it's missing (it isn't in the repo). Writes to a temp
+    file and renames it so a half download can't look valid. None on failure.
     """
     import shutil
     import urllib.request
@@ -149,10 +145,9 @@ def detect_poses(
     on_frame: Callable[[int, int], None] | None = None,
 ) -> FramePoseData:
     """
-    Run the Pose Landmarker over every frame. Detection normally happens in
-    analysis/pose_worker.py, a separate process, because MediaPipe has hard-crashed
-    the interpreter inside Streamlit's thread. FORMFIX_POSE_SUBPROCESS=0 forces the
-    in-process path, which the tests use.
+    Run the Pose Landmarker over every frame. Normally this runs in a separate
+    process (pose_worker.py) because MediaPipe crashed Streamlit a few times.
+    FORMFIX_POSE_SUBPROCESS=0 runs it in-process, which the tests use.
     """
     check_runtime_compatibility()
     if os.environ.get("FORMFIX_POSE_SUBPROCESS", "1") != "0":
@@ -189,9 +184,8 @@ def _drain(stream, into: list[str]) -> None:
 
 
 def _pump(stream, into: queue.Queue[str | None]) -> None:
-    """Forward a pipe's lines onto a queue, then post None at the end. The blocking
-    read is on its own thread so the caller can wait with a timeout and notice a
-    wedged worker."""
+    """Push a pipe's lines onto a queue, then None at the end. Runs on its own
+    thread so the caller can use a timeout and notice a stuck worker."""
     try:
         _drain_into_queue(stream, into)
     finally:
@@ -250,8 +244,8 @@ def _detect_poses_subprocess(
             stderr=subprocess.PIPE,
             text=True,
         )
-        # each pipe gets a draining thread and this side waits with a deadline -
-        # reading a pipe directly blocks, which is what a wedged worker does
+        # read the pipes on threads and wait here with a deadline, since reading
+        # a pipe directly would block forever on a stuck worker
         progress_queue: queue.Queue[str | None] = queue.Queue()
         stderr_lines: list[str] = []
         readers = (
@@ -354,9 +348,7 @@ def detect_poses_inprocess(
     model_path: Path | None = None,
     on_frame: Callable[[int, int], None] | None = None,
 ) -> FramePoseData:
-    """The actual MediaPipe loop. Returns the raw track - cleaning and smoothing are
-    smoothing.py's job. on_frame reports progress without this module knowing
-    anything about the UI."""
+    """The actual MediaPipe loop. Returns the raw track (smoothing.py cleans it)."""
     import mediapipe as mp
     from mediapipe.tasks import python as mp_python
     from mediapipe.tasks.python import vision
@@ -371,8 +363,8 @@ def detect_poses_inprocess(
     timestamps = np.arange(frame_count, dtype=np.float64) / video.fps
 
     options = vision.PoseLandmarkerOptions(
-        # CPU delegate spelled out - the Python GPU delegate isn't supported
-        # everywhere and has been blamed for the macOS crashes
+        # CPU on purpose - the GPU delegate isn't supported everywhere and was
+        # linked to the macOS crashes
         base_options=mp_python.BaseOptions(
             model_asset_path=str(resolved_model),
             delegate=mp_python.BaseOptions.Delegate.CPU,
@@ -393,7 +385,7 @@ def detect_poses_inprocess(
             for index, frame in iter_frames(capture):
                 if index >= frame_count:
                     break  # more frames than the container claimed; drop them
-                # VIDEO mode needs strictly increasing millisecond timestamps.
+                # VIDEO mode needs strictly increasing timestamps in ms
                 timestamp_ms = int(round(timestamps[index] * 1000.0))
                 if timestamp_ms <= last_timestamp_ms:
                     timestamp_ms = last_timestamp_ms + 1
@@ -452,15 +444,15 @@ def detect_poses_inprocess(
     )
 
 
-# how many people the landmarker looks for. At 2 a third person was never
-# detected, so the "is anyone else here" ratio under-reported.
+# how many people the landmarker looks for. With 2 a third person was never
+# picked up, so the multi-person check under-reported.
 MAX_TRACKED_POSES = 4
 
 # how far the tracked hip centre may move between frames, in torso lengths,
 # before it stops being the same person
 MAX_IDENTITY_DRIFT_TORSOS = 1.6
 
-# frames the tracked person may be missing before we restart from height
+# frames the tracked person can be missing before restarting from height
 MAX_IDENTITY_GAP_FRAMES = 30
 
 
@@ -482,7 +474,7 @@ def _hip_centre(landmarks: list) -> tuple[float, float] | None:
 
 
 def _torso_length(landmarks: list) -> float:
-    """Shoulder-centre to hip-centre. The scale everything else is measured in."""
+    """Shoulder-centre to hip-centre, used as the scale for everything else."""
     hips = _hip_centre(landmarks)
     if hips is None:
         return 0.0
@@ -498,16 +490,12 @@ def _torso_length(landmarks: list) -> float:
 
 class _PersonTracker:
     """
-    Decides which of the detected people is the athlete, and keeps that consistent.
+    Decides which detected person is the athlete and sticks with them.
 
-    Height alone is not enough: a bounding box shrinks as someone squats, so at the
-    bottom of a rep a bystander standing behind them can become the tallest person
-    in frame and take over the analysis. So height only starts the track, and after
-    that the athlete is whoever is nearest to where they were last frame, measured
-    hip to hip in torso lengths so camera distance doesn't matter.
-
-    switches counts how often the track was re-seeded, which is what says whether
-    the recording was analysable.
+    Tallest person alone doesn't work - at the bottom of a squat someone standing
+    behind can be taller and take over. So height only starts the track, then it
+    follows whoever is nearest to last frame's hip position (in torso lengths).
+    switches counts how often it had to restart.
     """
 
     def __init__(self) -> None:
@@ -562,8 +550,7 @@ class _PersonTracker:
 
 
 def _primary_pose(poses: list) -> list:
-    """Pick the person to analyse with no history: the tallest bounding box. Only
-    for callers looking at a single frame; the detection loop uses _PersonTracker."""
+    """Tallest person in a single frame, no history. The main loop uses _PersonTracker."""
     if len(poses) == 1:
         return poses[0]
     return max(poses, key=_bbox_height)

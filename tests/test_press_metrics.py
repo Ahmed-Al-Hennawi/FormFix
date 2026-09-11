@@ -1,8 +1,7 @@
 """
-Shoulder-press measurement layer. Nothing here says whether a press was any
-good, only that the numbers describe the movement generated - normalisation
-included, since that is what lets one threshold hold for someone filmed close
-up and someone filmed from across the gym.
+Tests for the shoulder press measurements. No verdicts, just that the numbers
+match the generated movement, including normalisation (so one threshold works
+close up and from across the gym).
 """
 
 from __future__ import annotations
@@ -58,8 +57,8 @@ class TestElbowAngles:
         assert min(right) == pytest.approx(85.0, abs=1.0)
 
     def test_the_movement_signal_is_flexion_not_the_raw_angle(self):
-        # High at the shoulders, near zero overhead. That's the shape the
-        # shared state machine wants, which is how the press reuses it.
+        # high at the shoulders, near zero overhead - what the shared state
+        # machine expects
         _, _, metrics = measured(PressSpec())
         signal = metrics_mod.movement_signal(metrics)
         finite = signal[np.isfinite(signal)]
@@ -97,8 +96,7 @@ class TestSymmetryMeasurements:
         assert max(differences) > CONFIG.SYMMETRY_ANGLE_WARN
 
     def test_the_sign_names_the_higher_arm(self):
-        # Positive means the left wrist is higher, and the right arm is the
-        # one lagging here, so it should come out positive.
+        # positive = left wrist higher, and the right arm lags here
         _, _, metrics = measured(PressSpec(right_lag=0.3))
         heights = [
             m.wrist_height_difference for m in metrics if math.isfinite(m.wrist_height_difference)
@@ -130,8 +128,7 @@ class TestAlignmentMeasurement:
         assert right < CONFIG.ALIGNMENT_OFFSET_WARN  # other arm unaffected
 
     def test_the_offset_is_normalised_by_shoulder_width_not_pixels(self):
-        # Same movement at two resolutions, same dimensionless offset. A raw
-        # pixel threshold wouldn't survive this.
+        # same movement at two resolutions gives the same offset
         pose = make_pose_data(PressSpec(left_drift=0.4))
         big = metrics_mod.compute_frame_metrics(video_for(pose), pose, "left", CONFIG)
         small = metrics_mod.compute_frame_metrics(
@@ -142,8 +139,8 @@ class TestAlignmentMeasurement:
                 assert a.left_alignment_offset == pytest.approx(b.left_alignment_offset, abs=1e-6)
 
     def test_a_collapsed_shoulder_width_cannot_explode_the_offset(self):
-        # Nearly side-on the apparent shoulder separation goes tiny and the
-        # normalisation divides by it; the exported numbers still have to be finite.
+        # nearly side-on the shoulder width gets tiny, but the numbers still have
+        # to be finite
         _, _, metrics = measured(PressSpec(view_compression=0.05))
         offsets = [m.left_alignment_offset for m in metrics if math.isfinite(m.left_alignment_offset)]
         assert max(offsets) < CONFIG.ALIGNMENT_OFFSET_MAX_PLAUSIBLE
@@ -179,8 +176,8 @@ class TestPhaseSegmentation:
         assert MovementPhase.RETURN in seen
 
     def test_an_athlete_who_never_locks_out_still_has_reps_counted(self):
-        # Why segmentation is adaptive: fix the thresholds and the range rule
-        # can never see the habit it exists to find.
+        # this is why rep detection is adaptive - with fixed thresholds the ROM
+        # rule would never see the habit it's meant to catch
         reps, _, _ = reps_for(PressSpec(top_elbow=138.0))
         assert len(reps) == 3
 
@@ -208,8 +205,8 @@ class TestRepMeasurements:
         assert rep.rom_difference > CONFIG.SYMMETRY_ROM_WARN
 
     def test_a_lagging_arm_does_not_shorten_the_other_arms_reported_range(self):
-        # Each arm's top extension is the best it sustained anywhere in the
-        # rep, so a timing fault is reported once, by the symmetry rule.
+        # each arm uses its own best top position, so a timing issue is only
+        # reported once (by symmetry)
         reps, _, _ = reps_for(PressSpec(right_lag=0.25))
         assert reps[0].left_top_elbow_angle == pytest.approx(168.0, abs=4.0)
 
@@ -239,7 +236,7 @@ class TestBottomWindows:
 
 
 def test_the_generator_itself_is_geometrically_faithful():
-    """Fixture guard: a synthetic 90-degree elbow should measure 90 in pixels."""
+    """A synthetic 90 degree elbow should measure 90 in pixels."""
     from analysis.geometry import calculate_angle
 
     spec = PressSpec(bottom_elbow=90.0, top_elbow=160.0)
@@ -255,17 +252,15 @@ def test_the_generator_itself_is_geometrically_faithful():
 
 class TestReliabilityGatesAreScopedToWhatEachCheckNeeds:
     """
-    Only symmetry needs both arms. Alignment judges each side on its own, so
-    one visible arm is enough. A single gate averaging both arms let a hidden
-    arm switch off the check for the arm that was perfectly visible.
+    Only symmetry needs both arms. Alignment is per arm, so one visible arm is
+    enough - averaging both let a hidden arm switch off the check for the other.
     """
 
     def _pose_with_one_hidden_arm(self):
         from tests.synthetic_press import make_pose_data
 
         pose = make_pose_data(PressSpec())
-        # Low enough that the mean across both arms drops under the floor,
-        # which is the case the old shared gate got wrong.
+        # low enough that the mean of both arms drops under the floor
         pose.visibility[:, [14, 16]] = 0.02
         return pose
 

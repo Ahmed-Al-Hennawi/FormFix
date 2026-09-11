@@ -1,6 +1,6 @@
 """
-Section 1b - what this is, and who it is for. Added after feedback that the
-hero said what the system does but not what kind of thing it is.
+Section 1b - what FormFix is and who it's for. Added after my supervisor said
+the hero didn't make that clear.
 """
 
 from __future__ import annotations
@@ -8,7 +8,7 @@ from __future__ import annotations
 from utils.helpers import strip
 from utils.styling import html
 
-# <em> is the house emphasis style, same as the hero headline.
+# <em> is the highlight style, same as the hero headline
 TITLE = "A <em>second pair of eyes</em> on the lifts you're learning."
 
 LEDE = (
@@ -19,8 +19,8 @@ LEDE = (
 CHIPS_LABEL = "The three movements"
 EXERCISES: tuple[str, ...] = ("Barbell squat", "Shoulder press", "Lat pulldown")
 
-# Both claims hold in the app as built: there is no account, and utils.analysis
-# unlinks the upload when the run finishes. Check that before changing either.
+# both are true: there are no accounts, and utils.analysis deletes the upload
+# when the run finishes
 ASIDE = "No account, no setup. Your video is deleted the moment the analysis finishes."
 
 # (panel title, marker modifier, lines)

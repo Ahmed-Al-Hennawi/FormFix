@@ -1,11 +1,11 @@
 """
-Page components. The homepage sections render in this order: background,
-navbar, hero, about, problem, how_it_works, exercise_section, explainable,
-results_section, technology, research, outro, footer.
+Page components. Homepage order: background, navbar, hero, about, problem,
+how_it_works, exercise_section, explainable, results_section, technology,
+research, outro, footer.
 
-For /analyse: analyse_page (upload + analysis) and analysis_results (score,
-feedback, reference videos). upload_section is the old in-page uploader that
-analyse_page replaced; nothing renders it any more.
+/analyse uses analyse_page (upload + analysis) and analysis_results (score,
+feedback, reference videos). upload_section is the old uploader and isn't used
+any more.
 """
 
 from . import (

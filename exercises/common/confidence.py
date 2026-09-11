@@ -1,17 +1,14 @@
 """
-How much to trust a measurement. Four bands, not a probability, because
-a probability would imply a calibrated model this doesn't have:
+How much to trust a measurement. Four bands rather than a probability, since a
+probability would suggest a calibrated model I don't have:
 
     HIGH           several reps, visible landmarks, suitable view
     MEDIUM         measurable, on thinner evidence
     LOW            measurable but weak; treat the finding as a hint
     CANNOT_ASSESS  nothing usable, so the rule reports nothing
 
-Worked out per measurement, not per video: a pulldown's range of motion can be
-reliable in the same clip where trunk lean is unassessable. The inputs are
-landmark visibility, the share of frames that produced a value, how well the
-view supports the metric and how many reps returned a verdict, plus two
-ceilings for what visibility can't express.
+It's worked out per measurement, not per video - e.g. a pulldown's range of
+motion can be reliable while trunk lean in the same clip isn't.
 """
 
 from __future__ import annotations
@@ -32,10 +29,7 @@ from analysis.models import (
 
 @dataclass(frozen=True)
 class ReliabilityBands:
-    """
-    Boundaries between the four reliability levels. All engineering settings: how
-    much evidence a verdict needs before we call it strong, nothing about technique.
-    """
+    """Boundaries between the four levels (engineering settings, not technique)."""
 
     high_visibility: float = 0.75
     high_measurable_ratio: float = 0.85
@@ -44,8 +38,8 @@ class ReliabilityBands:
     medium_visibility: float = 0.55
     medium_measurable_ratio: float = 0.6
     medium_view_support: float = 0.5
-    # subject size as median body-scale length in pixels. Someone filmed from far
-    # away carries more error per landmark than the visibility score shows.
+    # median body scale in pixels. Someone filmed from far away has more error
+    # per landmark than the visibility score shows
     min_subject_pixels: float = 140.0
     poor_subject_pixels: float = 70.0
 
@@ -85,13 +79,8 @@ def view_support(
     frontal_plane: bool = False,
 ) -> float:
     """
-    How much this camera view supports a metric, 0 to 1. A diagonal camera is
-    neither fine nor useless, so it scores the estimated view confidence; unknown
-    views get 0.5 - still analysed, never full support.
-
-    frontal_plane matters in the diagonal case: side_view_confidence measures how
-    side-on the camera is, which is backwards for a left/right comparison, so
-    frontal-plane metrics take the complement.
+    How well this camera view supports a metric, 0 to 1. Diagonal views score the
+    view confidence (flipped for front-on metrics), unknown views get 0.5.
     """
     if orientation.value not in supported_views:
         return 0.0
@@ -120,9 +109,8 @@ def gather_evidence(
     recording_quality: str = "good",
     frontal_plane: bool = False,
 ) -> MetricEvidence:
-    """Collect the evidence behind one metric across all reps. required_ids is only
-    the landmarks this metric depends on - averaging over all 33 would flatter
-    everything."""
+    """Collect the evidence for one metric across all reps. required_ids is just the
+    landmarks it depends on - averaging all 33 would make everything look better."""
     visibilities: list[float] = []
     measurable: list[float] = []
 
@@ -149,8 +137,8 @@ def gather_evidence(
 
 
 def reliability_for(evidence: MetricEvidence, bands: ReliabilityBands) -> Reliability:
-    """Turn the evidence into one of the four levels. Every floor has to be cleared
-    rather than averaged: great visibility with no camera support is unusable."""
+    """Turn the evidence into one of the four levels. Every floor has to be passed,
+    not averaged - great visibility with the wrong camera angle is still unusable."""
     if evidence.evaluable_reps == 0 or evidence.view_support <= 0.0:
         return Reliability.CANNOT_ASSESS
 
@@ -178,10 +166,8 @@ def apply_ceilings(
     level: Reliability, evidence: MetricEvidence, bands: ReliabilityBands
 ) -> Reliability:
     """
-    Two ceilings the visibility score can't express. Subject size: someone filmed
-    from across the gym has more absolute error in every landmark while visibility
-    stays high, since the joints aren't occluded, only small. Recording quality: if
-    validation already called the clip limited, nothing from it comes back high.
+    Two caps visibility can't capture: a person filmed from across the gym (small
+    but still "visible"), and a clip validation already marked as limited.
     """
     scale = evidence.subject_scale_px
     if np.isfinite(scale):
@@ -197,8 +183,8 @@ def apply_ceilings(
 
 
 def overall_reliability(levels: list[Reliability]) -> Reliability:
-    """Session-level figure: the median across metrics that gave a verdict. One weak
-    check shouldn't condemn a good recording, or one strong check rescue a bad one."""
+    """Median across the metrics that gave a verdict, so one weak or strong check
+    doesn't decide the whole session."""
     usable = [level for level in levels if level is not Reliability.CANNOT_ASSESS]
     if not usable:
         return Reliability.CANNOT_ASSESS

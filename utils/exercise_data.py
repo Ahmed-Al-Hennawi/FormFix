@@ -1,8 +1,7 @@
 """
-Everything the exercise explorer displays: a port of the EXERCISES array from
-the prototype's script.js plus the pose geometry that used to be inline SVG.
-Keeping the geometry as coordinates lets utils/pose.py render all three with
-one renderer. Coordinates use the photographs' 0 0 1122 1402 viewBox.
+Data for the exercise explorer, ported from the EXERCISES array in the
+prototype's script.js, with the pose geometry as coordinates so utils/pose.py
+can draw all three. Coordinates use the photos' 0 0 1122 1402 viewBox.
 """
 
 from __future__ import annotations
@@ -16,7 +15,6 @@ from exercises.squat import config as squat_config
 from . import assets
 from .camera_guide import CameraSetup
 
-# The photographs share this intrinsic coordinate space.
 POSE_VIEWBOX = "0 0 1122 1402"
 
 Point = tuple[float, float]
@@ -51,22 +49,19 @@ class Exercise:
     atmosphere_a: str
     atmosphere_b: str
     pose: Pose
-    # rule ids this exercise's analyser produces, so the explorer can't advertise
-    # a check we don't actually run
+    # rule ids the analyser produces, so the explorer can't show a check that
+    # doesn't exist
     rules: tuple[str, ...] = field(default=())
-    # camera position the analysis needs, in plain words
     camera_view: str = ""
-    # recording instructions, imported from the exercise's config rather than
-    # retyped, so the advice matches what the analyser enforces
+    # full recording tips, taken from the exercise config so they match the analyser
     recording_tips: tuple[str, ...] = field(default=())
-    # the three lines actually shown before upload. The full list above is long
-    # enough that testers skipped it, so the panel gets these and the diagram,
-    # and the full list is kept for the retry advice after a rejection.
+    # the three lines shown before upload (testers skipped the full list, which is
+    # now only used for retry advice)
     quick_tips: tuple[str, ...] = field(default=())
-    # the same camera position as geometry, for the overhead plan drawn beside
-    # the tips. Kept next to camera_view so the words and the picture agree.
+    # camera position as geometry for the overhead diagram, next to camera_view so
+    # the words and picture match
     camera: CameraSetup | None = None
-    # clip length the analyser accepts, also read from the exercise config
+    # clip length the analyser accepts, from the exercise config
     min_duration: float = 0.0
     max_duration: float = 0.0
 
@@ -107,8 +102,7 @@ SQUAT = Exercise(
     camera_view="Side-on",
     recording_tips=squat_config.RECORDING_TIPS,
     quick_tips=squat_config.QUICK_TIPS,
-    # square to the side of the bar: depth and torso lean are only measurable
-    # from the sagittal plane, and either side of the lifter serves equally
+    # side-on: depth and torso lean can only be measured from the side (either side)
     camera=CameraSetup(
         angle=90,
         arc=(72, 108),
@@ -179,8 +173,7 @@ PRESS = Exercise(
     camera_view="Front-on",
     recording_tips=press_config.RECORDING_TIPS,
     quick_tips=press_config.QUICK_TIPS,
-    # straight in front: the press rules compare the left arm against the right,
-    # so both have to be equally visible
+    # straight in front, since the rules compare the left and right arms
     camera=CameraSetup(
         angle=0,
         arc=(-22, 22),
@@ -249,11 +242,9 @@ PULLDOWN = Exercise(
     camera_view="Side or three-quarter",
     recording_tips=pulldown_config.RECORDING_TIPS,
     quick_tips=pulldown_config.QUICK_TIPS,
-    # square-on at the side, or rotated back from there towards the rear
-    # shoulder - never forward, where the machine frame, the bar and the weight
-    # stack sit between the lens and the body. Past about 135 degrees the head
-    # is lost and the torso rule can only report the size of a lean, not which
-    # way it went.
+    # from the side or turned back towards the rear shoulder, never forward
+    # (the machine is in the way). Past about 135 degrees the head is lost and
+    # the torso rule can't tell which way the lean went
     camera=CameraSetup(
         angle=108,
         arc=(80, 135),
@@ -300,5 +291,5 @@ BY_ID: dict[str, Exercise] = {exercise.id: exercise for exercise in EXERCISES}
 
 
 def get(exercise_id: str) -> Exercise:
-    """Look up an exercise by id, defaulting to the squat."""
+    """Look up an exercise by id (defaults to the squat)."""
     return BY_ID.get(exercise_id, SQUAT)

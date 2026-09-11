@@ -1,10 +1,10 @@
 """
-Picks which frames of the upload are worth rendering: first rep start to last
-rep end, plus a little padding. People film the walk-up and the walk back, and
-the set is often less than half the clip.
+Picks which frames are worth rendering: first rep start to last rep end, plus
+some padding. People film the walk-up and walk back, so the set is often less
+than half the clip.
 
-It never re-cuts the source, so frame numbers (and every timestamp in the
-feedback) still refer to the original. Anything odd returns the full video.
+The source is never re-cut, so frame numbers and feedback timestamps still
+match the original. If anything looks off it returns the full video.
 """
 
 from __future__ import annotations
@@ -58,7 +58,7 @@ class RenderWindow:
         return max(0.0, (total_frames - self.frame_count) / fps)
 
     def as_dict(self) -> dict[str, Any]:
-        """For the debug block and the exported run record."""
+        """For the debug panel and the export."""
         return {
             "start_frame": self.start_frame,
             "end_frame": self.end_frame,

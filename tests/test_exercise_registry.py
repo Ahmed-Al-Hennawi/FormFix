@@ -1,9 +1,7 @@
 """
-The wiring between the three exercises and the interface. Picking the wrong
-analyser, showing another exercise's reference clip or advertising a check
-that isn't implemented all look completely normal on screen. No pipeline runs
-here, it's the registries, metadata and results mapping checked against each
-other.
+Checks the wiring between the exercises and the UI. The wrong analyser, the
+wrong reference clip or a check that doesn't exist would all look normal on
+screen, so the registries and metadata are checked against each other here.
 """
 
 from __future__ import annotations
@@ -53,7 +51,7 @@ class TestRegistries:
         assert set(FEEDBACK) == set(EXERCISE_IDS)
 
     def test_the_three_analysers_are_distinct(self):
-        # Catches one exercise silently running another's analyser.
+        # catches one exercise running another's analyser
         assert len({id(fn) for fn in ANALYSERS.values()}) == 3
 
     def test_every_exercise_has_a_display_name(self):
@@ -86,7 +84,7 @@ class TestAdvertisedChecksMatchImplementedRules:
 
 
 class TestSampleFallback:
-    """The canned output shown when the CV dependencies are missing."""
+    """The sample output shown when the CV libraries are missing."""
 
     @pytest.mark.parametrize("exercise_id", EXERCISE_IDS)
     def test_the_sample_uses_only_real_rule_ids(self, exercise_id):
@@ -115,8 +113,8 @@ class TestSampleFallback:
 
 class TestRecordingQualityAdvice:
     """
-    The recording-quality note has to be per exercise. It started as one
-    hard-coded sentence about a clear side view, wrong for two of the three.
+    The recording note has to be per exercise - it used to be one sentence about
+    a side view, which was wrong for two of the three.
     """
 
     @pytest.mark.parametrize(
@@ -182,8 +180,8 @@ class TestRecordingGuidance:
         assert len(exercise.recording_tips) >= 3
 
     def test_the_two_new_exercises_ask_for_different_camera_views(self):
-        # Get this wrong and checks quietly disappear: a head-on pulldown
-        # loses its torso check, a side-on press loses two of its three.
+        # get this wrong and checks disappear: a front-on pulldown loses its torso
+        # check, a side-on press loses two of three
         assert "Side" in get_exercise("pulldown").camera_view
         assert "Front" in get_exercise("press").camera_view
 
@@ -218,7 +216,7 @@ class TestReferenceVideos:
 
 
 def fake_result(exercise_id: str, exercise_name: str, rule_id: str, feedback_key: str):
-    """The smallest analysis result that maps, so no video is needed."""
+    """Smallest result that maps, so no video is needed."""
     outcome = RepRuleOutcome(rep_number=1, status=RuleStatus.WARNING, evidence={})
     rule = RuleResult(
         rule_id=rule_id,
@@ -293,8 +291,7 @@ class TestResultsMapping:
         assert ui.improvements[0].title == "Uneven arms"
 
     def test_the_exercise_id_comes_from_the_result_not_the_caller(self):
-        # Otherwise a mismatched selection shows another exercise's reference
-        # clip on the results page.
+        # otherwise the results page could show another exercise's reference clip
         ui = _to_ui_result(
             fake_result("pulldown", "Lat Pulldown", "pulldown_rom", "pulldown_rom"),
             "squat",

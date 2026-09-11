@@ -1,7 +1,4 @@
-"""
-Metric-level reliability: how each verdict gets banded, and how the per-metric
-bands roll up into one figure for the run.
-"""
+"""Tests for per-metric reliability and how it rolls up into one figure."""
 
 from __future__ import annotations
 
@@ -69,8 +66,8 @@ class TestBanding:
         assert reliability_for(ev(evaluable_reps=0), CONFIG) is Reliability.CANNOT_ASSESS
 
     def test_excellent_visibility_cannot_rescue_an_unsupported_view(self):
-        # The bands are floors that all have to be met, not an average - an
-        # average here would report "medium" for something the camera can't see.
+        # all floors have to be met - an average would say "medium" for something
+        # the camera can't even see
         strong_but_blind = ev(landmark_visibility=1.0, measurable_ratio=1.0, view_support=0.0)
         assert reliability_for(strong_but_blind, CONFIG) is Reliability.CANNOT_ASSESS
 
@@ -99,11 +96,9 @@ class TestOverall:
 
 class TestFrontalPlaneMetricsOnADiagonalCamera:
     """
-    side_view_confidence says how side-on the camera is, which means
-    opposite things to different metrics: good for trunk lean, bad for
-    left/right knee evenness where the legs line up behind each other.
-    Feeding both the same number gave the worst diagonals the highest
-    confidence, so frontal-plane metrics take the complement.
+    side_view_confidence is good for trunk lean but bad for left/right checks,
+    where the legs line up behind each other. Using the same number gave the
+    worst diagonals the highest confidence, so front-on metrics use 1 - it.
     """
 
     def test_a_sagittal_metric_prefers_a_side_on_diagonal(self):

@@ -1,8 +1,7 @@
 """
-The rule engine: view gating, persistence gating, the timing rule and the
-feedback that comes out of them. A rule only runs when the camera view
-supports it, only fires when the violation persisted, and says why it was
-skipped instead of guessing a verdict.
+Tests for the rule engine: a rule only runs if the camera view supports it,
+only fires if the violation lasted, and says why it was skipped instead of
+guessing.
 """
 
 from __future__ import annotations
@@ -178,7 +177,7 @@ class TestViewGating:
             assert rules[rule_id].status is RuleStatus.NOT_EVALUABLE, rule_id
             assert rules[rule_id].limitation
             assert rules[rule_id].reliability is Reliability.CANNOT_ASSESS
-        # Heel lift doesn't depend on the camera position.
+        # heel lift doesn't depend on the camera position
         assert rules["heel_lift"].status is not RuleStatus.NOT_EVALUABLE
 
     def test_heel_check_is_view_independent(self):
@@ -269,7 +268,7 @@ class TestFeedbackGeneration:
         summary = build_summary(reps, 0, rules)
         flagged = {f.rule_id for f in build_findings(rules)}
         praised = set(summary.positives)
-        # Depth is flagged, so the depth praise mustn't appear as well.
+        # depth is flagged, so there shouldn't be depth praise as well
         assert "squat_depth" in flagged
         assert "Good squat depth" not in praised
 
@@ -319,7 +318,7 @@ class TestPerRepetitionReporting:
         reps = [rep_with(number=1), rep_with(number=2)]
         rules = list(evaluate(CameraOrientation.FRONTAL, confidence=0.0, reps=reps).values())
         overview = build_overview(rules)
-        # Omitted, rather than shown as "0 of 2 acceptable".
+        # left out instead of showing "0 of 2 acceptable"
         assert not any(line.startswith("Depth") for line in overview)
 
     def test_summary_aggregates_reliability_and_not_assessed(self):

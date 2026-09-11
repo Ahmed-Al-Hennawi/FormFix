@@ -1,9 +1,7 @@
 # ==========================================================================
 # FormFix - tooling configuration
 #
-# Black and Ruff have to agree on the line length, or `black .` reformats the
-# whole project against Ruff's own setting on every run. Ruff keeps its rule
-# selection in ruff.toml; the length lives in both files and must match.
+# Line length has to match ruff.toml, or black and ruff fight each other.
 # ==========================================================================
 
 [tool.black]

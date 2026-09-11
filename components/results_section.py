@@ -1,7 +1,6 @@
 """
-Analysis report rendering. render_example draws the worked example in section
-6, render_result draws a real AnalysisResult. Both go through report_markup, so
-a real run looks like the example the homepage promises.
+Report card rendering. render_example draws the example in section 6 and
+render_result a real result. Both use report_markup so they look the same.
 """
 
 from __future__ import annotations
@@ -24,7 +23,6 @@ _BADGE_MODIFIER = {
 
 
 def report_markup(result: AnalysisResult, animate: bool = True) -> str:
-    """Build the analysis report card for a result."""
     rows = []
     for row in result.rows:
         detail = f'<span class="report__sub">{row.detail}</span>' if row.detail else ""
@@ -60,7 +58,7 @@ def report_markup(result: AnalysisResult, animate: bool = True) -> str:
 
 
 def render_example() -> None:
-    """Section 6 - the worked example from the original prototype."""
+    """Section 6 - the example from the original prototype."""
     html(strip(f"""
             <div class="ff-page">
             <section class="analysis section" id="ff-analysis">
@@ -75,9 +73,8 @@ def render_example() -> None:
 
 
 def render_result(result: AnalysisResult | None) -> None:
-    """Render a real analysis result. None means process_uploaded_video couldn't
-    run - no CV dependencies, or no analyser for the exercise - and the empty state
-    says so rather than inventing a result."""
+    """Render a real result. None means the analysis couldn't run, and the empty
+    state says so instead of making up a result."""
     if result is None:
         html(strip("""
                 <div class="ff-page">

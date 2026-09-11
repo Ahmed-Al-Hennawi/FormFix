@@ -4,8 +4,8 @@ static/assets/models/pose_landmarker_full.task.
 
     python scripts/download_pose_model.py
 
-The download itself is in analysis.pose_detector.fetch_model, since the app
-also fetches the model on start-up. Run this after cloning.
+Run this after cloning. The actual download code is in
+analysis.pose_detector.fetch_model, which the app also uses on start-up.
 """
 
 from __future__ import annotations

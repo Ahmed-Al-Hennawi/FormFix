@@ -5,9 +5,8 @@ The shoulder-press pipeline, in order:
     clean + smooth -> measure per frame -> detect reps -> evaluate rules ->
     reliability -> feedback -> render annotated video -> export
 
-This module owns none of that logic, only the order. Measurement is in
-metrics.py, judgement in rules.py, wording in feedback.py, thresholds in
-config.py.
+This file only runs the steps in order. Measuring is in metrics.py, judging in
+rules.py, wording in feedback.py and thresholds in config.py.
 """
 
 from __future__ import annotations
@@ -78,15 +77,14 @@ logger = logging.getLogger(__name__)
 
 EVENT_CONTEXT_SECONDS = 0.5
 
-# Generic rep segment -> the caption the press shows for it.
+# generic rep segment -> press caption
 SEGMENT_PHASES = {
     PHASE_TOWARDS: PressPhase.PRESSING,
     PHASE_EXTREME: PressPhase.TOP,
     PHASE_RETURN: PressPhase.LOWERING,
 }
 
-# what the overlay says about a flagged rep. The part before the dash is the
-# small label by the joints; the whole line goes in the status pill.
+# overlay text for a flagged rep - the part before the dash is the short label
 BANNER_TEXT = {
     "press_symmetry": "Uneven arms - one arm leads",
     "press_alignment": "Wrist position - drifting",
@@ -110,10 +108,9 @@ LIMITATION_TEXT = {
 
 def smooth_movement_signal(series, config, fps: float):
     """
-    Smooth the signal that drives rep segmentation and the turning-point
-    measurements. Which filter runs is a config choice (ANGLE_FILTER): an EMA lags
-    exactly where the range-of-motion angles are read, but a 2 Hz Butterworth eats
-    real signal on a sharp turnaround. Default is "ema".
+    Smooth the signal used for rep detection and the ROM angles. The filter is set
+    by ANGLE_FILTER: an EMA lags at the turning points, but a 2 Hz Butterworth
+    cuts real signal on a sharp turnaround.
     """
     name = getattr(config, "ANGLE_FILTER", "ema")
     if name == "ema":
@@ -128,8 +125,7 @@ def analyse_shoulder_press(
     output_dir: Path | None = None,
     export_root: Path | None = None,
 ) -> ExerciseAnalysisResult:
-    """Analyse one shoulder-press video end to end. Raises AnalysisFailure if the
-    recording can't be analysed."""
+    """Analyse one shoulder press video end to end. Raises AnalysisFailure if it can't."""
     started = time.monotonic()
     report = progress or (lambda stage, fraction, message: None)
     try:
@@ -197,8 +193,7 @@ def _run(
     smoothing.ema_smooth(pose, config.EMA_ALPHA)
 
     # --- 5. side selection ---
-    # a press is bilateral, so both arms are always measured. This only decides
-    # whose numbers the interface quotes.
+    # both arms are always measured, this only picks which side the UI quotes
     side, side_scores = validation.select_analysis_side(
         pose,
         config.MIN_KEY_LANDMARK_VISIBILITY,
@@ -258,8 +253,8 @@ def _run(
     reps = metrics_mod.build_reps(detection.reps, metrics, pose, config)
 
     # --- 7b. is this actually an overhead press? ---
-    # a bench press or a curl reaches this point with good reps, so check the one
-    # thing that separates an overhead movement
+    # a bench press or curl can get here with good reps, so check the wrists
+    # actually go overhead
     peak_wrist_rise = _peak_wrist_rise(metrics)
     plausible = plausibility.check_press(reps, peak_wrist_rise)
     if not plausible.plausible:
@@ -285,7 +280,7 @@ def _run(
     )
     _apply_recording_limitations(rule_results, checks)
 
-    # attach the published measurement error to every finding
+    # attach the published measurement error to each finding
     _specs = {spec.rule_id: spec for spec in rule_specs(config)}
     uncertainty_notes = uncertainty.annotate_uncertainty(
         rule_results,
@@ -308,8 +303,6 @@ def _run(
 
     # --- 9. annotated video ---
     report("render", 0.0, "Rendering analysed video")
-    # cv2.VideoWriter doesn't create the folder and doesn't error if it can't
-    # open the file - it silently drops every frame
     session_dir = output_dir or new_session_dir()
     try:
         session_dir.mkdir(parents=True, exist_ok=True)
@@ -317,8 +310,7 @@ def _run(
         logger.warning("Output directory %s is unusable; using a scratch directory", session_dir)
         session_dir = new_session_dir()
     annotated_path = session_dir / "annotated.mp4"
-    # which frames to render. Frame numbers stay original, so the timestamps in
-    # the feedback still refer to the upload.
+    # which frames to render (frame numbers stay the original ones)
     render_window = trimming.compute_render_window(reps, pose.frame_count, video.fps)
     frame_states = _frame_states(detection, reps, metrics, pose.frame_count)
     events = _overlay_events(rule_results, video, pose.frame_count, side)
@@ -331,19 +323,18 @@ def _run(
             events,
             side,
             annotated_path,
-            # side-on, the overlay holds occluded limbs to a higher confidence bar
+            # side-on, hidden limbs need a higher confidence to be drawn
             camera_orientation=checks.orientation.value,
             on_frame=lambda i, n: report("render", (i + 1) / max(n, 1), "Rendering analysed video"),
             emphasis_landmarks=BOTH_ARM_LANDMARKS,
             marker_landmarks=(LEFT_WRIST, RIGHT_WRIST),
             marker_label="TOP",
-            # every press rule reads both arms, so draw both elbow angles
+            # every press rule reads both arms
             angle_joints=(
                 JointAngle("Left elbow", LEFT_SHOULDER, LEFT_ELBOW, LEFT_WRIST),
                 JointAngle("Right elbow", RIGHT_SHOULDER, RIGHT_ELBOW, RIGHT_WRIST),
             ),
-            # upper body only: seated, the legs sit behind the bench and no
-            # press rule reads them
+            # upper body only - the legs are behind the bench and no rule uses them
             drawn_landmarks=UPPER_BODY_DRAWN,
             frame_range=(render_window.start_frame, render_window.end_frame),
         )
@@ -396,10 +387,9 @@ def _run(
 
 def validation_config_for(config: PressConfig) -> validation.ValidationConfig:
     """
-    Press recording requirements in the generic validation vocabulary. The
-    camera-view policy is the mirror of the squat's: front-on is the requirement
-    here, since two of the three checks compare the arms. A side-on press warns and
-    switches those two off while range of motion still runs.
+    Press recording requirements for the generic validation. Opposite to the
+    squat: front-on is needed because two of the three checks compare the arms.
+    A side-on press warns and only runs the ROM check.
     """
     return validation.ValidationConfig(
         min_duration=config.VIDEO_MIN_DURATION,
@@ -465,7 +455,7 @@ def validation_config_for(config: PressConfig) -> validation.ValidationConfig:
 
 
 def _apply_recording_limitations(rule_results, checks: ValidationResult) -> None:
-    """Switch off the rules this *recording* cannot support - and only those."""
+    """Switch off only the rules this recording can't support."""
     if not checks.limited_metrics:
         return
     limited = set(checks.limited_metrics)
@@ -483,7 +473,7 @@ def _apply_recording_limitations(rule_results, checks: ValidationResult) -> None
 
 
 def _frame_states(detection, reps: list[PressRep], metrics, frame_count: int):
-    """Per-frame HUD state: phase, rep counter, top-window flag, live values."""
+    """Per-frame HUD state: phase, rep counter and top-window flag."""
     phases = named_phases(detection.phases)
     states: list[FrameState] = []
     total = len(reps)
@@ -496,15 +486,14 @@ def _frame_states(detection, reps: list[PressRep], metrics, frame_count: int):
                 rep_number = rep.number
                 seg = rep.segmentation
                 in_window = seg.extreme_start_frame <= f <= seg.extreme_end_frame
-                # inside a committed rep the caption comes from that rep's own segmentation
-                # repetition's own segmentation.
+                # inside a rep, use that rep's own segmentation for the caption
                 segment = segment_at(seg, f)
                 if segment is not None:
                     phase = SEGMENT_PHASES[segment]
                 break
             if f > rep.end_frame:
                 rep_number = rep.number
-        # both elbow angles are on the elbows, so the HUD only carries rep and phase
+        # HUD only shows rep and phase
         extra: list[HudLine] = []
         metric = metrics[f] if f < len(metrics) else None
         del metric
@@ -521,7 +510,7 @@ def _frame_states(detection, reps: list[PressRep], metrics, frame_count: int):
 
 
 def _overlay_events(rule_results, video: VideoMetadata, frame_count: int, side: str):
-    """A banner per flagged per-rep outcome, around its evidence frame only."""
+    """One banner per flagged rep, shown around its evidence frame."""
     context = max(int(EVENT_CONTEXT_SECONDS * video.fps), 3)
     events: list[OverlayEvent] = []
     for rule in rule_results:
@@ -531,7 +520,7 @@ def _overlay_events(rule_results, video: VideoMetadata, frame_count: int, side: 
                 continue
             if outcome.evidence_frame < 0:
                 continue
-            # The alignment finding belongs to one arm; highlight that one.
+            # alignment is about one arm, so highlight that one
             worst = outcome.evidence.get("worst_side") or side
             events.append(
                 OverlayEvent(
@@ -556,7 +545,7 @@ def _debug_block(
     resting_reference,
     started,
 ) -> dict:
-    """Developer metrics for thesis evaluation - never shown to normal users."""
+    """Debug metrics for the evaluation, not shown to normal users."""
     return {
         "config": config.as_dict(),
         "rule_specs": [spec.as_dict() for spec in rule_specs(config)],
@@ -625,17 +614,16 @@ def _debug_block(
 
 
 def _run_id(video_path: Path) -> str:
-    """A short, non-identifying id for the export bundle."""
+    """Short, non-identifying id for the export bundle."""
     digest = hashlib.sha1(video_path.name.encode("utf-8")).hexdigest()[:8]
     return f"{time.strftime('%Y%m%d-%H%M%S')}-press-{digest}"
 
 
 def _peak_wrist_rise(metrics) -> float | None:
     """
-    Highest either wrist gets above the shoulder line, in shoulder widths - the
-    signal that separates an overhead press from a bench press, a curl or a front
-    raise. The peak across the whole clip, so one clean lockout is enough and a
-    badly tracked rep can't argue the exercise was wrong.
+    Highest either wrist gets above the shoulder line over the whole clip, in
+    shoulder widths. Separates an overhead press from a bench press, curl or
+    front raise, and one clean lockout is enough.
     """
     best = None
     for frame in metrics:

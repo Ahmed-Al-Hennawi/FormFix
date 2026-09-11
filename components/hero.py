@@ -1,7 +1,6 @@
 """
-Section 1 - Hero. Masked three-line headline, the athlete image with the
-landmark overlay on top, three HUD chips at different parallax depths, and
-the scroll hint at the bottom.
+Section 1 - Hero: three-line headline, athlete image with the landmark overlay,
+three parallax HUD chips and the scroll hint.
 """
 
 from __future__ import annotations

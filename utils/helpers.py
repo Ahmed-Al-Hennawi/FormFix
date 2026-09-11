@@ -7,16 +7,14 @@ from html import escape
 
 
 def esc(text: str) -> str:
-    """Escape a string for inclusion in markup."""
     return escape(str(text), quote=True)
 
 
 def masked_lines(lines: Iterable[str], animate: str = "line", dim_from: int | None = None) -> str:
     """
-    Masked line-reveal markup: each line sits in an overflow:hidden mask so it can
-    slide up into view. The data-animate hook has to go on the mask, not the line -
-    the line starts translated fully below it, so it is clipped to zero area and an
-    IntersectionObserver watching it never fires.
+    Lines that slide up into view from inside an overflow:hidden mask. data-animate
+    goes on the mask, not the line - the line starts fully hidden, so an
+    IntersectionObserver on it would never fire.
     """
     out = []
     for index, line in enumerate(lines):
@@ -51,9 +49,8 @@ def container(inner: str, narrow: bool = False, extra_class: str = "") -> str:
 
 def strip(markup: str) -> str:
     """
-    Flatten a triple-quoted markup block onto unindented, blank-line-free lines.
-    Streamlit's markdown renderer reads four-space indentation as a code block, and
-    a blank line ends an HTML block, so both have to go.
+    Remove indentation and blank lines from a markup block. Streamlit's markdown
+    treats indented lines as code and a blank line ends the HTML block.
     """
     lines = (line.strip() for line in markup.strip().splitlines())
     return "\n".join(line for line in lines if line)

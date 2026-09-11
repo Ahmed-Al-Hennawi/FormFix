@@ -1,18 +1,16 @@
 """
-Landmarks in, numbers out. Measurement only.
+Landmarks in, numbers out. Only measuring here.
 
     landmarks -> per-frame metrics -> top-position baseline -> trunk excursion
               -> per-rep facts
 
-An elbow angle alone can't describe a pulldown: the same angle comes from
-pulling the bar down or from leaning back under a bar that barely moved. So we
-also measure trunk inclination, the trunk's excursion from this person's own
-top posture, trunk velocity (exported only), and normalised wrist and elbow
-rise against the shoulder line.
+The elbow angle alone isn't enough - you get the same angle by pulling the bar
+down or by leaning back under a bar that barely moved. So I also measure trunk
+angle, trunk movement from the person's own top posture, trunk velocity
+(export only) and wrist/elbow rise above the shoulder line.
 
-Conventions: image y grows downward, angles are interior angles in degrees,
-normalised distances use a body dimension from the same frame, and anything
-unmeasurable is NaN rather than 0.
+Image y grows downward, angles are interior angles in degrees, and anything
+unmeasurable is NaN, not 0.
 """
 
 from __future__ import annotations
@@ -60,30 +58,27 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class PulldownFrameMetrics:
-    """
-    Everything measured on one frame. Anything unmeasurable is NaN rather
-    than a zero a rule would read as real.
-    """
+    """Measurements for one frame (NaN if unmeasurable, never 0)."""
 
     frame_index: int
     timestamp: float
     valid: bool
 
-    # SHOULDER-ELBOW-WRIST interior angle, degrees. ~170-180 extended.
+    # SHOULDER-ELBOW-WRIST, degrees, ~170-180 extended
     elbow_angle: float = float("nan")
     left_elbow_angle: float = float("nan")
     right_elbow_angle: float = float("nan")
     elbow_angle_difference: float = float("nan")
 
-    # Trunk (mid-hip -> mid-shoulder) from image vertical, degrees, unsigned.
+    # mid-hip -> mid-shoulder from vertical, degrees, unsigned
     torso_angle: float = float("nan")
     # same segment with its direction kept: positive = shoulders to the +x side
     torso_angle_signed: float = float("nan")
-    # the signed angle re-expressed anatomically: positive = leaning backwards
+    # same but positive = leaning backwards
     torso_posterior: float = float("nan")
-    # Trunk movement away from this person's own top-position posture, degrees.
+    # trunk movement away from the person's own top posture, degrees
     torso_excursion: float = float("nan")
-    # trunk speed, deg/s. Exported for a possible swinging check; unused.
+    # trunk speed, deg/s - exported for a possible swinging check, not used yet
     torso_velocity: float = float("nan")
     torso_reliable: bool = False
 
@@ -106,8 +101,8 @@ def compute_frame_metrics(
     side: str,
     config: PulldownConfig,
 ) -> list[PulldownFrameMetrics]:
-    """Measure every frame, both arms, in pixel space. MediaPipe normalises x and y
-    separately, so an angle off the normalised values is skewed on a phone clip."""
+    """Measure every frame, both arms, in pixels (normalised coordinates skew angles
+    on a phone clip)."""
     chain = ARM_CHAINS[side]
     metrics: list[PulldownFrameMetrics] = []
 
@@ -148,8 +143,8 @@ def compute_frame_metrics(
             else float("nan")
         )
 
-        # movement signal: mean of whichever arms are usable. Two halves the effect
-        # of one noisy estimate; falling back to one keeps a side view analysable.
+        # movement signal: mean of the usable arms. Two arms halve the noise, and
+        # falling back to one keeps side views working
         usable_angles = [per_arm[n] for n in ARM_CHAINS if arm_ok[n] and np.isfinite(per_arm[n])]
         elbow_angle = float(np.mean(usable_angles)) if usable_angles else float("nan")
 
@@ -197,8 +192,8 @@ def compute_frame_metrics(
 
 
 def _mean_rise(px, chains, role: str, mid_shoulder, scale: float) -> float:
-    """Mean height of a landmark pair above the shoulder line, normalised. Measured
-    against the person's own shoulders, so shifting in the seat isn't travel."""
+    """Mean height of a landmark pair above the shoulder line, normalised. Relative
+    to the shoulders so shifting in the seat doesn't count as travel."""
     if mid_shoulder is None:
         return float("nan")
     values = []
@@ -212,8 +207,7 @@ def _mean_rise(px, chains, role: str, mid_shoulder, scale: float) -> float:
 
 
 def _apply_torso_velocity(metrics: list[PulldownFrameMetrics], timestamps: np.ndarray) -> None:
-    """Trunk angular speed in deg/s. Exported rather than judged - it is what a
-    body-swinging check would need, once one is validated."""
+    """Trunk angular speed in deg/s. Exported only, for a future swinging check."""
     for i in range(1, len(metrics)):
         a, b = metrics[i - 1].torso_angle, metrics[i].torso_angle
         dt = float(timestamps[i]) - float(timestamps[i - 1])
@@ -231,13 +225,9 @@ def estimate_facing(
     config: PulldownConfig,
 ) -> tuple[int, float]:
     """
-    Which way the person faces: +1 towards +x, -1 towards -x, 0 unknown. "Leaning
-    backwards" is a direction, and the image alone can't tell back from forward
-    without it. The head sits in front of the shoulder line, so the median offset
-    of the visible head landmarks gives the direction.
-
-    (0, 0.0) when the head isn't visible enough, and the trunk measurement then
-    comes back unsigned.
+    Which way the person faces: +1 towards +x, -1 towards -x, 0 unknown. Needed
+    to tell leaning back from leaning forward. Uses the median offset of the head
+    landmarks from the shoulders. (0, 0.0) if the head isn't visible enough.
     """
     offsets: list[float] = []
     visibilities: list[float] = []
@@ -273,9 +263,8 @@ def estimate_facing(
 
 
 def apply_posterior_lean(metrics: list[PulldownFrameMetrics], facing: int) -> None:
-    """Re-express the signed trunk angle anatomically: positive = leaning back.
-    Someone facing +x leans back by moving their shoulders to -x, hence the -facing
-    factor. NaN when the facing direction is unknown."""
+    """Signed trunk angle with positive = leaning back. Someone facing +x leans back
+    towards -x, hence the -facing. NaN if facing is unknown."""
     if facing == 0:
         return
     for m in metrics:
@@ -289,9 +278,9 @@ def top_baseline(
     first_rep_start: int | None,
     config: PulldownConfig,
 ) -> dict[str, float]:
-    """The person's own posture at the extended top. Comparing the trunk against
-    true vertical would penalise a reclined seat or a tilted camera. A median over
-    real top frames, since people are often still reaching for the bar at frame 0."""
+    """The person's own posture at the top, so a reclined seat or tilted camera isn't
+    a fault. Median over real top frames, since people are still reaching for the
+    bar at the start."""
     top = [
         i
         for i, phase in enumerate(phases)
@@ -320,12 +309,9 @@ def apply_torso_excursion(
     config: PulldownConfig,
 ) -> str:
     """
-    Fill in torso_excursion and return which mode was used.
-
-    "posterior" is the signed backward lean minus its baseline, which is what the
-    rule is really about. Only available when the facing direction was established.
-    "unsigned" is the absolute change, always available, but it can't tell back
-    from forward - so the wording says "moved" rather than "leaned back".
+    Fill in torso_excursion and return the mode used. "posterior" is the backward
+    lean minus its baseline (needs the facing direction). "unsigned" is just the
+    size of the change, so the wording says "moved" instead of "leaned back".
     """
     posterior_ref = baseline.get("torso_posterior", float("nan"))
     unsigned_ref = baseline.get("torso_angle", float("nan"))
@@ -356,7 +342,7 @@ def apply_torso_excursion(
 
 
 def phase_frames(rep: PulldownRep, phase: str) -> range:
-    """Frame range a rule should read for phase on rep."""
+    """Frame range a rule should read for this phase."""
     return frames_for(rep.segmentation, phase)
 
 
@@ -367,11 +353,9 @@ def top_windows(
     frame_count: int,
 ) -> list[range]:
     """
-    Frames where the arms are genuinely at the extended top. Not the rep's own
-    first frame: the state machine only commits once the pull has started, so
-    reading the top angle there under-reports extension and invents a "limited top
-    extension" finding on correct technique. The two rest windows either side stay
-    separate so a sustained search can't bridge across the rep.
+    Frames where the arms are really at the top. Not the rep's first frame - the
+    rep only starts once the pull is moving, so reading there gave false "limited
+    top extension" findings. The windows either side are kept separate.
     """
     raw = raw_reps[index]
     span = max(int(round(1.0 * fps)), 1)
@@ -388,8 +372,7 @@ def top_windows(
 def _sustained_top(
     metrics: list[PulldownFrameMetrics], windows: list[range], attribute: str, hold: int
 ) -> float:
-    """Largest value held for hold consecutive frames in any window, so one jittering
-    wrist can't become the extension this person reached."""
+    """Largest value held for `hold` frames in a row, so one jittery wrist doesn't count."""
     best = float("nan")
     for window in windows:
         values = series(metrics, attribute, window)
@@ -409,8 +392,8 @@ def build_reps(
     torso_mode: str,
     config: PulldownConfig,
 ) -> list[PulldownRep]:
-    """Turn detected rep boundaries into measured reps, taking each measurement from
-    the frames of the phase it belongs to. Peaks are sustained extremes."""
+    """Turn rep boundaries into measured reps, each value taken from its own phase.
+    Peaks are sustained extremes."""
     timestamps = pose.timestamps
     fps = effective_fps(timestamps)
     reps: list[PulldownRep] = []
@@ -446,7 +429,7 @@ def build_reps(
 
         excursion = series(metrics, "torso_excursion", rep_frames)
         peak, offset = sustained_extreme(excursion, config.TORSO_MIN_FRAMES)
-        if not np.isfinite(peak):  # never held for long enough to sustain
+        if not np.isfinite(peak):  # never held long enough
             peak = safe_max(excursion)
             offset = int(np.nanargmax(excursion)) if np.isfinite(peak) else -1
         peak_frame = raw.start_frame + offset if offset >= 0 else -1
@@ -520,17 +503,14 @@ def build_reps(
 
 
 def _at(metrics: list[PulldownFrameMetrics], frame: int, attribute: str) -> float:
-    """One frame's value of attribute, NaN if the index is out of range."""
+    """NaN if the frame is out of range."""
     if 0 <= frame < len(metrics):
         return float(getattr(metrics[frame], attribute, float("nan")))
     return float("nan")
 
 
 def movement_signal(metrics: list[PulldownFrameMetrics]) -> np.ndarray:
-    """
-    The signal the rep state machine runs on: mean elbow angle, high with the arms
-    extended overhead and falling as the bar comes down.
-    """
+    """Signal for the rep state machine: mean elbow angle, high with arms extended."""
     return series(metrics, "elbow_angle", range(len(metrics)))
 
 

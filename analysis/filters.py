@@ -1,10 +1,10 @@
 """
-Filters for the landmark and joint-angle series, written out so there is no
-extra dependency.
+Filters for the landmark and angle series, written by hand so there's no extra
+dependency.
 
-An EMA is causal, so it lags, and it lags worst at the turning points - which
-for a squat are lockout and depth, the measurement everything hangs on. Dill
-et al. (2024) hit the same problem and picked a 4th-order Butterworth at 2 Hz.
+An EMA lags, and worst at the turning points (lockout and depth for a squat),
+which is exactly what I measure. Dill et al. (2024) had the same problem and
+used a 4th-order Butterworth at 2 Hz.
 """
 
 from __future__ import annotations
@@ -91,8 +91,8 @@ def _sosfilt_run(sos: np.ndarray, signal: np.ndarray, zero_phase_init: bool) -> 
     for section in sos:
         b0, b1, b2, _, a1, a2 = section
         if zero_phase_init:
-            # start the delay line where it would settle if the first sample had been
-            # held forever - from zero every run opens with a big false transient
+            # start from the settled state for the first sample, otherwise every
+            # run starts with a big false jump
             gain = (b0 + b1 + b2) / (1.0 + a1 + a2)
             first = out[0]
             z1 = first * (b1 + b2 - gain * (a1 + a2))
@@ -127,8 +127,8 @@ def _odd_reflect(signal: np.ndarray, pad: int) -> np.ndarray:
 
 
 def filtfilt(sos: np.ndarray, values: np.ndarray) -> np.ndarray:
-    """Zero-phase filtering: forward then backward over each finite stretch. Runs
-    too short to pad come back untouched."""
+    """Zero-phase: forward then backward over each finite stretch. Stretches too
+    short to pad are left as they are."""
     out = np.asarray(values, dtype=np.float64).copy()
     pad = 3 * (2 * len(sos) + 1)
     for start, stop in _finite_runs(out, min_length=1):
@@ -145,13 +145,12 @@ def filtfilt(sos: np.ndarray, values: np.ndarray) -> np.ndarray:
 def butterworth_lowpass(
     values: np.ndarray, fs: float, cutoff_hz: float = 2.0, order: int = 4
 ) -> np.ndarray:
-    """Dill et al.'s choice: 4th-order Butterworth at 2 Hz, run both ways so there
-    is no lag. fs has to be the clip's real frame rate - 24 and 60 fps clips need
-    the same movement bandwidth, not the same fraction of their sample rate."""
+    """4th-order Butterworth at 2 Hz run both ways, no lag (Dill et al., 2024). fs
+    must be the clip's real frame rate."""
     fs = float(fs)
     if fs <= 0 or not math.isfinite(fs):
         return np.asarray(values, dtype=np.float64).copy()
-    # Keep the cut-off under Nyquist for absurdly low frame rates.
+    # keep the cut-off under Nyquist for very low frame rates
     cutoff = min(cutoff_hz, 0.45 * fs)
     if cutoff <= 0:
         return np.asarray(values, dtype=np.float64).copy()
@@ -163,10 +162,9 @@ def butterworth_lowpass(
 
 def _savgol_coefficients(window: int, polyorder: int, position: float) -> np.ndarray:
     """
-    Coefficients that evaluate a window's least-squares polynomial fit at
-    position, an offset in samples from the centre. The fit is linear in the
-    samples, so it collapses to [1, p, p^2, ...] @ pinv(V). position = 0 is the
-    normal smoothing kernel; other positions handle the ends without padding.
+    Coefficients for the window's least-squares polynomial fit evaluated at
+    position (samples from the centre). 0 is the normal kernel, other positions
+    handle the ends without padding.
     """
     if window % 2 == 0 or window < 3:
         raise ValueError(f"window must be an odd integer >= 3, got {window}")
@@ -180,14 +178,12 @@ def _savgol_coefficients(window: int, polyorder: int, position: float) -> np.nda
 
 
 def _savgol_kernel(window: int, polyorder: int) -> np.ndarray:
-    """The centre-evaluated smoothing kernel (position = 0)."""
     return _savgol_coefficients(window, polyorder, 0.0)
 
 
 def savitzky_golay(values: np.ndarray, window: int = 9, polyorder: int = 2) -> np.ndarray:
-    """Savitzky-Golay smoothing, per finite stretch. Fits a curve through the
-    window instead of flattening it, so peak heights survive - and the peaks are
-    the measurement here. Symmetric, so no lag."""
+    """Savitzky-Golay per finite stretch. Fits a curve instead of flattening it,
+    so the peaks (which is what I measure) survive. Symmetric, so no lag."""
     out = np.asarray(values, dtype=np.float64).copy()
     kernel = _savgol_kernel(window, polyorder)
     half = window // 2
@@ -207,12 +203,12 @@ def savitzky_golay(values: np.ndarray, window: int = 9, polyorder: int = 2) -> n
     return out
 
 
-# --- Moving average - here so the harness can measure what it costs ---
+# --- Moving average (kept so the harness can compare it) ---
 
 
 def moving_average(values: np.ndarray, window: int = 5, centred: bool = True) -> np.ndarray:
-    """Boxcar mean. centred=True is the zero-phase form; centred=False trails by
-    (window - 1) / 2 samples, which is the lag Dill et al. describe."""
+    """Boxcar mean. centred=False lags by (window - 1) / 2 samples, the lag Dill
+    et al. describe."""
     if window < 1:
         raise ValueError(f"window must be >= 1, got {window}")
     out = np.asarray(values, dtype=np.float64).copy()
@@ -234,12 +230,12 @@ def moving_average(values: np.ndarray, window: int = 5, centred: bool = True) ->
     return out
 
 
-# --- Named filters, so a config value can pick one ---
+# --- Named filters so the config can pick one ---
 
 
 @dataclass(frozen=True)
 class FilterSpec:
-    """A filter choice plus where its parameters came from."""
+    """A filter and where its parameters came from."""
 
     name: str
     description: str
@@ -289,8 +285,7 @@ FILTERS: dict[str, FilterSpec] = {
 
 
 def apply_named_filter(name: str, values: np.ndarray, fs: float) -> np.ndarray:
-    """Run one of the named filters over a 1-D series."""
-    from .smoothing import smooth_series  # local import to dodge a cycle
+    from .smoothing import smooth_series  # local import to avoid a circular import
 
     spec = FILTERS.get(name)
     if spec is None:
@@ -306,8 +301,8 @@ def apply_named_filter(name: str, values: np.ndarray, fs: float) -> np.ndarray:
 
 # --- What each filter costs the measurement ---
 
-# worst-case degrees of depth each filter loses at the bottom of a rep, from
-# scripts/compare_filters.py. Feeds the systematic term of the depth band.
+# worst-case degrees of depth each filter loses at the bottom of a rep
+# (measured with scripts/compare_filters.py), used in the depth uncertainty band
 MEASURED_DEPTH_BIAS_DEG: dict[str, float] = {
     "ema": 4.53,
     "moving_average": 6.94,
@@ -315,7 +310,7 @@ MEASURED_DEPTH_BIAS_DEG: dict[str, float] = {
     "savgol": 3.27,
 }
 
-# same figures over smooth reps only, where the ranking flips round
+# same but on smooth reps only, where the ranking flips
 MEASURED_DEPTH_BIAS_SMOOTH_DEG: dict[str, float] = {
     "ema": 1.09,
     "moving_average": 1.70,
@@ -325,5 +320,4 @@ MEASURED_DEPTH_BIAS_SMOOTH_DEG: dict[str, float] = {
 
 
 def depth_bias_for(filter_name: str) -> float:
-    """Worst-case depth bias of a named filter, in degrees."""
     return MEASURED_DEPTH_BIAS_DEG.get(filter_name, 0.0)

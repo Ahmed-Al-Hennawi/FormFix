@@ -6,9 +6,8 @@ The lat-pulldown pipeline, in order:
     top-position baseline -> trunk excursion -> evaluate rules -> reliability
     -> feedback -> render annotated video -> export
 
-This module owns none of that logic, only the order. Measurement is in
-metrics.py, judgement in rules.py, wording in feedback.py, thresholds in
-config.py.
+This file only runs the steps in order. Measuring is in metrics.py, judging in
+rules.py, wording in feedback.py and thresholds in config.py.
 """
 
 from __future__ import annotations
@@ -79,21 +78,20 @@ logger = logging.getLogger(__name__)
 # seconds either side of the evidence frame that a banner stays up
 EVENT_CONTEXT_SECONDS = 0.5
 
-# Generic rep segment -> the caption the pulldown shows for it.
+# generic rep segment -> pulldown caption
 SEGMENT_PHASES = {
     PHASE_TOWARDS: PulldownPhase.PULLING,
     PHASE_EXTREME: PulldownPhase.BOTTOM,
     PHASE_RETURN: PulldownPhase.RETURNING,
 }
 
-# what the overlay says about a flagged rep. The part before the dash is the
-# small label by the joints; the whole line goes in the status pill.
+# overlay text for a flagged rep - the part before the dash is the short label
 BANNER_TEXT = {
     "pulldown_rom": "Pull range - stopping short",
     "pulldown_torso": "Torso movement - swinging",
 }
 
-# what we say on a rule the recording couldn't support
+# message for a rule the recording couldn't support
 LIMITATION_TEXT = {
     METRIC_PULLDOWN_TORSO: (
         "Torso movement is only visible from a side or three-quarter view, so it was "
@@ -107,10 +105,9 @@ LIMITATION_TEXT = {
 
 def smooth_movement_signal(series, config, fps: float):
     """
-    Smooth the signal that drives rep segmentation and the turning-point
-    measurements. Which filter runs is a config choice (ANGLE_FILTER): an EMA lags
-    exactly where the range-of-motion angles are read, but a 2 Hz Butterworth eats
-    real signal on a sharp turnaround. Default is "ema".
+    Smooth the signal used for rep detection and the ROM angles. The filter is set
+    by ANGLE_FILTER: an EMA lags at the turning points, but a 2 Hz Butterworth
+    cuts real signal on a sharp turnaround.
     """
     name = getattr(config, "ANGLE_FILTER", "ema")
     if name == "ema":
@@ -125,8 +122,7 @@ def analyse_lat_pulldown(
     output_dir: Path | None = None,
     export_root: Path | None = None,
 ) -> ExerciseAnalysisResult:
-    """Analyse one lat-pulldown video end to end. Raises AnalysisFailure if the
-    recording can't be analysed."""
+    """Analyse one lat pulldown video end to end. Raises AnalysisFailure if it can't."""
     started = time.monotonic()
     report = progress or (lambda stage, fraction, message: None)
     try:
@@ -194,7 +190,7 @@ def _run(
     smoothing.ema_smooth(pose, config.EMA_ALPHA)
 
     # --- 5. side selection ---
-    # both arms get measured; this only picks whose numbers get quoted
+    # both arms are measured, this only picks which side the UI quotes
     side, side_scores = validation.select_analysis_side(
         pose,
         config.MIN_KEY_LANDMARK_VISIBILITY,
@@ -265,8 +261,8 @@ def _run(
     reps = metrics_mod.build_reps(detection.reps, metrics, pose, side, torso_mode, config)
 
     # --- 8b. is this actually a pulldown? ---
-    # a row and a curl also produce clean elbow reps. What separates a pulldown
-    # is where the movement starts: hands above the shoulders.
+    # a row or curl also gives clean elbow reps, but a pulldown starts with the
+    # hands above the shoulders
     peak_wrist_rise = _peak_wrist_rise(metrics)
     plausible = plausibility.check_pulldown(reps, peak_wrist_rise)
     if not plausible.plausible:
@@ -292,7 +288,7 @@ def _run(
     )
     _apply_recording_limitations(rule_results, checks)
 
-    # attach the published measurement error to every finding
+    # attach the published measurement error to each finding
     _specs = {spec.rule_id: spec for spec in rule_specs(config)}
     uncertainty_notes = uncertainty.annotate_uncertainty(
         rule_results,
@@ -315,8 +311,6 @@ def _run(
 
     # --- 10. annotated video ---
     report("render", 0.0, "Rendering analysed video")
-    # cv2.VideoWriter doesn't create the folder and doesn't error if it can't
-    # open the file - it silently drops every frame
     session_dir = output_dir or new_session_dir()
     try:
         session_dir.mkdir(parents=True, exist_ok=True)
@@ -324,8 +318,7 @@ def _run(
         logger.warning("Output directory %s is unusable; using a scratch directory", session_dir)
         session_dir = new_session_dir()
     annotated_path = session_dir / "annotated.mp4"
-    # which frames to render. Frame numbers stay original, so the timestamps in
-    # the feedback still refer to the upload.
+    # which frames to render (frame numbers stay the original ones)
     render_window = trimming.compute_render_window(reps, pose.frame_count, video.fps)
     frame_states = _frame_states(detection, reps, metrics, pose.frame_count)
     events = _overlay_events(rule_results, video, pose.frame_count, side)
@@ -339,16 +332,16 @@ def _run(
             events,
             side,
             annotated_path,
-            # side-on, the overlay holds occluded limbs to a higher confidence bar
+            # side-on, hidden limbs need a higher confidence to be drawn
             camera_orientation=checks.orientation.value,
             on_frame=lambda i, n: report("render", (i + 1) / max(n, 1), "Rendering analysed video"),
             emphasis_landmarks=chain.all_ids,
             marker_landmarks=(chain.elbow,),
             marker_label="CONTRACTED",
-            # the ROM rule reads the elbow angle, so draw it on the elbow
+            # the ROM rule reads the elbow angle
             angle_joints=(JointAngle("Elbow", chain.shoulder, chain.elbow, chain.wrist),),
-            # upper body only. Nothing below the hip is measured, and the legs
-            # are half under the seat pad where tracking is at its worst
+            # upper body only - nothing below the hip is measured and the legs are
+            # under the seat pad where tracking is worst
             drawn_landmarks=UPPER_BODY_DRAWN,
             frame_range=(render_window.start_frame, render_window.end_frame),
         )
@@ -405,10 +398,10 @@ def _run(
 
 def validation_config_for(config: PulldownConfig) -> validation.ValidationConfig:
     """
-    Pulldown recording requirements in the generic validation vocabulary. Three
-    things differ from the squat: the core landmarks are the arm chain, the framing
-    regions are the arms and trunk (a pulldown's hands go above the head, which is
-    where clips get cropped), and a front-on recording can't show trunk lean.
+    Pulldown recording requirements for the generic validation. Differences from
+    the squat: the core landmarks are the arms, framing checks the arms and trunk
+    (hands above the head are where clips get cropped), and front-on can't show
+    trunk lean.
     """
     return validation.ValidationConfig(
         min_duration=config.VIDEO_MIN_DURATION,
@@ -472,8 +465,7 @@ def validation_config_for(config: PulldownConfig) -> validation.ValidationConfig
 
 
 def _apply_recording_limitations(rule_results, checks: ValidationResult) -> None:
-    """Switch off the rules this recording can't support, and only those. The
-    affected rule becomes NOT_EVALUABLE with a reason."""
+    """Mark the rules this recording can't support as NOT_EVALUABLE, with a reason."""
     if not checks.limited_metrics:
         return
     limited = set(checks.limited_metrics)
@@ -491,7 +483,7 @@ def _apply_recording_limitations(rule_results, checks: ValidationResult) -> None
 
 
 def _frame_states(detection, reps: list[PulldownRep], metrics, frame_count: int):
-    """Per-frame HUD state: phase, rep counter, contracted-window flag."""
+    """Per-frame HUD state: phase, rep counter and contracted-window flag."""
     phases = named_phases(detection.phases)
     states: list[FrameState] = []
     total = len(reps)
@@ -504,14 +496,14 @@ def _frame_states(detection, reps: list[PulldownRep], metrics, frame_count: int)
                 rep_number = rep.number
                 seg = rep.segmentation
                 in_window = seg.extreme_start_frame <= f <= seg.extreme_end_frame
-                # inside a committed rep the caption comes from that rep's own segmentation
+                # inside a rep, use that rep's own segmentation for the caption
                 segment = segment_at(seg, f)
                 if segment is not None:
                     phase = SEGMENT_PHASES[segment]
                 break
             if f > rep.end_frame:
                 rep_number = rep.number
-        # the elbow angle is drawn on the elbow; only the trunk gets a HUD chip
+        # trunk angle as an extra HUD chip
         extra: list[HudLine] = []
         metric = metrics[f] if f < len(metrics) else None
         if metric is not None and metric.valid and np.isfinite(metric.torso_angle):
@@ -529,8 +521,7 @@ def _frame_states(detection, reps: list[PulldownRep], metrics, frame_count: int)
 
 
 def _overlay_events(rule_results, video: VideoMetadata, frame_count: int, side: str):
-    """One banner per flagged rep, around its evidence frame, with the joints worth
-    highlighting."""
+    """One banner per flagged rep, shown around its evidence frame."""
     context = max(int(EVENT_CONTEXT_SECONDS * video.fps), 3)
     events: list[OverlayEvent] = []
     for rule in rule_results:
@@ -554,12 +545,11 @@ def _overlay_events(rule_results, video: VideoMetadata, frame_count: int, side: 
 
 
 def _highlight_ids(rule_id: str, side: str) -> tuple[int, ...]:
-    """A rule's highlight roles -> MediaPipe landmark indices."""
     roles = HIGHLIGHT_ROLES.get(rule_id, ())
     if not roles or side not in ARM_CHAINS:
         return ()
     if rule_id == "pulldown_torso":
-        # A trunk finding is about the whole trunk, so light up both sides.
+        # a trunk finding is about the whole trunk, so highlight both sides
         return tuple(sorted({*landmark_ids("left", roles), *landmark_ids("right", roles)}))
     return landmark_ids(side, roles)
 
@@ -579,7 +569,7 @@ def _debug_block(
     resting_reference,
     started,
 ) -> dict:
-    """Developer metrics for the evaluation write-up, not for normal users."""
+    """Debug metrics for the evaluation, not shown to normal users."""
     return {
         "config": config.as_dict(),
         "rule_specs": [spec.as_dict() for spec in rule_specs(config)],
@@ -654,7 +644,7 @@ def _run_id(video_path: Path) -> str:
 
 def _peak_wrist_rise(metrics) -> float | None:
     """Highest the wrists get above the shoulder line, in trunk lengths. A pulldown
-    reaches overhead every rep; a row or a curl never does."""
+    reaches overhead every rep, a row or curl never does."""
     best = None
     for frame in metrics:
         value = getattr(frame, "wrist_rise", None)

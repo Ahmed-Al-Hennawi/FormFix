@@ -1,10 +1,8 @@
 # ==========================================================================
 # FormFix - Streamlit configuration
 #
-# The goal here is to get Streamlit out of the way: dark surfaces that match
-# the "Cyber Pulse" palette, no toolbar, no sidebar, and static file serving
-# so the athlete photographs and the research paper are fetched (and cached)
-# by the browser instead of being re-sent on every rerun.
+# Dark theme matching the "Cyber Pulse" palette, no toolbar or sidebar, and
+# static file serving so images get cached instead of re-sent on every rerun.
 # ==========================================================================
 
 [theme]
@@ -28,10 +26,7 @@ font = "sans serif"
 enableStaticServing = true
 headless = true
 
-# The analyser accepts clips up to 120 s, and a 120 s recording from a modern
-# phone can exceed Streamlit's 200 MB default - which rejects it with a generic
-# message rather than one of the analyser's own. 300 MB covers the clips this
-# app asks for.
+# a 120 s phone clip can go over Streamlit's 200 MB default, so 300 MB
 maxUploadSize = 300
 
 [browser]

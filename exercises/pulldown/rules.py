@@ -1,15 +1,10 @@
 """
-The lat-pulldown technique rules, two of them. Each asks one narrow question
-about one measurement, in the phase where that means something, and only when
-the camera view supports it.
+The two lat pulldown rules. Same setup as the squat: one measurement per rule,
+in the phase where it matters, only if the camera view supports it.
 
-Same shape as the squat's: numbers arrive measured from metrics.py, every
-threshold crossing goes through persistence.py, and thresholds are ranges with
-a tolerance band.
-
-Deliberately not implemented, because one 2D camera can't support them:
-scapular movement, lat activation, grip width, whether the bar touched the
-chest, and anything about injury or loading.
+Left out on purpose because one 2D camera can't support them: shoulder blade
+movement, lat activation, grip width, bar touching the chest, and anything
+about injury or loading.
 """
 
 from __future__ import annotations
@@ -45,8 +40,8 @@ from .config import PulldownConfig, rule_specs
 from .landmarks import ARM_CHAINS, required_ids
 from .metrics import PulldownFrameMetrics, phase_frames
 
-# joints to highlight in the video when a rule fires, as roles - the analyser
-# resolves them to MediaPipe ids once it knows which side is being analysed
+# joints to highlight when a rule fires, as roles (the analyser turns them into
+# ids once it knows the side)
 HIGHLIGHT_ROLES: dict[str, tuple[str, ...]] = {
     "pulldown_rom": ("shoulder", "elbow", "wrist"),
     "pulldown_torso": ("shoulder", "hip"),
@@ -82,9 +77,8 @@ def _persistence(
     exceeds: float,
     prefer_max: bool = True,
 ) -> PersistenceEvidence:
-    """How persistently attribute broke exceeds during the rule's phase. Empty
-    evidence with no frame series, which is what lets tests drive a rule from
-    constructed reps."""
+    """How persistently the value broke the limit during the rule's phase. Returns
+    empty evidence without a frame series, so tests can use made-up reps."""
     if spec is None or metrics is None:
         return _EMPTY_EVIDENCE
     frames = phase_frames(rep, spec.phase)
@@ -110,10 +104,9 @@ def _round(value: float, digits: int = 1):
 
 def classify_rom(rep: PulldownRep, config: PulldownConfig) -> tuple[str, RuleStatus]:
     """
-    Which end of the movement fell short, from the elbow's own excursion: the top
-    (do the arms return towards extension), the bottom (does the pull close the
-    elbow) and the total excursion. A category, not a score, because
-    "limited range of motion" tells a beginner nothing.
+    Which end fell short: the top (arms back to extension), the bottom (elbow
+    closes in the pull) or the total range. A category, not a score, so the
+    beginner knows what to fix.
     """
     top, bottom = rep.top_elbow_angle, rep.bottom_elbow_angle
     if not (math.isfinite(top) and math.isfinite(bottom)) or not rep.arms_reliable:
@@ -145,12 +138,10 @@ def rule_range_of_motion(
     metrics: list[PulldownFrameMetrics] | None = None,
 ) -> RuleResult:
     """
-    Did each rep use the configured range at both ends? The criterion is the body's
-    joint excursion, not the bar's position - MediaPipe tracks landmarks, not
-    equipment. Wrist travel is reported as supporting evidence but never passes a
-    rep on its own.
+    Did each rep use enough range at both ends? Based on the elbow, not the bar
+    (MediaPipe doesn't track equipment). Wrist travel is only supporting evidence.
     """
-    del metrics  # per-rep extremes, so no frame series to filter
+    del metrics  # uses per-rep values, no frame series needed
     outcomes: list[RepRuleOutcome] = []
     for rep in reps:
         category, status = classify_rom(rep, config)
@@ -264,15 +255,9 @@ def rule_torso_movement(
     metrics: list[PulldownFrameMetrics] | None = None,
 ) -> RuleResult:
     """
-    Did the trunk stay reasonably still while the arms did the work?
-
-    Not aiming for a vertical trunk - a seated pulldown has a small deliberate lean
-    and the bench often sets one. What we measure is the change away from this
-    person's own top position during the pull.
-
-    The peak has to be sustained and cover a configured share of the pull. Where
-    the facing direction is known the excursion is a signed backward lean;
-    otherwise it's an unsigned change and the wording says "moved".
+    Did the trunk stay reasonably still while the arms did the work? Measured as
+    change from the person's own top position, not from vertical, since a small
+    lean is normal. If facing is unknown the wording says "moved", not "leaned back".
     """
     outcomes: list[RepRuleOutcome] = []
     for rep in reps:
@@ -393,7 +378,7 @@ def _result(
     feedback_key: str,
     limitation: str = "",
 ) -> RuleResult:
-    """Bolt the declared spec metadata onto a computed rule outcome."""
+    """Add the spec metadata to a computed rule outcome."""
     return RuleResult(
         rule_id=rule_id,
         title=spec.title if spec else title,
@@ -421,7 +406,7 @@ def _result(
     )
 
 
-# what we say when a rule is switched off because of the camera view
+# message when a rule is switched off because of the camera view
 VIEW_LIMITATION_TEXT: dict[str, str] = {
     "pulldown_torso": (
         "Torso movement happens towards and away from the camera in a front-on or "
@@ -433,7 +418,7 @@ VIEW_LIMITATION_TEXT: dict[str, str] = {
 
 
 def not_evaluable(spec: RuleSpec, reps: list[PulldownRep], reason: str) -> RuleResult:
-    """A rule the recording can't support: reported, not guessed at."""
+    """A rule the recording can't support."""
     return RuleResult(
         rule_id=spec.rule_id,
         title=spec.title,
@@ -460,8 +445,7 @@ _EVALUATORS = {
 
 
 def _subject_scale(metrics: list[PulldownFrameMetrics] | None) -> float:
-    """Median trunk length in pixels. Someone filmed from far away carries more
-    landmark error than the visibility score admits, so reliability is capped."""
+    """Median trunk length in pixels, used to cap reliability for far-away people."""
     if not metrics:
         return float("nan")
     values = [m.body_scale for m in metrics if m.valid and np.isfinite(m.body_scale)]
@@ -478,8 +462,7 @@ def evaluate_all(
     side: str = "left",
     recording_quality: str = "good",
 ) -> list[RuleResult]:
-    """Run every declared rule, gate it by camera view, attach reliability. View
-    gating happens before any threshold is compared."""
+    """Run every rule, check the camera view first, then attach reliability."""
     results: list[RuleResult] = []
     subject_scale = _subject_scale(metrics)
     if side not in ARM_CHAINS:

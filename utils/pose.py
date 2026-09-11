@@ -1,18 +1,15 @@
 """
-Draws the landmark overlay on the exercise figures. Back to front: a faint
-dashed spine, cyan hairline links, the focus limb the rules read, a light
-travelling along it, the measured angle arc, then the ringed nodes.
-
-All three exercises come through here, which is the only reason the node sizes
-and stroke weights stay identical between them.
+Draws the landmark overlay on the exercise figures on the site: dashed spine,
+cyan links, the focus limb with a light moving along it, the angle arc and the
+ringed nodes. All three exercises use this so they look the same.
 """
 
 from __future__ import annotations
 
 from .exercise_data import POSE_VIEWBOX, Pose
 
-# Node geometry in viewBox units. Key and ordinary landmarks share a radius on
-# purpose: the key one is picked out by colour and its rings, not by size.
+# node sizes in viewBox units. Key joints are the same size on purpose, they
+# stand out by colour and rings instead
 NODE_RING_R = 13
 NODE_CORE_R = 4.6
 KEY_RING_R = NODE_RING_R
@@ -52,8 +49,8 @@ def _node(x: float, y: float, key: bool = False) -> str:
 
 
 def render_pose(pose: Pose, key: str, extra_class: str = "") -> str:
-    """Render the landmark overlay for one figure. key must be unique on the page -
-    it namespaces the SVG gradient id."""
+    """Render the overlay for one figure. key must be unique on the page (it's used
+    in the SVG gradient id)."""
     gradient_id = f"ffFocus-{key}"
     x1, y1, x2, y2 = pose.gradient
 

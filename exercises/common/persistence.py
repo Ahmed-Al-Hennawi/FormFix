@@ -1,13 +1,10 @@
 """
-Deciding whether a rule violation lasted long enough to be real. Pose estimates
-wobble - a landmark jumping for one frame can swing a torso angle five degrees
-past a threshold while the lifter stands still.
+Did a rule violation last long enough to be real? One jumpy landmark can push
+a torso angle five degrees past a threshold while the lifter stands still.
 
-Two conditions, because they catch different things: longest_run throws out
-one- and two-frame spikes however extreme, and violation_ratio catches a fault
-that flickers on and off through most of the descent. Both have to be met.
-
-Unmeasurable frames count as neither - "could not see it" is not "it was fine".
+Both conditions have to be met: longest_run ignores one or two frame spikes,
+and violation_ratio catches a fault that flickers through most of the phase.
+Unmeasurable frames don't count either way.
 """
 
 from __future__ import annotations
@@ -21,27 +18,21 @@ import numpy as np
 class PersistenceEvidence:
     """How much of a phase actually violated a rule."""
 
-    # Frames in the phase that produced a usable measurement.
     measurable_frames: int
-    # Of those, how many violated the condition.
     violating_frames: int
-    # The longest unbroken run of violating frames.
     longest_run: int
-    # violating_frames / measurable_frames, 0.0 when nothing was measurable.
+    # violating_frames / measurable_frames
     ratio: float
-    # Frame index (into the original series) showing the violation best: the
-    # extreme value inside the longest violating run.
+    # frame (in the full series) with the worst value inside the longest run
     peak_index: int
-    # The measured value at peak_index; NaN when there is none.
     peak_value: float
 
     @property
     def has_evidence(self) -> bool:
-        """True when at least one frame in the phase could be measured."""
         return self.measurable_frames > 0
 
     def triggers(self, min_frames: int, min_ratio: float) -> bool:
-        """Both conditions have to pass, not either one."""
+        """Both conditions have to pass."""
         if not self.has_evidence:
             return False
         return self.longest_run >= max(min_frames, 1) and self.ratio >= min_ratio
@@ -69,7 +60,7 @@ def assess(
     prefer_max: bool = True,
 ) -> PersistenceEvidence:
     """
-    Summarise how persistently violates held over a phase.
+    How persistently the rule was broken over a phase.
 
         values      measured series for the phase, NaN where unmeasurable
         violates    boolean of the same length, True where the rule is broken
@@ -107,9 +98,8 @@ def assess(
 
 def sustained_extreme(values: np.ndarray, window: int, prefer_max: bool = True) -> tuple[float, int]:
     """
-    The most extreme value held for window consecutive measurable frames, with the
-    frame offset of its peak. This is the "how bad did it get" number: the sliding
-    window means the figure shown is one the lifter actually held.
+    Most extreme value held for `window` frames in a row, and where it peaked.
+    This way the number shown is one the lifter actually held.
     """
     values = np.asarray(values, dtype=np.float64)
     n = len(values)

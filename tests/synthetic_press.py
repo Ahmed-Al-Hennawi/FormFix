@@ -1,9 +1,6 @@
 """
-Synthetic dumbbell shoulder press.
-
-A 33-landmark pose track from a 2D linkage seen from the front: fixed trunk,
-two upper arms abducting from the shoulders, forearms hinged at a controlled
-elbow angle. Only the detector's output is replaced. Faults you can dial in:
+Fake front-view shoulder press for testing: a 33-landmark pose track from a
+simple 2D stick model, replacing only the detector's output. Faults you can set:
 
     top_elbow / bottom_elbow      the range each arm actually covers
     right_lag                     right arm trailing the left, as a fraction
@@ -14,9 +11,8 @@ elbow angle. Only the detector's output is replaced. Faults you can dial in:
     visibility                    per-group MediaPipe visibility scores
     view_compression              how side-on the camera is
 
-Horizontal displacements are multiplied by ASPECT: MediaPipe normalises x and
-y independently, so without it a 90-degree elbow doesn't measure 90 once the
-pipeline converts back to pixels, and nothing can target a threshold.
+Horizontal distances are multiplied by ASPECT because MediaPipe normalises x
+and y separately - without it a 90 degree elbow wouldn't measure 90 in pixels.
 """
 
 from __future__ import annotations
@@ -32,15 +28,14 @@ WIDTH, HEIGHT = 720, 1280
 FPS = 30.0
 ASPECT = HEIGHT / WIDTH
 
-# Body dimensions, normalised to frame height.
+# body sizes, normalised to frame height
 SHOULDER_HALF_WIDTH = 0.085  # half the shoulder width, before aspect scaling
 TORSO = 0.24
 UPPER_ARM = 0.13
 FOREARM = 0.12
 HEAD = 0.06
 
-# Upper-arm abduction from vertical, degrees, at each end of the press: out
-# to the side at the shoulders, nearly straight up overhead.
+# upper arm angle from vertical at the bottom and top of the press
 UPPER_ARM_BOTTOM_DEG = 78.0
 UPPER_ARM_TOP_DEG = 12.0
 
@@ -52,22 +47,21 @@ class PressSpec:
     ready_seconds: float = 1.0
     rep_seconds: float = 2.4
     reps: int = 3
-    # Elbow angle at the shoulders and overhead, degrees.
+    # elbow angle at the shoulders and overhead
     bottom_elbow: float = 85.0
     top_elbow: float = 168.0
-    # Per-arm overrides. None falls back to the shared value above.
+    # per-arm overrides (None = use the value above)
     right_bottom_elbow: float | None = None
     right_top_elbow: float | None = None
-    # Right arm trailing the left, as a fraction of the movement. 0.0 is in
-    # sync, 0.25 is a clearly uneven press.
+    # right arm lag as a fraction of the movement (0.25 is clearly uneven)
     right_lag: float = 0.0
-    # Extra outward wrist drift, in shoulder widths, at the top of the press.
+    # outward wrist drift at the top, in shoulder widths
     left_drift: float = 0.0
     right_drift: float = 0.0
     noise: float = 0.0
     visibility: float = 0.95
     wrist_visibility: float = 0.95
-    # 1.0 is a square front view, 0.0 is fully side-on.
+    # 1.0 = straight front view, 0.0 = fully side-on
     view_compression: float = 1.0
 
 
@@ -94,9 +88,8 @@ def _arm(
     half_width: float,
 ) -> tuple[tuple[float, float], tuple[float, float]]:
     """
-    One arm's elbow and wrist at press height d. lateral is +1 for the
-    arm on the +x side of the image. drift adds outward wrist travel that
-    grows towards the top of the press - the alignment fault.
+    One arm's elbow and wrist at press height d. lateral is +1 for the arm on the
+    +x side. drift adds outward wrist movement towards the top (alignment fault).
     """
     theta = math.radians(UPPER_ARM_BOTTOM_DEG + (UPPER_ARM_TOP_DEG - UPPER_ARM_BOTTOM_DEG) * d)
     elbow_angle = bottom_elbow + (top_elbow - bottom_elbow) * d
@@ -122,12 +115,12 @@ def skeleton_at(d: float, spec: PressSpec) -> dict[int, tuple[float, float]]:
     shoulder_y = 0.42
     half = SHOULDER_HALF_WIDTH * spec.view_compression
 
-    # MediaPipe's "left" is the person's left, so it lands on the image's
-    # right when they face the camera. The lateral signs follow that.
+    # MediaPipe's "left" is the person's left, so on the image's right when
+    # they face the camera
     left_shoulder = (centre_x + ASPECT * half, shoulder_y)
     right_shoulder = (centre_x - ASPECT * half, shoulder_y)
 
-    # The right arm can trail the left, which is the asymmetry fault.
+    # right arm can lag behind (asymmetry fault)
     d_left = d
     d_right = max(0.0, d - spec.right_lag)
 
@@ -178,7 +171,7 @@ ARM_LANDMARKS = (13, 14, 15, 16)
 
 
 def make_pose_data(spec: PressSpec, seed: int = 0) -> FramePoseData:
-    """The FramePoseData the detector would have returned for this spec."""
+    """What the detector would have returned for this spec."""
     profile = press_profile(spec)
     n = len(profile)
     rng = np.random.default_rng(seed)

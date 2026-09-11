@@ -1,17 +1,15 @@
 """
 Developer calibration tool - any exercise, one command.
 
-Runs the pipeline on a video and prints every measurement a threshold decision
-rests on next to the threshold it was compared against.
+Runs the pipeline on a video and prints each measurement next to the threshold
+it was compared against.
 
     python scripts/calibrate.py path/to/video.mp4 pulldown
     python scripts/calibrate.py path/to/video.mp4 press --frames
     python scripts/calibrate.py path/to/video.mp4 squat --json
 
-The export bundle and the annotated clip go to analysis_results/<run id>/.
-Not used by the app at runtime.
-
-Careful with the first line - main() hands it to argparse as the description.
+Output goes to analysis_results/<run id>/. Not used by the app itself.
+(The first line is used as the argparse description.)
 """
 
 from __future__ import annotations
@@ -31,8 +29,8 @@ if str(APP_ROOT) not in sys.path:
 from analysis.models import AnalysisFailure, RuleStatus  # noqa: E402
 from exercises import ANALYSERS, DISPLAY_NAMES  # noqa: E402
 
-# Per-rep fields worth printing, per exercise, with a column label and a
-# format. Anything left out still ends up in reps.csv.
+# per-rep fields to print for each exercise (label, format) - everything else
+# is still in reps.csv
 REP_COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
     "squat": (
         ("min_knee_angle", "min knee", "{:.0f}"),
@@ -63,7 +61,7 @@ REP_COLUMNS: dict[str, tuple[tuple[str, str, str], ...]] = {
     ),
 }
 
-# Threshold keys worth printing beside a rule's verdict.
+# threshold keys to print next to a rule's verdict
 THRESHOLD_KEYS = (
     "threshold_pass_deg",
     "threshold_warn_deg",
@@ -176,7 +174,7 @@ def _print_rules(result) -> None:
 
 
 def _save_key_frames(result, exercise_id: str) -> None:
-    """Dump each rep's start, turning point and end as annotated stills."""
+    """Save each rep's start, turning point and end as annotated stills."""
     import cv2
 
     clip = result.annotated_video_path
@@ -219,8 +217,7 @@ def main() -> int:
 
     logging.basicConfig(level=logging.WARNING, format="%(levelname)s %(name)s: %(message)s")
 
-    # I pipe this output into a file for the write-up, and carriage-return
-    # progress makes a mess of that, so only do it on a real terminal.
+    # I pipe this into a file for the write-up, so only show progress in a terminal
     interactive = sys.stdout.isatty()
 
     def progress(stage: str, fraction: float, message: str) -> None:

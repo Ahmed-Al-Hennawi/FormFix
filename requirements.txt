@@ -3,23 +3,15 @@
 # ==========================================================================
 
 # --- application -----------------------------------------------------------
-# 1.36+ for st.navigation (the / and /analyse pages).
-#
-# The upper bound is deliberate. The behaviour layer (utils/styling.py) installs
-# scripts/main.js and scripts/analyse.js through `st.components.v1.html`, which
-# Streamlit has deprecated - and `st.iframe`, its replacement, takes a URL
-# rather than inline markup, so it is not a drop-in. Without a ceiling a fresh
-# deploy would install a Streamlit that has dropped the API, and the reference
-# lightbox, the scroll reveals and the score count-up would silently stop
-# working. Raise the bound once the injection is ported.
+# 1.36+ for st.navigation. Capped because the JS is injected with
+# st.components.v1.html, which is deprecated - a newer Streamlit could drop it
+# and the lightbox, scroll reveals and score count-up would stop working.
 streamlit>=1.36,<1.63
 
-# --- computer-vision backend (Squat analyser) ------------------------------
-# macOS: 0.10.14 is the LAST MediaPipe build published for macOS, and it is a
-# native binary compiled against NumPy 1.x - running it with NumPy 2 crashes
-# the process ("Python quit unexpectedly") during landmark detection. The
-# whole macOS stack is therefore pinned to the NumPy-1 ABI it was built for.
-# Linux (deployment/CI) keeps the modern stack.
+# --- computer vision ---------------------------------------------------------
+# macOS: 0.10.14 is the last MediaPipe build for macOS and it's built against
+# NumPy 1.x - with NumPy 2 it crashes ("Python quit unexpectedly"), so the
+# macOS stack is pinned to match.
 mediapipe==0.10.14; sys_platform == "darwin"
 numpy==1.26.4; sys_platform == "darwin"
 opencv-python==4.10.0.84; sys_platform == "darwin"
@@ -27,44 +19,26 @@ opencv-contrib-python==4.10.0.84; sys_platform == "darwin"
 jax==0.4.30; sys_platform == "darwin"
 jaxlib==0.4.30; sys_platform == "darwin"
 
-# Linux (deployment/CI) is pinned to the same versions the project was
-# developed and tested against. Left as floors, a fresh deploy resolves to
-# MediaPipe 1.x, NumPy 2.x and OpenCV 5.x - none of which this code has been
-# run against, and MediaPipe 1.0 is a major release. Pinning keeps the
-# deployed app the same program as the evaluated one, which matters for a
-# result anyone is expected to reproduce.
+# Linux (deployment) is pinned to the versions I tested with, otherwise a fresh
+# deploy would pull MediaPipe 1.x, NumPy 2.x and OpenCV 5.x, which this code
+# has never run on.
 mediapipe==0.10.14; sys_platform != "darwin"
 numpy==1.26.4; sys_platform != "darwin"
-# The OpenCV pin has to be opencv-contrib-python, not the headless build.
-# MediaPipe hard-depends on opencv-contrib-python (an unpinned Requires-Dist),
-# and both distributions install into the same site-packages/cv2 directory, so
-# contrib overwrites opencv-python-headless whatever the requirements say - the
-# deploy ends up running contrib's GUI build at whatever version pip resolved.
-# That build links against libGL.so.1, which is why packages.txt ships libgl1.
-# Pinning contrib here keeps the deployed OpenCV the version this project was
-# evaluated against. Nothing in this app calls cv2.imshow or cv2.namedWindow.
+# Has to be opencv-contrib-python, not headless: MediaPipe depends on contrib,
+# which overwrites the headless build anyway. It needs libGL, hence libgl1 in
+# packages.txt.
 opencv-contrib-python==4.10.0.84; sys_platform != "darwin"
 
-# FFmpeg as a pip wheel, so the H.264 conversion needs no system package. The
-# system binary still wins when one is installed (see analysis/video_processor).
+# FFmpeg from pip so H.264 conversion works without a system install (a system
+# ffmpeg is used first if there is one)
 imageio-ffmpeg==0.6.0
 
 # --- development -----------------------------------------------------------
-# pytest, ruff and black are used for testing/linting; keep them if you want
-# to run the test-suite locally:
+# testing / linting
 pytest>=8.0
 ruff>=0.4
-# Black is pinned to an exact version, not a floor. Its formatting changes
-# between releases (line-hugging rules moved in the 25.x series), so a range
-# means `black --check .` passes on one machine and fails on another over code
-# nobody touched. One version keeps that check meaningful.
+# exact version, since black's formatting changes between releases
 black==26.5.1
 
-# NOTE: the annotated result video is converted to browser-playable H.264
-# with FFmpeg. The system binary is used when present (`brew install ffmpeg`
-# on macOS); otherwise the static build from imageio-ffmpeg above is used,
-# which is what runs on Community Cloud. Without either the app still works,
-# but the annotated clip may not play in a browser.
-#
-# NOTE: the MediaPipe Pose Landmarker model file is also required - run
+# NOTE: the pose model file is also needed - run
 # `python scripts/download_pose_model.py` once (see README).

@@ -1,8 +1,8 @@
 """
 End-to-end squat pipeline on synthetic recordings. Only MediaPipe's output is
-faked; everything after it runs for real, including the annotated-video render
-to an actual MP4. Detection itself is only covered by the optional test at the
-bottom, which needs FORMFIX_TEST_VIDEO set to a side-view squat clip.
+faked, everything else runs for real, including rendering the MP4. The
+optional test at the bottom runs real detection if FORMFIX_TEST_VIDEO points
+to a side-view squat clip.
 """
 
 from __future__ import annotations
@@ -48,7 +48,7 @@ class TestFullPipeline:
         rendered = probe_video(result.annotated_video_path)
         assert rendered.readable
         assert rendered.frame_count > 0
-        # Sanity-check that these are real measurements, not placeholders.
+        # check these are real measurements, not placeholders
         for rep in result.reps:
             assert 50 < rep.min_knee_angle < 100
             assert rep.duration > 1.0
@@ -104,8 +104,7 @@ def test_real_video_end_to_end(tmp_path):
 
 class TestRecordingQualityStates:
     """
-    Recording cases from the validation design, end to end. Numbers match that
-    table.
+    Recording cases from the validation design (numbers match that table).
 
     1    clean side view         -> analysed, "good"
     2    diagonal camera         -> analysed, "limited" plus a warning
@@ -184,8 +183,8 @@ class TestRecordingQualityStates:
 
 
 class TestExplainableOutput:
-    """One link at a time in landmarks -> measurement -> phase -> rule ->
-    evidence -> feedback, as it reaches the UI."""
+    """Each link of landmarks -> measurement -> phase -> rule -> evidence ->
+    feedback, as it reaches the UI."""
 
     def test_per_repetition_results_are_produced(self, tmp_path):
         result = run_synthetic(tmp_path, SyntheticSpec(noise=0.002))
@@ -199,8 +198,8 @@ class TestExplainableOutput:
         assert any(line.startswith("Depth: 3 of 3") for line in result.summary.overview)
 
     def test_unavailable_measurements_are_reported_not_guessed(self, tmp_path):
-        # A front-on clip can't support the sagittal measurements, so they
-        # should turn up in not_assessed with a reason attached.
+        # front-on can't support the side-view checks, so they should be in
+        # not_assessed with a reason
         result = run_synthetic(tmp_path, SyntheticSpec(noise=0.002, side_offset=0.45))
         assert any(item.metric == "squat_depth" for item in result.summary.not_assessed)
         assert all(item.reason for item in result.summary.not_assessed)
@@ -249,11 +248,7 @@ class TestRecordingVariation:
     """Ways phone footage varies that shouldn't change the verdict."""
 
     def test_resolution_does_not_change_the_measurements(self, tmp_path):
-        """
-        Same framing at half the resolution, same angles. Aspect ratio is held
-        constant on purpose: changing it is a different recording, not the
-        same one rescaled.
-        """
+        """Same framing at half the resolution gives the same angles (aspect ratio kept)."""
         import tests.synthetic_squat as syn
 
         full = run_synthetic(tmp_path / "hd", SyntheticSpec(noise=0.002))
@@ -285,7 +280,7 @@ class TestRecordingVariation:
 
     def test_temporary_occlusion_of_one_leg_is_survivable(self, tmp_path):
         pose = make_pose_data(SyntheticSpec(noise=0.002, side_offset=0.45))
-        # The far leg disappears for a third of the clip.
+        # far leg disappears for a third of the clip
         n = pose.frame_count
         pose.visibility[n // 3 : 2 * n // 3, [26, 28, 30, 32]] = 0.05
         pose.valid[n // 3 : 2 * n // 3, [26, 28, 30, 32]] = False
@@ -299,11 +294,8 @@ class TestRecordingVariation:
 
 
 class TestHeelMeasurementRobustness:
-    """
-    Heel lift is measured inside the foot: heel height above the toe of the
-    same foot, over lower-leg length. That survives a drifting camera, which
-    an absolute image-position baseline would not.
-    """
+    """Heel lift is measured within the foot (heel vs toe), so a drifting camera
+    doesn't affect it."""
 
     def test_heel_lift_is_detected_in_proportion(self, tmp_path):
         planted = run_synthetic(tmp_path / "flat", SyntheticSpec(noise=0.002, heel_lift=0.0))
@@ -335,9 +327,8 @@ class TestHeelMeasurementRobustness:
 
 class TestImplausibleTrackingIsNotAFinding:
     """
-    MediaPipe reports confident positions for limbs it is really just
-    extrapolating, so an impossible measurement has to come out as "not
-    measured", not a technique fault.
+    MediaPipe can be confident about limbs it's guessing, so an impossible
+    measurement has to be "not measured", not a technique fault.
     """
 
     def test_an_impossible_knee_angle_is_discarded(self, tmp_path):
@@ -346,7 +337,7 @@ class TestImplausibleTrackingIsNotAFinding:
         from exercises.squat.metrics import compute_frame_metrics
 
         pose = make_pose_data(SyntheticSpec(noise=0.002))
-        # Fold the far knee onto its own hip. Geometrically fine, humanly not.
+        # fold the far knee onto its hip - fine geometrically, impossible for a human
         pose.xy[:, 26] = pose.xy[:, 24]
         video = VideoMetadata(
             path=Path("clip.mp4"),

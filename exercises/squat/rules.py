@@ -1,15 +1,10 @@
 """
-The squat technique rules. Each asks one narrow question about one measurement,
-in the phase where that question means something, and only when the camera view
-can support it. A rule the landmarks or the view can't support reports
+Squat technique rules. Each one checks one measurement in the phase where it
+matters, and only if the camera view supports it - otherwise it returns
 NOT_EVALUABLE with a reason instead of guessing.
 
-The numbers arrive already measured from metrics.py, every threshold crossing
-goes through persistence.py, and thresholds are ranges with a tolerance band
-rather than exact targets.
-
-Deliberately not implemented, because a 2D pose can't support them: lumbar
-rounding, injury risk, joint loading, and "knees past toes" as a blanket error.
+Left out on purpose because 2D pose can't support them: lower-back rounding,
+injury risk, joint loading, and "knees past toes" as a blanket error.
 """
 
 from __future__ import annotations
@@ -34,8 +29,8 @@ from .config import SquatConfig, SquatRule, rule_specs
 from .metrics import phase_frames, series
 from .persistence import PersistenceEvidence, assess
 
-# joints to highlight in the video when a rule fires, as roles - the analyser
-# resolves them to MediaPipe ids once it knows which side is being analysed
+# joints to highlight when a rule fires, as roles (the analyser turns them into
+# ids once it knows the side)
 HIGHLIGHT_ROLES: dict[str, tuple[str, ...]] = {
     "squat_depth": ("hip", "knee"),
     "torso_lean": ("shoulder", "hip"),
@@ -46,7 +41,7 @@ HIGHLIGHT_ROLES: dict[str, tuple[str, ...]] = {
 
 
 def format_timestamp(seconds: float) -> str:
-    """00:04.2 style timestamps for evidence lines."""
+    """00:04.2 style timestamp."""
     if not math.isfinite(seconds):
         return "-"
     minutes = int(seconds // 60)
@@ -83,9 +78,8 @@ def _persistence(
     exceeds: float,
     prefer_max: bool = True,
 ) -> PersistenceEvidence:
-    """How persistently attribute broke exceeds during the rule's phase. Empty
-    evidence with no frame series, which is what lets tests drive a rule from
-    constructed reps."""
+    """How persistently the value broke the limit during the rule's phase. Returns
+    empty evidence without a frame series, so tests can use made-up reps."""
     if spec is None or metrics is None:
         return _EMPTY_EVIDENCE
     frames = phase_frames(rep, spec.phase)
@@ -111,8 +105,8 @@ def rule_squat_depth(
     spec: SquatRule | None = None,
     metrics: list[FrameMetrics] | None = None,
 ) -> RuleResult:
-    """Depth from two signals at the bottom: minimum knee angle, and whether the hip
-    got down to knee level. Either one passing passes the rep."""
+    """Depth from the minimum knee angle or the hip reaching knee level - either
+    one passing passes the rep."""
     outcomes: list[RepRuleOutcome] = []
     for rep in reps:
         knee_ok = (
@@ -135,8 +129,7 @@ def rule_squat_depth(
             and evidence.has_evidence
             and not evidence.triggers(spec.minimum_persistence_frames, spec.min_violation_ratio)
         ):
-            # the bottom window didn't stay above the target, so there isn't enough
-            # evidence to call the rep shallow
+            # not enough of the bottom window was shallow to call it
             status = RuleStatus.PASS
         elif rep.min_knee_angle <= config.DEPTH_KNEE_ANGLE_WARN:
             status = RuleStatus.WARNING
@@ -227,8 +220,8 @@ def rule_torso_lean(
     spec: SquatRule | None = None,
     metrics: list[FrameMetrics] | None = None,
 ) -> RuleResult:
-    """Peak forward trunk lean, judged both absolutely and as a change from the
-    lifter's own standing posture, so a tilted camera isn't a fault."""
+    """Peak forward lean, both absolute and compared to the person's own standing
+    posture, so a tilted camera isn't a fault."""
     outcomes: list[RepRuleOutcome] = []
     baseline_ok = math.isfinite(standing_torso_lean)
     for rep in reps:
@@ -336,8 +329,8 @@ def rule_heel_lift(
     spec: SquatRule | None = None,
     metrics: list[FrameMetrics] | None = None,
 ) -> RuleResult:
-    """Heel rise above the lifter's own standing heel height, normalised by lower-leg
-    length. Unreliable heel landmarks give NOT_EVALUABLE, never a pass or fail."""
+    """Heel rise above the person's standing heel height / lower-leg length.
+    Unreliable heel landmarks give NOT_EVALUABLE."""
     outcomes: list[RepRuleOutcome] = []
     for rep in reps:
         evidence = _persistence(spec, metrics, rep, "heel_lift", config.HEEL_LIFT_THRESHOLD)
@@ -348,7 +341,7 @@ def rule_heel_lift(
             or not evidence.has_evidence
             or evidence.triggers(spec.minimum_persistence_frames, spec.min_violation_ratio)
         ):
-            # only ever a warning: off 2D landmarks a lifted heel is worth checking
+            # only ever a warning - from 2D landmarks it's just worth checking
             status = RuleStatus.WARNING
         else:
             status = RuleStatus.PASS
@@ -427,8 +420,7 @@ def rule_extension(
     spec: SquatRule | None = None,
     metrics: list[FrameMetrics] | None = None,
 ) -> RuleResult:
-    """Did each rep come back to the lifter's own standing posture? Measured against
-    their baseline rather than 180 degrees."""
+    """Did each rep come back to the person's own standing posture (not 180)?"""
     del metrics  # one measurement at completion, so no phase series to filter
     outcomes: list[RepRuleOutcome] = []
     baseline_ok = math.isfinite(standing_knee_angle)
@@ -512,8 +504,7 @@ def rule_descent_control(
     spec: SquatRule | None = None,
     metrics: list[FrameMetrics] | None = None,
 ) -> RuleResult:
-    """How long the descent took, in seconds from the timestamps. An observation
-    about control, not anatomy - never an injury warning."""
+    """How long the descent took, in seconds. About control, never an injury warning."""
     del metrics  # a per-rep duration, so no frame series to filter
     outcomes: list[RepRuleOutcome] = []
     for rep in reps:
@@ -605,7 +596,7 @@ def _result(
     feedback_key: str,
     limitation: str = "",
 ) -> RuleResult:
-    """Bolt the declared spec metadata onto a computed rule outcome."""
+    """Add the spec metadata to a computed rule outcome."""
     return RuleResult(
         rule_id=rule_id,
         title=spec.title if spec else title,
@@ -633,7 +624,7 @@ def _result(
     )
 
 
-# what we say when a rule is switched off because of the camera view
+# message when a rule is switched off because of the camera view
 VIEW_LIMITATION_TEXT: dict[str, str] = {
     "squat_depth": (
         "Depth needs a side view: knee and hip angles cannot be measured reliably "
@@ -658,7 +649,7 @@ VIEW_LIMITATION_TEXT: dict[str, str] = {
 
 
 def not_evaluable(spec: SquatRule, reps: list[SquatRep], reason: str) -> RuleResult:
-    """A rule the recording can't support: reported, not guessed at."""
+    """A rule the recording can't support."""
     return RuleResult(
         rule_id=spec.rule_id,
         title=spec.title,
@@ -694,8 +685,7 @@ _EVALUATORS = {
 
 
 def _subject_scale(metrics: list[FrameMetrics] | None) -> float:
-    """Median torso length in pixels. Someone filmed from far away carries more
-    landmark error than the visibility score admits, so reliability is capped."""
+    """Median torso length in pixels, used to cap reliability for far-away people."""
     if not metrics:
         return float("nan")
     values = [m.body_scale for m in metrics if m.valid and np.isfinite(m.body_scale)]
@@ -715,9 +705,8 @@ def evaluate_all(
     recording_quality: str = "good",
 ) -> list[RuleResult]:
     """
-    Run every declared rule, gate it by camera view, attach reliability. View
-    gating happens before any threshold is compared, so a measurement the camera
-    can't support produces no finding at all, not a confident one.
+    Run every rule, check the camera view first, then attach reliability. The
+    view check comes first so an unsupported measurement gives no finding at all.
     """
     context = {
         "metrics": metrics,

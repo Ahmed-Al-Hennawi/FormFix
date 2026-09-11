@@ -1,7 +1,7 @@
 """
-The technical-evaluation harness, which turns labelled recordings into the
-tables in the write-up. A bug here corrupts the evaluation rather than the
-product. Driven end to end on clips whose faults are known by construction.
+Tests for the evaluation harness that makes the tables for the write-up. A bug
+here would corrupt the evaluation, so it's run end to end on synthetic clips
+with known faults.
 """
 
 from __future__ import annotations
@@ -75,8 +75,8 @@ class TestManifest:
             evaluate_videos.load_manifest(manifest)
 
     def test_an_unknown_rule_id_is_rejected_loudly(self, tmp_path):
-        # A typo in a label turns every detection into a false positive, so it
-        # needs to fail before anything gets analysed.
+        # a typo in a label would make every detection a false positive, so it
+        # has to fail before anything runs
         manifest = tmp_path / "labels.csv"
         manifest.write_text("video,exercise,expected\na.mp4,press,press_symetry\n", encoding="utf-8")
         with pytest.raises(SystemExit):
@@ -194,7 +194,7 @@ class TestEndToEnd:
 
 
 def test_the_example_manifest_ships_and_parses():
-    """The template users copy has to parse under the same loader."""
+    """The example template has to load with the same loader."""
     example = Path(__file__).resolve().parent.parent / "evaluation" / "labels.example.csv"
     assert example.is_file()
     entries = evaluate_videos.load_manifest(example)

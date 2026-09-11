@@ -1,7 +1,7 @@
 """
-The measurement-uncertainty layer: the published figures reach a verdict with
-the arithmetic intact, and by default the layer only annotates. No verdict,
-score or reliability label moves unless strict mode is asked for.
+Tests for the measurement uncertainty layer: the published figures reach the
+verdict correctly, and by default it only annotates - nothing changes unless
+strict mode is on.
 """
 
 from __future__ import annotations
@@ -64,7 +64,7 @@ class TestTheBandsThemselves:
             assert key in PUBLISHED_BANDS, f"{rule_id} points at an unknown band {key!r}"
 
     def test_every_derived_band_shows_its_working(self):
-        # A derived figure nobody can check is worse than no figure.
+        # a derived figure nobody can check is worse than none
         for band in PUBLISHED_BANDS.values():
             if band.derived:
                 assert band.derivation.strip(), band.metric
@@ -82,7 +82,7 @@ class TestTheBandsThemselves:
         good = band_for("", rule_id="squat_depth", view_support=1.0)
         poor = band_for("", rule_id="squat_depth", view_support=0.0)
         assert poor.sigma > good.sigma
-        # Capped at the 1.58x Dill et al. measured rather than unbounded.
+        # capped at the 1.58x that Dill et al. measured
         assert poor.sigma == pytest.approx(good.sigma * 1.584, rel=0.01)
 
     def test_a_systematic_term_is_added_in_quadrature_not_arithmetically(self):
@@ -91,8 +91,7 @@ class TestTheBandsThemselves:
         assert band.total > band.sigma
 
     def test_normalised_and_timing_bands_are_not_scaled_by_camera_view(self):
-        # Dill et al. measured that degradation for joint angles, so applying
-        # it to a duration would cite them for something they never said.
+        # Dill et al. measured this for joint angles only, not durations
         for rule_id in ("heel_lift", "descent_control"):
             good = band_for("", rule_id=rule_id, view_support=1.0)
             poor = band_for("", rule_id=rule_id, view_support=0.0)
@@ -113,8 +112,8 @@ class TestAnnotationDoesNotChangeVerdicts:
         assert result.status is RuleStatus.FAIL
 
     def test_a_marginal_fault_also_keeps_its_status_by_default(self):
-        # 108 deg against a 100 deg pass bar is an 8 deg margin, inside the
-        # +/-10.7 deg band. Still reported, just labelled.
+        # 108 vs a 100 deg pass bar is 8 deg, inside the +/-10.7 band - still
+        # reported, just labelled
         result = _depth_result(108.0)
         annotate_uncertainty([result], _specs())
         assert result.status is RuleStatus.WARNING
@@ -189,11 +188,9 @@ class TestStrictMode:
         assert result.correction == ""
 
     def test_depth_failures_can_never_be_marginal_and_that_is_by_design(self):
-        # The 15 deg gap between the depth pass bar (100) and the fail bar (115)
-        # is wider than the 10.7 deg band, so anything shallow enough to fail has
-        # already cleared it. Strict mode can soften a warning but never a failure.
-        # (115) is wider than the 10.7 deg band, so anything shallow enough to
-        # fail has already cleared the band. Strict mode can soften a depth
+        # the 15 deg gap between the pass (100) and fail (115) bars is wider than
+        # the 10.7 deg band, so strict mode can soften a depth warning but never
+        # a fail
         result = _depth_result(120.0)
         assert result.status is RuleStatus.FAIL
         annotate_uncertainty([result], _specs(), strict=True)
@@ -210,11 +207,8 @@ class TestStrictMode:
 
 
 class TestWhatTheLayerRevealsAboutTheThresholds:
-    """
-    Recorded findings more than tests: if someone tightens one of these
-    thresholds, the suite should say the new value is under its own noise
-    floor.
-    """
+    """If one of these thresholds is tightened, this should flag that it's now
+    inside the measurement noise."""
 
     def test_the_heel_lift_bar_sits_below_its_own_measurement_error(self):
         band = band_for("", rule_id="heel_lift")
@@ -228,9 +222,9 @@ class TestWhatTheLayerRevealsAboutTheThresholds:
 
 class TestAcceptabilityCriterion:
     """
-    Mercadal-Baudart et al. (2024) give the bars: under 12 deg beats a
-    physiotherapist's by-eye assessment, under 6 deg is half that. Each band
-    reports where it sits, including where that isn't flattering.
+    Mercadal-Baudart et al. (2024): under 12 deg beats a physio's by-eye
+    assessment, under 6 deg is "very good". Each band reports where it sits,
+    even when it isn't flattering.
     """
 
     def test_the_bars_are_the_published_ones(self):
@@ -255,16 +249,14 @@ class TestAcceptabilityCriterion:
         assert acceptability(sigma) == expected
 
     def test_the_depth_band_still_beats_by_eye_assessment(self):
-        # With the smoothing filter's own bias included, since that's the
-        # figure that actually reaches a verdict.
+        # includes the filter's own bias, since that's what reaches the verdict
         from analysis.filters import depth_bias_for
 
         band = band_for("", rule_id="squat_depth", systematic=depth_bias_for("ema"))
         assert band.as_dict()["acceptability"] == "good"
 
     def test_the_bilateral_band_does_not_and_the_export_says_so(self):
-        # Published anyway, since the press symmetry rule rests on the same
-        # left-vs-right comparison.
+        # still published, since press symmetry uses the same left/right comparison
         band = band_for("", rule_id="press_symmetry")
         assert band.as_dict()["acceptability"] == "worse than by-eye assessment"
 

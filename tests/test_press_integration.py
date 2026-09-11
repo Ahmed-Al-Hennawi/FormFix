@@ -1,7 +1,6 @@
 """
-End-to-end shoulder-press pipeline on synthetic recordings. Only MediaPipe's
-output is faked; everything after it runs for real, including the
-annotated-video render to an actual MP4.
+End-to-end shoulder press pipeline on synthetic recordings. Only MediaPipe's
+output is faked, everything else runs for real, including rendering the MP4.
 """
 
 from __future__ import annotations
@@ -53,8 +52,8 @@ class TestCleanRecording:
         assert result.summary.score == 100
 
     def test_a_square_front_view_is_recognised_as_frontal(self, tmp_path):
-        # If this regresses, every front-on clip gets quietly downgraded to
-        # "diagonal" reliability and all the left/right comparisons with it.
+        # if this breaks, every front-on clip gets downgraded to "diagonal" and
+        # the left/right checks with it
         result = run(tmp_path, PressSpec())
         assert result.validation.orientation is CameraOrientation.FRONTAL
         for rule in result.rule_results:
@@ -165,8 +164,7 @@ class TestGracefulDegradation:
         assert result.summary.score == 100
 
     def test_one_hidden_arm_costs_only_the_check_that_needs_both(self, tmp_path):
-        # Only symmetry needs both arms. Alignment judges each side on its own
-        # and range of motion is a single-arm joint angle.
+        # only symmetry needs both arms, alignment and ROM work per arm
         pose = make_pose_data(PressSpec())
         pose.visibility[:, [14, 16]] = 0.02  # right elbow and wrist
         tmp_path.mkdir(parents=True, exist_ok=True)

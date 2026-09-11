@@ -1,7 +1,6 @@
 """
-How a validation verdict reaches the interface. A limited recording still
-renders as an analysis, with warnings and "not assessed" rows; a rejected one
-carries a typed reason and the developer diagnostics.
+How validation results reach the UI. A limited recording still shows as an
+analysis with warnings and "not assessed" rows, a rejected one shows the reason.
 """
 
 from __future__ import annotations
@@ -103,7 +102,7 @@ def test_rejection_carries_reason_code_and_diagnostics():
 
 
 def test_per_rep_results_and_reliability_reach_the_interface():
-    """Per-rep verdicts, the overview and the not-assessed block, all three."""
+    """Per-rep verdicts, the overview and the not-assessed block."""
     from analysis.models import NotAssessedItem, Reliability, RepSummary
 
     validation = ValidationResult()
@@ -141,6 +140,6 @@ def test_per_rep_results_and_reliability_reach_the_interface():
     assert ui.rep_results[0].timestamp == "00:04.2"
     assert ui.overview == ["Depth: 1 of 1 repetitions acceptable"]
     assert [n.title for n in ui.not_assessed] == ["Heel stability"]
-    # Reliability is shown per check, not just once for the run.
+    # reliability is shown per check, not once for the whole run
     assert next(r for r in ui.rows if r.rule_id == "squat_depth").reliability == "High"
     assert next(r for r in ui.rows if r.rule_id == "heel_lift").reliability == "Cannot assess"

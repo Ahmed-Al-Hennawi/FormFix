@@ -1,9 +1,6 @@
 """
-The old in-page upload section, superseded by the /analyse page. Nothing
-renders it any more.
-
-The Streamlit widgets inside st.container(key="ff_analyse") are restyled by
-section 15 of styles/main.css so the uploader reads as a FormFix drop zone.
+The old upload section, replaced by the /analyse page and no longer used.
+Styled by section 15 of styles/main.css.
 """
 
 from __future__ import annotations
@@ -93,5 +90,5 @@ def render() -> None:
         if st.session_state.get("ff_has_run"):
             results_section.render_result(st.session_state.get("ff_result"))
 
-    # Spacer so the next section keeps the site's vertical rhythm.
+    # spacer before the next section
     html('<div class="ff-page"><div style="height: clamp(96px, 12vw, 176px)"></div></div>')

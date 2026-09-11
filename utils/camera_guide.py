@@ -1,18 +1,13 @@
 """
-The little overhead map shown above the uploader: where to stand the phone for
-one exercise.
+The small overhead diagram above the uploader showing where to put the phone.
 
-Testers read the written instructions and then filmed from the wrong side
-anyway, so the camera position is drawn rather than described - the words beside
-it are cut down to three lines. Everything is a bird's-eye view: the figure in
-the middle faces up the page, the dashed ring is every place the phone could
-stand, and the solid band on it is the part of the ring this exercise's rules
-can actually be measured from.
+Testers read the written instructions and still filmed from the wrong side, so
+I draw the camera position instead. It's a bird's-eye view: the figure faces up
+the page, the dashed ring is every possible phone position, and the solid band
+is where this exercise can actually be measured from.
 
-Geometry is angles-from-facing, not pixels: `angle=90` means "a quarter turn
-round from straight in front of you", which is what side-on means, and the
-renderer turns that into coordinates. Nothing here knows about a specific
-exercise - exercise_data.py owns the numbers.
+Positions are angles from the person's front, not pixels (angle=90 = side-on).
+The numbers per exercise are in exercise_data.py.
 """
 
 from __future__ import annotations
@@ -20,49 +15,41 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-# --- Canvas -----------------------------------------------------------------
-# Bird's-eye plan in viewBox units. The figure sits a little above centre so the
-# equipment drawn behind it (a bench, a seat) still has room.
+# --- Canvas ---
+# viewBox units. The figure is a bit above centre to leave room for the bench
+# or seat behind it
 CENTRE_X = 150.0
 CENTRE_Y = 110.0
 
-# The dashed ring of possible camera positions.
 ORBIT_R = 78.0
 
-# Square, and centred on the ring rather than on the drawing: the ring is the
-# thing that has to look deliberately placed inside its tile. Wide enough to
-# hold the camera wherever it sits on the ring, so nothing spills over the edge.
+# square and centred on the ring, wide enough that the phone never goes over
+# the edge
 VIEWBOX = "52 12 196 196"
 
-# Half-width of the slice of the body the view cone is drawn around. Not a real
-# field of view - it just has to read as "this is what the camera sees".
+# half-width of the view cone - not a real field of view, just has to look right
 CONE_HALF_WIDTH = 44.0
 
 
 @dataclass(frozen=True)
 class CameraSetup:
-    """Where to put the camera for one exercise, in plain geometry.
+    """Where to put the camera for one exercise. Angles are degrees clockwise from
+    the person's front: 0 face-on, 90 their left side, 180 behind."""
 
-    Angles are degrees clockwise from straight in front of the person, so 0 is
-    face-on, 90 is their left-hand side, 180 is behind them.
-    """
-
-    # where the phone is drawn
     angle: float
-    # the usable band on the ring, as (from, to) in the same degrees
+    # usable band on the ring, (from, to)
     arc: tuple[float, float]
-    # how high to hold it, and how far back, in the fewest words possible
+    # how high and how far back, in as few words as possible
     height: str
     distance: str
-    # a hint of what they are on, so the plan is recognisable at a glance
+    # outline of the equipment so it's recognisable at a glance
     equipment: str = ""
-    # true when the mirror image of the arc works just as well (either side)
+    # true when either side works
     either_side: bool = False
 
 
 def _point(angle: float, radius: float) -> tuple[float, float]:
-    """Polar to plan coordinates. 0 degrees is straight in front of the figure,
-    which is up the page, and the angle increases clockwise."""
+    """Polar to plan coordinates (0 = in front of the figure = up the page, clockwise)."""
     radians = math.radians(angle)
     return (
         CENTRE_X + radius * math.sin(radians),
@@ -76,7 +63,6 @@ def _fmt(value: float) -> str:
 
 
 def _arc_path(start: float, end: float, radius: float) -> str:
-    """The band on the ring between two angles."""
     x1, y1 = _point(start, radius)
     x2, y2 = _point(end, radius)
     large = 1 if abs(end - start) > 180 else 0
@@ -88,7 +74,7 @@ def _arc_path(start: float, end: float, radius: float) -> str:
 
 
 def _cone(angle: float) -> str:
-    """What the camera sees: a wedge from the lens across the body."""
+    """Wedge from the lens across the body."""
     cam_x, cam_y = _point(angle, ORBIT_R)
     # perpendicular to the line of sight, so the wedge opens across the figure
     radians = math.radians(angle)
@@ -102,9 +88,8 @@ def _cone(angle: float) -> str:
 
 
 def _camera(angle: float) -> str:
-    """A phone, lens towards the figure. Drawn upright in its own coordinates and
-    turned to face the middle: rotate(angle + 180) points its lens back at the
-    centre, since the phone stands at `angle` on the ring."""
+    """A phone with its lens towards the figure (rotate(angle + 180) points it at
+    the centre)."""
     x, y = _point(angle, ORBIT_R)
     return (
         f'<g class="cg-cam" transform="translate({_fmt(x)} {_fmt(y)}) '
@@ -117,8 +102,7 @@ def _camera(angle: float) -> str:
 
 
 def _equipment(kind: str) -> str:
-    """A trace of the kit, so the plan reads as the right exercise. Behind the
-    figure for a bench, in front for a machine, across the shoulders for a bar."""
+    """Outline of the equipment: bench behind, machine in front, bar across the shoulders."""
     if kind == "barbell":
         return (
             '<g class="cg-kit">'
@@ -145,7 +129,7 @@ def _equipment(kind: str) -> str:
 
 
 def _figure() -> str:
-    """The person from above: shoulders across, head on top, facing up the page."""
+    """The person from above, facing up the page."""
     return (
         '<g class="cg-figure">'
         '<ellipse class="cg-figure__ground" cx="150" cy="112" rx="34" ry="26" />'
@@ -158,14 +142,14 @@ def _figure() -> str:
 
 
 def render_camera_plan(setup: CameraSetup, key: str, label: str) -> str:
-    """The overhead plan for one exercise. `key` only has to be unique on the
-    page - it names the gradient - and `label` is what a screen reader hears."""
+    """The overhead plan for one exercise. `key` must be unique on the page (used
+    for the gradient) and `label` is for screen readers."""
     gradient_id = f"cgCone-{key}"
     start, end = setup.arc
 
     bands = [f'<path class="cg-band" d="{_arc_path(start, end, ORBIT_R)}" />']
     if setup.either_side:
-        # the mirror image is just as valid; drawn faintly, without a phone on it
+        # the other side works too, drawn faintly without a phone
         bands.append(f'<path class="cg-band cg-band--alt" d="{_arc_path(-end, -start, ORBIT_R)}" />')
 
     return (

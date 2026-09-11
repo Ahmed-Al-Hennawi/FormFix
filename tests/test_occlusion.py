@@ -1,13 +1,8 @@
 """
-Far-side occlusion in a sagittal recording.
-
-The behaviour under test is the one that made the side-on squat overlay look
-unstable: MediaPipe reports a confident position for a limb it cannot see,
-that position drifts frame to frame, and the overlay drew it at full strength
-on top of the half of the body that was actually measured.
-
-The fix doesn't ask the detector whether it can see the limb. It measures
-whether the limb has anywhere to hide.
+Tests for far-side occlusion in side-view recordings. MediaPipe gave confident
+but drifting positions for limbs it couldn't see, which made the squat overlay
+look unstable. Instead of trusting the detector, the fix checks whether the
+limb is lined up behind its twin.
 """
 
 from __future__ import annotations
@@ -63,22 +58,19 @@ def track(pairs: dict[int, float], n: int = 33) -> tuple[np.ndarray, np.ndarray]
 
 
 def test_far_knee_behind_near_knee_is_occluded():
-    # Legs together, side on: the two knees project within a few pixels.
+    # legs together side-on, so the knees are within a few pixels
     xy, valid = track({LEFT_KNEE: 0.500, RIGHT_KNEE: 0.505})
     assert policy().is_occluded(LEFT_KNEE, xy, valid, WIDTH)
 
 
 def test_far_knee_driven_forward_is_visible():
-    # Bottom of a squat with the legs apart - genuinely two visible knees.
+    # bottom of a squat with legs apart - both knees really visible
     xy, valid = track({LEFT_KNEE: 0.40, RIGHT_KNEE: 0.55})
     assert not policy().is_occluded(LEFT_KNEE, xy, valid, WIDTH)
 
 
 def test_threshold_is_horizontal_only():
-    """
-    Vertical separation is real movement, not visibility. One knee bent and
-    one straight sits at two heights and both are genuinely in shot.
-    """
+    """Vertical separation is real movement, so only the horizontal gap counts."""
     xy, valid = track({LEFT_KNEE: 0.500, RIGHT_KNEE: 0.505})
     xy[LEFT_KNEE][1] = 0.20  # far above its twin
     xy[RIGHT_KNEE][1] = 0.80
@@ -90,13 +82,13 @@ def test_threshold_is_horizontal_only():
     [(0.0, True), (10.0, True), (35.0, True), (37.0, False), (60.0, False), (200.0, False)],
 )
 def test_threshold_boundary(gap_px, expected):
-    # 36 px is the threshold itself; a float round-trip through normalised
-    # coordinates makes the exact boundary meaningless to assert on.
+    # 36 px is the threshold itself, float rounding makes the exact boundary
+    # pointless to test
     xy, valid = track({LEFT_KNEE: 0.5, RIGHT_KNEE: 0.5 + gap_px / WIDTH})
     assert policy().is_occluded(LEFT_KNEE, xy, valid, WIDTH) is expected
 
 
-# --- Failing safe - none of these may hide a limb on a guess ---
+# --- Failing safe - none of these should hide a limb on a guess ---
 
 
 def test_disabled_when_no_occlusion_distance():
@@ -105,7 +97,7 @@ def test_disabled_when_no_occlusion_distance():
 
 
 def test_landmark_without_a_twin_is_never_occluded():
-    # Shoulders and hips give the torso its width and are never suppressed.
+    # shoulders and hips give the torso its width, never hidden
     xy, valid = track({LEFT_SHOULDER: 0.5, LEFT_HIP: 0.5})
     assert not policy().is_occluded(LEFT_SHOULDER, xy, valid, WIDTH)
     assert not policy().is_occluded(LEFT_HIP, xy, valid, WIDTH)
@@ -132,11 +124,7 @@ def test_short_valid_array_does_not_raise():
 
 
 def test_ramp_is_not_dead_code_for_far_limbs():
-    """
-    The regression this guards: with the far floor above FULL_DRAW_VISIBILITY,
-    every far limb that passed the gate drew at alpha 1.0 - a guessed limb
-    rendered exactly as solid as a measured one.
-    """
+    """Far-side floor has to stay below FULL_DRAW_VISIBILITY."""
     assert FULL_DRAW_VISIBILITY > MIN_FAR_SIDE_VISIBILITY
 
 
@@ -149,10 +137,9 @@ def test_far_floor_is_stricter_than_the_general_floor():
 
 def test_occlusion_is_skipped_when_confidence_is_uninformative():
     """
-    A synthetic fixture has no per-landmark confidence and often places both
-    sides at identical coordinates by construction. That is geometrically
-    indistinguishable from real occlusion, so the test is skipped there rather
-    than hiding half the skeleton - the same reasoning as the visibility gate.
+    Synthetic data has no confidence and often puts both sides at the same x,
+    which looks like occlusion - so the check is skipped instead of hiding half
+    the skeleton.
     """
     import numpy as np
 
@@ -177,6 +164,6 @@ def test_occlusion_is_skipped_when_confidence_is_uninformative():
     )
     pol = policy(trust_visibility=False)
     points, _ = _drawable_points(pose, 0, video, pol)
-    # Both knees stacked at x=0.5, but nothing is suppressed.
+    # both knees at x=0.5, but nothing is hidden
     assert LEFT_KNEE in points
     assert RIGHT_KNEE in points

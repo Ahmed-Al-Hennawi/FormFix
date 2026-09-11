@@ -1,15 +1,10 @@
 """
-Small measurement helpers used by all three metrics layers. The two worth
-knowing about:
+Small measurement helpers shared by the three exercises. The important two:
 
-    plausible    an anatomical sanity gate. MediaPipe reports a confident
-                 position while extrapolating a limb it can't see, and the
-                 angle is geometrically fine and anatomically impossible.
-    frames_for   phase scoping. An elbow angle during the pull is meant to
-                 differ from one at the top, so asking whether a measurement
-                 was correct everywhere invents findings.
-
-series returns NaN for invalid frames rather than 0.
+    plausible    sanity check - MediaPipe can be confident about a limb it is
+                 guessing, giving an angle that is anatomically impossible
+    frames_for   phase scoping, so a rule only reads the part of the rep it
+                 is about
 """
 
 from __future__ import annotations
@@ -18,27 +13,18 @@ import numpy as np
 
 from analysis.models import RepetitionSegmentation
 
-# Generic phase keys. Rules are declared against these; each exercise renames
-# them for display in its own metrics module.
-
-# Rest position at the start of the rep.
+# generic phase keys the rules use; each exercise renames them for display
 PHASE_START = "start"
-# Travel away from rest - the pull, the press, the descent.
-PHASE_TOWARDS = "towards"
-# Short window around the turning point.
-PHASE_EXTREME = "extreme"
-# Controlled return to rest.
+PHASE_TOWARDS = "towards"  # the pull, the press, the descent
+PHASE_EXTREME = "extreme"  # short window around the turning point
 PHASE_RETURN = "return"
-# Travel plus turning point, i.e. the working part of the rep.
-PHASE_WORKING = "working"
-# Whole rep, first frame to last.
-PHASE_MOVEMENT = "movement"
-# Just the frame the rep finished on.
-PHASE_COMPLETION = "completion"
+PHASE_WORKING = "working"  # towards + extreme
+PHASE_MOVEMENT = "movement"  # whole rep
+PHASE_COMPLETION = "completion"  # the frame the rep finished on
 
 
 def frames_for(segmentation: RepetitionSegmentation, phase: str) -> range:
-    """Frame range a rule should read for phase on one rep."""
+    """Frame range a rule should read for this phase of one rep."""
     seg = segmentation
     if phase == PHASE_START:
         return range(seg.start_frame, max(seg.towards_start_frame, seg.start_frame) + 1)
@@ -55,17 +41,12 @@ def frames_for(segmentation: RepetitionSegmentation, phase: str) -> range:
         return range(seg.towards_start_frame, seg.extreme_end_frame + 1)
     if phase == PHASE_COMPLETION:
         return range(seg.end_frame, seg.end_frame + 1)
-    # PHASE_MOVEMENT and anything unrecognised: the whole repetition.
+    # PHASE_MOVEMENT or anything unknown: the whole rep
     return range(seg.start_frame, seg.end_frame + 1)
 
 
 def segment_at(segmentation: RepetitionSegmentation, frame: int) -> str | None:
-    """
-    Which part of a rep a frame belongs to, or None if it is outside one. The
-    video uses this so the caption inside a committed rep comes from that rep's
-    segmentation - an abandoned partial movement can leave labels sitting inside
-    the span of the real rep that followed.
-    """
+    """Which part of a rep a frame is in, or None if it's outside one."""
     seg = segmentation
     if not (seg.start_frame <= frame <= seg.end_frame):
         return None
@@ -89,8 +70,8 @@ def series(metrics: list, attribute: str, frames: range | None = None) -> np.nda
 
 
 def raw_series(metrics: list, attribute: str, frames: range | None = None) -> np.ndarray:
-    """series without the frame-level validity gate, for measurements that carry
-    their own reliability flag."""
+    """Like series but without the validity check, for measurements that have their
+    own reliability flag."""
     frames = frames if frames is not None else range(len(metrics))
     values: list[float] = []
     for i in frames:
@@ -102,7 +83,7 @@ def raw_series(metrics: list, attribute: str, frames: range | None = None) -> np
 
 
 def median(values) -> float:
-    """NaN-tolerant median; NaN when nothing is measurable."""
+    """Median ignoring NaN, NaN if nothing is measurable."""
     finite = [float(v) for v in values if np.isfinite(v)]
     return float(np.median(finite)) if finite else float("nan")
 
@@ -125,9 +106,7 @@ def plausible(value: float, low: float, high: float) -> float:
 
 
 def effective_fps(timestamps: np.ndarray) -> float:
-    """
-    Frames per second from the timestamps themselves. Nothing assumes 30 fps.
-    """
+    """FPS from the timestamps themselves, so nothing assumes 30 fps."""
     timestamps = np.asarray(timestamps, dtype=np.float64)
     if len(timestamps) < 2:
         return 30.0

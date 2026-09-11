@@ -1,11 +1,7 @@
 """
-Which of MediaPipe's landmarks the press reads. Nothing else in the package has
-a bare landmark number, so a typo is an import error, not a silently
-wrong joint.
-
-Note what isn't here: the dumbbells. MediaPipe tracks a body, not equipment,
-which is why one hiding a wrist shows up as "not assessed", not a wrong
-number.
+Which MediaPipe landmarks the press uses. All landmark numbers live here, so a
+typo is an import error instead of a silently wrong joint. MediaPipe doesn't
+track the dumbbells, so one hiding a wrist gives "not assessed".
 """
 
 from __future__ import annotations
@@ -26,7 +22,7 @@ from analysis.models import (
     RIGHT_WRIST,
 )
 
-# The subset we use, with official MediaPipe Pose ids (33-landmark topology).
+# the ones I use, with their MediaPipe Pose ids
 PRESS_LANDMARKS: dict[str, int] = {
     "left_shoulder": LEFT_SHOULDER,
     "right_shoulder": RIGHT_SHOULDER,
@@ -51,7 +47,6 @@ class ArmChain:
 
     @property
     def arm(self) -> tuple[int, int, int]:
-        """Shoulder/elbow/wrist, which is all the elbow angle needs."""
         return (self.shoulder, self.elbow, self.wrist)
 
     @property
@@ -68,8 +63,7 @@ ARM_CHAINS: dict[str, ArmChain] = {
 
 OPPOSITE_SIDE = {"left": "right", "right": "left"}
 
-# both arms, in the order the video emphasises them - two of the three checks
-# compare the arms
+# both arms - two of the three checks compare them
 BOTH_ARM_LANDMARKS: tuple[int, ...] = (
     LEFT_SHOULDER,
     LEFT_ELBOW,
@@ -79,11 +73,11 @@ BOTH_ARM_LANDMARKS: tuple[int, ...] = (
     RIGHT_WRIST,
 )
 
-# frontal-plane scale reference. Shoulder width rather than trunk length,
-# because trunk length foreshortens when the lifter leans.
+# scale reference for the front view. Shoulder width, not trunk length, because
+# the trunk looks shorter when the person leans
 SHOULDER_LANDMARKS: tuple[int, int] = (LEFT_SHOULDER, RIGHT_SHOULDER)
 
-# Without these a shoulder press cannot be measured at all.
+# without these the press can't be measured at all
 CORE_LANDMARK_NAMES: tuple[str, ...] = (
     "left_shoulder",
     "right_shoulder",
@@ -93,25 +87,24 @@ CORE_LANDMARK_NAMES: tuple[str, ...] = (
     "right_wrist",
 )
 
-# What each measurement actually depends on, by role.
+# what each measurement depends on
 METRIC_REQUIREMENTS: dict[str, tuple[str, ...]] = {
     METRIC_PRESS_ROM: ("shoulder", "elbow", "wrist"),
     METRIC_PRESS_SYMMETRY: ("shoulder", "elbow", "wrist"),
     METRIC_PRESS_ALIGNMENT: ("shoulder", "elbow", "wrist"),
 }
 
-# Measurements that compare the arms and so need both visible.
+# measurements that compare the arms, so both need to be visible
 BILATERAL_METRICS: frozenset[str] = frozenset({METRIC_PRESS_SYMMETRY})
 
 
 def landmark_ids(side: str, roles: tuple[str, ...]) -> tuple[int, ...]:
-    """Turn roles on a side into MediaPipe landmark indices."""
     chain = ARM_CHAINS[side]
     return tuple(getattr(chain, role) for role in roles)
 
 
 def required_ids(metric: str, side: str) -> tuple[int, ...]:
-    """Landmark indices metric needs; both arms for bilateral ones."""
+    """Landmark indices a metric needs (both arms if bilateral)."""
     roles = METRIC_REQUIREMENTS.get(metric, ())
     if not roles:
         return ()

@@ -1,7 +1,6 @@
 """
-The press's wording. The aggregation is shared
-(exercises/common/feedback.py); the only press-specific parts are the two
-tables below.
+Press feedback wording. The logic is shared (exercises/common/feedback.py),
+this file just has the press templates and which values to print.
 """
 
 from __future__ import annotations
@@ -53,8 +52,7 @@ __all__ = [
 
 POSITIVES_OPENING = "{n} full press rep{s} completed"
 
-# feedback_key -> wording. Each entry has the beginner's three lines plus the
-# plain-language description shown in the "how did we detect this" panel.
+# feedback_key -> wording
 FEEDBACK_TEMPLATES: dict[str, FeedbackTemplate] = {
     "press_symmetry": FeedbackTemplate(
         title="Uneven arms",
@@ -94,8 +92,7 @@ FEEDBACK_TEMPLATES: dict[str, FeedbackTemplate] = {
     ),
 }
 
-# Which measured values a finding prints, and in what units - the numbers the
-# rule compared against its threshold.
+# which measured values a finding prints, and their units
 EVIDENCE_FORMATS = {
     "max_elbow_angle_difference": lambda v: f"left/right elbow difference {float(v):.0f} deg",
     "max_wrist_height_difference": (
@@ -111,7 +108,6 @@ EVIDENCE_FORMATS = {
 
 
 def template_for(rule: RuleResult) -> FeedbackTemplate:
-    """Look up a press rule's wording by its declared feedback key."""
     return _template_for(rule, FEEDBACK_TEMPLATES)
 
 
@@ -121,7 +117,6 @@ def build_findings(rule_results: list[RuleResult]) -> list[FeedbackFinding]:
 
 
 def build_rep_summaries(reps: list, rule_results: list[RuleResult]) -> list[RepSummary]:
-    """One verdict per rep."""
     return _build_rep_summaries(reps, rule_results, FEEDBACK_TEMPLATES)
 
 
@@ -131,10 +126,8 @@ def build_overview(rule_results: list[RuleResult]) -> list[str]:
 
 
 def build_not_assessed(rule_results: list[RuleResult]) -> list[NotAssessedItem]:
-    """The checks we did not judge, with the reason for each."""
     return _build_not_assessed(rule_results, FEEDBACK_TEMPLATES)
 
 
 def build_summary(reps: list, partial_movements: int, rule_results: list[RuleResult]) -> SessionSummary:
-    """Everything the results page needs for the set as a whole."""
     return _build_summary(reps, partial_movements, rule_results, FEEDBACK_TEMPLATES, POSITIVES_OPENING)

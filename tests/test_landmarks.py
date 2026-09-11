@@ -1,8 +1,6 @@
 """
-The squat's landmark subset.
-
-A wrong index here doesn't break anything visibly - the pipeline carries on and
-produces plausible angles measured on the wrong joint.
+Tests for the squat landmarks. A wrong index wouldn't break anything visibly,
+it would just give believable angles from the wrong joint.
 """
 
 from __future__ import annotations
@@ -33,7 +31,7 @@ from exercises.squat.landmarks import (
 
 class TestSubset:
     def test_official_mediapipe_indices(self):
-        # Documented ids from MediaPipe's 33-landmark topology.
+        # ids from MediaPipe's documentation
         assert SQUAT_LANDMARKS["left_shoulder"] == 11
         assert SQUAT_LANDMARKS["right_shoulder"] == 12
         assert SQUAT_LANDMARKS["left_hip"] == 23

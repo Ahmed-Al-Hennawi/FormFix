@@ -1,7 +1,6 @@
 """
-Filters checked against analytically known behaviour, not a stored
-snapshot of their own output, which only ever tells you the numbers haven't
-changed, not that they were right.
+Filters tested against known maths, not a saved copy of their own output
+(which would only show the numbers haven't changed, not that they're right).
 """
 
 from __future__ import annotations
@@ -25,7 +24,7 @@ from analysis.filters import (
 
 
 def _response(sos: np.ndarray, frequency_hz: float, fs: float) -> complex:
-    """Complex frequency response of the SOS cascade, evaluated directly."""
+    """Complex frequency response of the SOS cascade."""
     z = np.exp(2j * np.pi * frequency_hz / fs)
     response = 1 + 0j
     for b0, b1, b2, _a0, a1, a2 in sos:
@@ -41,8 +40,7 @@ class TestButterworthCoefficients:
         assert abs(_response(sos, 0.0, 30.0)) == pytest.approx(1.0, abs=1e-12)
 
     def test_it_is_three_decibels_down_at_the_cutoff(self):
-        # -3.0103 dB at the cut-off is the definition, and the pre-warping in
-        # the bilinear transform is what makes it land exactly there.
+        # -3.0103 dB at the cut-off by definition (the pre-warping makes it exact)
         sos = butterworth_sos(4, 2.0, 30.0)
         decibels = 20 * math.log10(abs(_response(sos, 2.0, 30.0)))
         assert decibels == pytest.approx(-3.0103, abs=1e-3)
@@ -52,8 +50,8 @@ class TestButterworthCoefficients:
         assert abs(_response(sos, 15.0, 30.0)) == pytest.approx(0.0, abs=1e-12)
 
     def test_the_response_falls_monotonically(self):
-        # No passband ripple is what makes it a Butterworth rather than a
-        # Chebyshev, and a coefficient slip shows up here first.
+        # no passband ripple is what makes it a Butterworth, so a coefficient
+        # mistake shows up here first
         sos = butterworth_sos(4, 2.0, 30.0)
         magnitudes = [abs(_response(sos, f, 30.0)) for f in np.linspace(0.0, 15.0, 200)]
         assert all(b <= a + 1e-12 for a, b in zip(magnitudes, magnitudes[1:], strict=False))
@@ -74,24 +72,23 @@ class TestButterworthCoefficients:
 
 
 class TestZeroPhase:
-    """Zero phase lag - the reason the module exists at all."""
+    """Zero phase lag - the whole reason for the module."""
 
     def test_forward_backward_filtering_does_not_move_a_peak(self):
         fs = 30.0
         t = np.arange(0, 300) / fs
-        # Asymmetric pulse on purpose: a symmetric one hides a phase shift.
+        # asymmetric pulse on purpose, a symmetric one would hide a phase shift
         signal = np.exp(-(((t - 4.0) / 0.35) ** 2)) + 0.4 * np.exp(-(((t - 4.6) / 0.9) ** 2))
         sos = butterworth_sos(4, 3.0, fs)
         zero_phase = filtfilt(sos, signal)
         causal = sosfilt(sos, signal)
         assert int(np.argmax(zero_phase)) == int(np.argmax(signal))
-        # The single-pass version does move it, which is the contrast.
+        # the single-pass version does shift it
         assert int(np.argmax(causal)) > int(np.argmax(signal))
 
     def test_it_removes_the_amount_of_noise_theory_predicts(self):
-        # White noise over 0-15 Hz through a filter whose noise-equivalent
-        # bandwidth is roughly the 2 Hz cut-off should come out at about
-        # sqrt(2/15) = 0.37 of its amplitude. Asserting the figure is the point.
+        # white noise over 0-15 Hz through a ~2 Hz filter should come out at
+        # about sqrt(2/15) = 0.37 of its amplitude
         fs = 30.0
         t = np.arange(0, 600) / fs
         clean = 135 + 40 * np.cos(2 * np.pi * 0.5 * t)
@@ -114,8 +111,8 @@ class TestZeroPhase:
 
 class TestSavitzkyGolay:
     def test_it_reproduces_a_polynomial_exactly(self):
-        # A quadratic is inside the filter's own model, which is why
-        # Savitzky-Golay keeps peak height where a boxcar mean flattens it.
+        # Savitzky-Golay fits a quadratic exactly, so it keeps the peak height
+        # where a moving average flattens it
         x = np.arange(60, dtype=np.float64)
         quadratic = 3.0 + 0.5 * x - 0.02 * x**2
         smoothed = savitzky_golay(quadratic, 9, 2)
@@ -138,10 +135,7 @@ class TestSavitzkyGolay:
 
 
 class TestGapsAreNeverBridged:
-    """
-    Same rule as the rest of FormFix: a stretch with no tracking stays
-    missing, or the filter invents a landmark nobody ever observed.
-    """
+    """A gap in tracking stays missing, otherwise the filter invents landmarks."""
 
     @pytest.mark.parametrize("name", sorted(FILTERS))
     def test_a_gap_survives_every_filter(self, name):
@@ -153,8 +147,7 @@ class TestGapsAreNeverBridged:
         assert np.isfinite(out[100:]).all()
 
     def test_each_side_of_a_gap_is_filtered_independently(self):
-        # Concatenating the two runs would let the step between them ring
-        # across the gap and distort both sides.
+        # joining the two runs would make the step between them ring across the gap
         left = np.full(120, 170.0)
         right = np.full(120, 100.0)
         values = np.concatenate([left, [np.nan] * 20, right])
@@ -169,8 +162,8 @@ class TestGapsAreNeverBridged:
 
 class TestStartOfSignal:
     def test_it_does_not_invent_a_transient_at_the_first_sample(self):
-        # Initialised to zero the filter swings wildly over the first frames,
-        # which for a squat are the standing baseline every threshold uses.
+        # starting from zero the filter swings over the first frames, which are
+        # the standing baseline for a squat
         constant = np.full(200, 175.0)
         out = butterworth_lowpass(constant, 30.0)
         assert np.allclose(out, 175.0, atol=1e-6)
@@ -199,8 +192,8 @@ class TestNamedFilters:
         assert np.allclose(apply_named_filter("ema", values, 30.0), smooth_series(values, 0.5))
 
     def test_every_named_filter_has_a_measured_depth_bias(self):
-        # The uncertainty band needs each filter's measured depth cost, so
-        # adding a filter without measuring it should fail here.
+        # every filter needs a measured depth cost for the uncertainty band, so an
+        # unmeasured new filter should fail here
         for name in FILTERS:
             assert depth_bias_for(name) > 0.0
 

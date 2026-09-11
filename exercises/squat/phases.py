@@ -4,11 +4,10 @@ knee angle:
 
     STANDING -> DESCENDING -> BOTTOM -> ASCENDING -> STANDING
 
-Counting threshold crossings would turn a knee angle fluttering around one
-number into several reps, so this uses four separate thresholds, a persistence
-requirement, a minimum range of motion, a reversal delta and duration bounds in
-seconds. All of them live in config.py. Movements that don't qualify are
-counted as partial and reported with a reason.
+Simple threshold crossing counted a jittery knee angle as several reps, so it
+uses four thresholds, a persistence check, a minimum range of motion, a
+reversal delta and duration limits (all in config.py). Movements that don't
+qualify are counted as partial, with a reason.
 """
 
 from __future__ import annotations
@@ -27,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class RawRep:
-    """A detected rep as frame indices; metrics get added later."""
+    """A detected rep as frame indices, metrics added later."""
 
     start_frame: int
     bottom_frame: int
@@ -39,13 +38,10 @@ class RawRep:
 class PhaseDetectionResult:
     """Everything the state machine worked out about the movement."""
 
-    # Per-frame phase, aligned with the input series.
     phases: list[Phase]
-    # Completed, sanity-checked reps in order.
     reps: list[RawRep] = field(default_factory=list)
-    # Movements that started but never qualified as a full rep.
+    # movements that started but never became a full rep
     partial_movements: int = 0
-    # Why each partial was rejected, for the debug view.
     partial_reasons: list[str] = field(default_factory=list)
 
 
@@ -54,8 +50,8 @@ def detect_reps(
     timestamps: np.ndarray,
     config: SquatConfig,
 ) -> PhaseDetectionResult:
-    """Run the state machine over a smoothed knee-angle series. A NaN reaching here
-    means the frame really had no measurement - short gaps are filled upstream."""
+    """Run the state machine over the smoothed knee angle. Short gaps are already
+    filled, so a NaN here means there really was no measurement."""
     n = len(knee_angles)
     phases = [Phase.UNKNOWN] * n
     result = PhaseDetectionResult(phases=phases)
@@ -89,7 +85,7 @@ def detect_reps(
     for i in range(n):
         angle = knee_angles[i]
 
-        # ---------- missing measurement ----------------------------------
+        # --- missing measurement ---
         if not np.isfinite(angle):
             nan_streak += 1
             phases[i] = state if nan_streak <= config.MAX_TRACKING_LOSS_FRAMES else Phase.UNKNOWN
@@ -98,12 +94,11 @@ def detect_reps(
             continue
         nan_streak = 0
 
-        # ---------- state transitions ------------------------------------
+        # --- state transitions ---
         if state is Phase.UNKNOWN:
             if angle >= config.STANDING_KNEE_ANGLE:
                 state = Phase.STANDING
-            # Otherwise stay UNKNOWN: the video might start mid-squat, and we
-            # can't count a movement whose beginning we never saw.
+            # otherwise stay UNKNOWN - the video might start mid-squat
 
         elif state is Phase.STANDING:
             if angle < config.REP_START_KNEE_ANGLE:
@@ -111,12 +106,11 @@ def detect_reps(
                 if below_start_streak == 1:
                     descent_first_frame = i
                 if below_start_streak >= config.PHASE_MIN_FRAMES:
-                    # Commit the descent, backdated to where it began.
+                    # commit the descent, backdated to where it started
                     state = Phase.DESCENDING
                     rep_start_frame = max(descent_first_frame - 1, 0)
                     min_angle = angle
                     min_frame = i
-                    # Re-label the streak's frames as DESCENDING.
                     for j in range(descent_first_frame, i):
                         phases[j] = Phase.DESCENDING
             else:
@@ -128,23 +122,23 @@ def detect_reps(
                 min_angle = angle
                 min_frame = i
             if angle > min_angle + config.BOTTOM_REVERSAL_DELTA:
-                # Rising again - was the descent deep enough for a real bottom?
+                # rising again - was it deep enough for a real bottom?
                 if min_angle <= config.BOTTOM_CANDIDATE_ANGLE:
                     state = Phase.ASCENDING
                     above_end_streak = 0
-                    # Mark the bottom window around the true minimum.
+                    # bottom window around the true minimum
                     lo = max(min_frame - config.BOTTOM_WINDOW_FRAMES, 0)
                     hi = min(min_frame + config.BOTTOM_WINDOW_FRAMES, n - 1)
                     for j in range(lo, hi + 1):
                         phases[j] = Phase.BOTTOM
                 elif angle >= config.REP_END_KNEE_ANGLE:
-                    # All the way back up with no real bottom: a shallow dip.
+                    # back up without a real bottom, so just a shallow dip
                     abandon("movement was too shallow to count as a squat")
                     state = Phase.STANDING
 
         elif state is Phase.ASCENDING:
             if angle < min_angle:
-                # Deeper than before, so that "ascent" was a bounce.
+                # deeper than before, so that "ascent" was just a bounce
                 state = Phase.DESCENDING
                 min_angle = angle
                 min_frame = i
@@ -172,11 +166,11 @@ def detect_reps(
             else:
                 above_end_streak = 0
 
-        # ---------- phase labelling for this frame ------------------------
+        # --- phase label for this frame ---
         if phases[i] is Phase.UNKNOWN or phases[i] is not Phase.BOTTOM:
             phases[i] = state
 
-    # Video ended mid-movement.
+    # video ended mid-movement
     if state in (Phase.DESCENDING, Phase.BOTTOM, Phase.ASCENDING):
         abandon("the video ended before the repetition finished")
 

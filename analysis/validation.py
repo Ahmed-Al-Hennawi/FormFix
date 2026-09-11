@@ -1,14 +1,10 @@
 """
-Is this recording good enough to measure?
-
-Runs after pose detection, before anything judges technique. It doesn't ask for
-a perfect side view - gym clips rarely are - so the camera angle comes out as a
-confidence. It can mark measurements unavailable, but it never stops the
-analysis on its own.
+Is this recording good enough to measure? Runs after pose detection and before
+any technique checks.
 
 Five stages: pose coverage, key landmarks, usable frames, framing, camera
-orientation. GOOD analyses normally, LIMITED says what the recording weakens,
-UNUSABLE stops with a RejectionCode.
+orientation. The camera angle only lowers confidence (gym clips are rarely a
+perfect side view), it never rejects a video by itself.
 """
 
 from __future__ import annotations
@@ -46,14 +42,13 @@ from .models import (
 
 logger = logging.getLogger(__name__)
 
-# what a squat measurement needs, per side. Heel and foot are left out.
+# what a squat measurement needs per side (no heel or foot)
 CORE_SIDE_LANDMARKS: dict[str, tuple[int, ...]] = {
     "left": (LEFT_SHOULDER, LEFT_HIP, LEFT_KNEE, LEFT_ANKLE),
     "right": (RIGHT_SHOULDER, RIGHT_HIP, RIGHT_KNEE, RIGHT_ANKLE),
 }
 
-# same for the upper body. Hips are excluded even though the pulldown's
-# trunk measurement wants them - seated, they are routinely hidden.
+# same for the upper body. No hips, because seated they are often hidden
 CORE_ARM_LANDMARKS: dict[str, tuple[int, ...]] = {
     "left": (LEFT_SHOULDER, LEFT_ELBOW, LEFT_WRIST),
     "right": (RIGHT_SHOULDER, RIGHT_ELBOW, RIGHT_WRIST),
@@ -62,13 +57,13 @@ CORE_ARM_LANDMARKS: dict[str, tuple[int, ...]] = {
 
 @dataclass(frozen=True)
 class FramingRegion:
-    """A body region that should stay inside the frame. critical means being out
-    of frame for most of the clip stops the analysis; non-critical only warns."""
+    """Body region that should stay in frame. If a critical one is out of frame for
+    most of the clip the analysis stops, otherwise it just warns."""
 
     name: str
     landmarks: tuple[int, ...]
     critical: bool = True
-    # a measurement only this region supports, marked unavailable when clipped
+    # measurement that depends on this region, marked unavailable when clipped
     limited_metric: str | None = None
     warn_message: str | None = None
     fail_message: str | None = None
@@ -76,14 +71,14 @@ class FramingRegion:
 
 @dataclass(frozen=True)
 class OrientationNote:
-    """What one camera orientation costs this exercise. Front-on is useless for
-    squat depth and ideal for press symmetry, so each exercise declares its own."""
+    """What a camera angle costs this exercise. Front-on is useless for squat depth
+    but ideal for press symmetry, so each exercise sets its own."""
 
     orientation: CameraOrientation
     message: str
-    # goes on the warning so the interface can name the measurement it disabled
+    # so the warning can name the measurement it disabled
     primary_metric: str | None = None
-    # Other measurements this view can't support.
+    # other measurements this view can't support
     limited_metrics: tuple[str, ...] = ()
 
 
@@ -133,28 +128,26 @@ SAGITTAL_ORIENTATION_NOTES: tuple[OrientationNote, ...] = (
 
 @dataclass(frozen=True)
 class ValidationConfig:
-    """Thresholds for the suitability checks. Every value comes from the exercise
-    config, so re-tuning happens in one place."""
+    """Thresholds for the checks. All values come from the exercise config."""
 
     min_duration: float
     max_duration: float
-    # Stage A - share of frames a person must be found in at all.
+    # Stage A - share of frames a person must be found in
     min_pose_frame_ratio: float
-    # Stage B - per-frame, per-landmark visibility floor.
+    # Stage B - per-landmark visibility floor
     min_key_landmark_visibility: float
-    # Stage C - share of frames whose core landmarks all clear that floor.
+    # Stage C - share of frames where all core landmarks clear that floor
     min_usable_frame_ratio: float
-    # Share of frames with a second person above which the result carries a note.
+    # share of frames with a second person before a note is added
     multi_person_warn_ratio: float
-    # kept so the exercise configs keep their shape, but no longer read - see
-    # MIN_SWITCHES_TO_REJECT
+    # not used any more (see MIN_SWITCHES_TO_REJECT), kept so the configs match
     multi_person_fail_ratio: float
     # Stage E - frontality bands: max(shoulder sep, hip sep) / torso length,
     # near 0 side-on and near 1 facing the camera
     side_view_good_ratio: float
     side_view_frontal_ratio: float
-    # Stage D - how much of the frame edge counts as cropped, then the share of
-    # frames allowed inside it before we warn and before we stop
+    # Stage D - edge margin that counts as cropped, then the share of frames
+    # allowed in it before warning / stopping
     framing_margin: float
     framing_warn_tolerance: float
     framing_fail_tolerance: float
@@ -164,21 +157,21 @@ class ValidationConfig:
     core_landmarks: dict[str, tuple[int, ...]] = field(
         default_factory=lambda: dict(CORE_SIDE_LANDMARKS)
     )
-    # What to call those landmarks in the "we couldn't track..." message.
+    # name used for them in the "we couldn't track..." message
     core_landmarks_label: str = "hips, knees and ankles"
     # Stage B - wider set, only for breaking a tie between the two sides
     side_landmarks: dict[str, tuple[int, ...]] = field(default_factory=lambda: dict(SIDE_LANDMARKS))
-    # Stage D - body regions that must stay in frame.
+    # Stage D - body regions that must stay in frame
     framing_regions: tuple[FramingRegion, ...] = SAGITTAL_FRAMING_REGIONS
-    # Stage E - what each orientation costs this exercise.
+    # Stage E - what each orientation costs this exercise
     orientation_notes: tuple[OrientationNote, ...] = SAGITTAL_ORIENTATION_NOTES
 
 
 # fewer switches than this never reject - one or two is someone walking past
 MIN_SWITCHES_TO_REJECT = 4
 
-# switches per tracked second above which the track is unusable. A rate, so
-# long and short clips are held to the same standard.
+# switches per tracked second above which the track is unusable (a rate so
+# long and short clips are treated the same)
 MAX_SWITCH_RATE_PER_SECOND = 0.5
 
 RETRY_TIPS = [
@@ -193,7 +186,7 @@ RETRY_TIPS = [
 
 
 def validate_file(video: VideoMetadata, config: ValidationConfig) -> ValidationResult:
-    """Checks that only need container metadata, run before detection."""
+    """Checks that only need the file metadata, before detection."""
     result = ValidationResult()
     result.metrics.update(
         width=video.width,
@@ -238,7 +231,6 @@ def validate_file(video: VideoMetadata, config: ValidationConfig) -> ValidationR
 
 
 def pose_detection_ratio(pose: FramePoseData) -> float:
-    """Share of frames in which MediaPipe reported a pose at all."""
     return float(pose.pose_found.mean()) if pose.frame_count else 0.0
 
 
@@ -250,8 +242,8 @@ def usable_frame_ratios(
     min_visibility: float,
     core_landmarks: dict[str, tuple[int, ...]] | None = None,
 ) -> dict[str, float]:
-    """Per side, the share of frames where every core landmark is present and over
-    the visibility floor. Over the whole clip, so briefly losing a joint is fine."""
+    """Per side, share of frames where every core landmark is above the visibility
+    floor. Over the whole clip, so briefly losing a joint is fine."""
     frames = pose.frame_count
     ratios: dict[str, float] = {}
     for side, ids in (core_landmarks or CORE_SIDE_LANDMARKS).items():
@@ -281,9 +273,8 @@ def select_analysis_side(
     core_landmarks: dict[str, tuple[int, ...]] | None = None,
     side_landmarks: dict[str, tuple[int, ...]] | None = None,
 ) -> tuple[str, dict[str, float]]:
-    """Pick the side with the strongest evidence - higher usable-frame ratio, then
-    mean visibility. For a bilateral exercise this is only the side the interface
-    quotes; both arms are still measured."""
+    """Pick the side with the best evidence (usable-frame ratio, then visibility).
+    For two-arm exercises both arms are still measured."""
     usable = usable_frame_ratios(pose, min_visibility, core_landmarks)
     visibility = mean_side_visibility(pose, side_landmarks)
     best = max(usable, key=lambda side: (round(usable[side], 3), visibility[side]))
@@ -301,14 +292,9 @@ def select_analysis_side(
 
 def frontality_series(pose: FramePoseData, width: int = 1, height: int = 1) -> np.ndarray:
     """
-    Per-frame max(shoulder separation, hip separation) / torso length. Side-on the
-    shoulders and hips nearly overlap so the ratio is small; front-on it is close
-    to torso length.
-
-    Both go to pixels first, and that matters: MediaPipe normalises x by width and
-    y by height, so dividing a normalised width by a normalised length inflated the
-    ratio by height/width (1.8x on a phone clip) and pushed ordinary side-on
-    recordings into the frontal band.
+    Per-frame max(shoulder gap, hip gap) / torso length - small side-on, close to
+    1 front-on. Has to be in pixels: with normalised coordinates a phone clip was
+    inflated 1.8x and normal side views came out as frontal.
     """
     found = pose.pose_found
     xy = pose.xy_raw[found]
@@ -333,15 +319,14 @@ def frontality_series(pose: FramePoseData, width: int = 1, height: int = 1) -> n
 
 
 def frontality_ratio(pose: FramePoseData, width: int = 1, height: int = 1) -> float:
-    """The median of frontality_series; NaN when it cannot be judged."""
+    """Median of frontality_series, NaN if it can't be judged."""
     ratio = frontality_series(pose, width, height)
     return float(np.median(ratio)) if ratio.size else float("nan")
 
 
 def view_stability(pose: FramePoseData, width: int = 1, height: int = 1) -> float:
-    """How much the camera angle varies within the clip - the IQR of the frontality
-    ratio. Orientation is estimated once, so a big spread means one label can't
-    describe the recording."""
+    """IQR of the frontality ratio - a big spread means the camera angle changes
+    during the clip."""
     ratio = frontality_series(pose, width, height)
     if ratio.size == 0:
         return float("nan")
@@ -350,8 +335,8 @@ def view_stability(pose: FramePoseData, width: int = 1, height: int = 1) -> floa
 
 def classify_orientation(ratio: float, config: ValidationConfig) -> tuple[CameraOrientation, float]:
     """
-    Frontality ratio -> orientation plus a side-view confidence, ramped linearly
-    between the bands rather than stepped:
+    Frontality ratio -> orientation and a side-view confidence (linear between
+    the bands):
 
         <= good ratio     -> SIDE,          confidence 1.0
         between           -> DIAGONAL_SIDE, confidence 1..0
@@ -379,8 +364,7 @@ def validate_pose_track(
     pose: FramePoseData,
     config: ValidationConfig,
 ) -> ValidationResult:
-    """Can this pose track support an analysis? Only rejects when the evidence is
-    missing; the camera angle can downgrade but never rejects."""
+    """Can this pose track be analysed? Only rejects when the evidence is missing."""
     result = ValidationResult()
 
     # --- Stage A: was a person found often enough? ---
@@ -406,7 +390,7 @@ def validate_pose_track(
 
     # --- more than one person? ---
     # what matters is whether the tracker stayed on one person, not how busy
-    # the room was. A gym is busy by definition.
+    # the gym was
     detected = pose.n_poses[pose.pose_found]
     multi_ratio = float((detected > 1).mean()) if detected.size else 0.0
     tracked_frames = int(pose.pose_found.sum())
@@ -470,8 +454,7 @@ def validate_pose_track(
     # --- Stage D: framing ---
     _check_framing(pose, config, result)
 
-    # --- Stage E: camera orientation, never a rejection on its own ---
-    # needs the frame size: comparing two body lengths only works in pixels
+    # --- Stage E: camera orientation (never rejects on its own) ---
     _assess_camera_angle(pose, config, result, video.width, video.height)
 
     return result
@@ -479,9 +462,8 @@ def validate_pose_track(
 
 def _check_framing(pose: FramePoseData, config: ValidationConfig, result: ValidationResult) -> None:
     """
-    Check the important body regions stay inside the frame. On the raw coordinates,
-    since interpolation would hide cropping, with a margin because a landmark on
-    the edge is usually clipped. Only critical regions can stop the analysis.
+    Check the important body regions stay in frame. Uses the raw coordinates
+    because interpolation would hide cropping.
     """
     margin = config.framing_margin
     found = pose.pose_found
@@ -544,9 +526,7 @@ def _assess_camera_angle(
     width: int = 1,
     height: int = 1,
 ) -> None:
-    """Estimate the camera orientation and record what it costs. This only says
-    where the camera is; config.orientation_notes says what that costs the
-    exercise. It never stops a run."""
+    """Estimate the camera angle and note what it costs the exercise. Never stops a run."""
     ratio = frontality_ratio(pose, width, height)
     orientation, confidence = classify_orientation(ratio, config)
     spread = view_stability(pose, width, height)
@@ -559,7 +539,7 @@ def _assess_camera_angle(
     result.metrics["side_view_confidence"] = round(confidence, 3)
 
     if np.isfinite(spread) and spread > config.view_stability_spread:
-        # One label can't describe a clip whose angle changes partway.
+        # camera angle changes partway through
         result.add_warning(
             "The camera angle appears to change during this recording. FormFix "
             "estimated one viewing angle for the whole clip, so some measurements "
@@ -576,7 +556,6 @@ def _assess_camera_angle(
 
 
 def merge(*results: ValidationResult) -> ValidationResult:
-    """Combine several validation results into one."""
     merged = ValidationResult()
     for partial in results:
         merged.errors.extend(partial.errors)

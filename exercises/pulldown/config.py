@@ -1,11 +1,9 @@
 """
-Every tunable value for the lat pulldown, in one place.
+All tunable values for the lat pulldown in one place.
 
-Two kinds, marked by the section headings. ENGINEERING values control
-stability - confidences, gap handling, hysteresis, persistence. TECHNIQUE
-(OPERATIONAL) values make claims about the movement: prototype values from the
-exercise definition, the reference clip and testing, not biomechanical
-constants. Each rule carries its threshold_source into the technical details.
+ENGINEERING values just keep the system stable. TECHNIQUE (OPERATIONAL) values
+judge the movement - my prototype values from the exercise definition, the
+reference clip and testing, not biomechanical constants.
 
 Angle conventions:
 
@@ -39,67 +37,64 @@ class PulldownConfig:
     TRACKING_CONFIDENCE: float = 0.5
 
     # --- ENGINEERING - landmark reliability and gap handling ---
-    # a pulldown machine puts a frame, a cable and a weight stack between the
-    # camera and the lifter, so these floors are set for a real gym
-    # per-frame visibility floor. Below it the landmark is not measured.
+    # the machine, cable and weight stack get in the way of the camera, so these
+    # are set for a real gym
+    # per-frame visibility floor
     MIN_KEY_LANDMARK_VISIBILITY: float = 0.4
     MIN_REQUIRED_LANDMARK_VISIBILITY: float = 0.4
     # share of frames one arm's shoulder, elbow, wrist and hip must be usable on
     MIN_USABLE_FRAME_RATIO: float = 0.5
     MIN_VALID_FRAME_RATIO: float = 0.45
     MIN_POSE_FRAME_RATIO: float = 0.5
-    # gaps up to this long get interpolated; equipment occlusion is usually brief
+    # gaps up to this long get interpolated (equipment blocking is usually brief)
     MAX_SHORT_GAP_FRAMES: int = 5
 
     # --- ENGINEERING - anatomical plausibility gates ---
-    # MediaPipe reports a confident position even while extrapolating an arm
-    # hidden behind the machine. Wide bands - outside them is NaN, never a fault.
+    # MediaPipe can be confident about an arm hidden behind the machine. Wide
+    # bands - outside them is NaN, not a fault
     PLAUSIBLE_ELBOW_ANGLE_MIN: float = 15.0
     PLAUSIBLE_ELBOW_ANGLE_MAX: float = 190.0
     # a trunk moving more than this in one rep is tracking failure, not a pulldown
     PLAUSIBLE_TORSO_EXCURSION_MAX: float = 60.0
-    # A left/right elbow gap this big is one arm being extrapolated behind the other.
+    # a left/right elbow gap this big means one arm is being guessed
     ARM_DIFFERENCE_MAX_PLAUSIBLE: float = 60.0
 
     # --- ENGINEERING - smoothing ---
     EMA_ALPHA: float = 0.45
-    # EMA weight for the derived elbow-angle series - a light second pass.
+    # EMA weight for the elbow-angle series (light second pass)
     ANGLE_EMA_ALPHA: float = 0.5
 
     # --- ENGINEERING - phase state machine / hysteresis ---
-    # these four thresholds are adaptive, taken from the lifter's own resting
-    # extension. A fixed "extended" level goes circular: someone who never
-    # straightens their arms would never cross it, so no rep would be detected,
-    # so the range-of-motion rule meant to catch that habit would never run.
+    # these four are adaptive, based on the person's own resting extension. With
+    # a fixed "extended" level, someone who never straightens their arms would
+    # never count a rep, so the ROM rule meant to catch that would never run.
     #     SEGMENTATION  was this a rep?              adaptive
     #     JUDGEMENT     did it cover enough range?   fixed, the ROM_* values
-    # the reference is a high percentile of the smoothed elbow angle, clamped.
-    # The margins below are subtracted from it and give the hysteresis.
-    # percentile taken as this person's resting extension
+    # percentile of the elbow angle used as the resting extension
     REST_REFERENCE_PERCENTILE: float = 90.0
-    # the reference is clamped into this band
+    # clamped to this band
     REST_REFERENCE_MIN: float = 110.0
     REST_REFERENCE_MAX: float = 180.0
-    # Degrees below the reference at which the arms stop counting as rested.
+    # degrees below the reference where the arms stop counting as rested
     REST_MARGIN: float = 6.0
-    # ...at which a rep attempt begins.
+    # ...where a rep attempt starts
     PULL_START_MARGIN: float = 14.0
-    # ...needed for a real contracted position to exist.
+    # ...needed for a real contracted position
     CONTRACTED_MARGIN: float = 30.0
-    # ...back above which the rep completes.
+    # ...back above which the rep is complete
     REP_END_MARGIN: float = 10.0
     TOP_ELBOW_ANGLE: float = 150.0
-    # Frames a phase transition must hold before it commits.
+    # frames a phase change must hold before it commits
     PHASE_MIN_FRAMES: int = 3
     # how far the elbow must open past the running minimum before the contracted
     # position commits
     CONTRACTION_REVERSAL_DELTA: float = 5.0
-    # minimum elbow excursion to count as a pulldown attempt. A segmentation
-    # guard against a wobble, not a technique criterion.
+    # minimum elbow range to count as an attempt (stops a wobble counting, not a
+    # technique check)
     MIN_RANGE_OF_MOTION: float = 25.0
     # frames either side of the raw minimum, so the bottom is a window median
     CONTRACTED_WINDOW_FRAMES: int = 3
-    # Untracked frames tolerated mid-rep before the attempt is abandoned.
+    # untracked frames allowed mid-rep before the attempt is abandoned
     MAX_TRACKING_LOSS_FRAMES: int = 10
 
     # --- ENGINEERING - rep duration bounds, in seconds ---
@@ -111,8 +106,8 @@ class PulldownConfig:
     VIDEO_MAX_DURATION: float = 120.0
     MULTI_PERSON_WARN_RATIO: float = 0.10
     MULTI_PERSON_FAIL_RATIO: float = 0.50
-    # frontality bands: small for a side or three-quarter view, towards 1 front
-    # or rear on. They set the camera-angle confidence. Provisional.
+    # frontality bands: small for a side or three-quarter view, close to 1 front
+    # or back on
     SIDE_VIEW_GOOD_RATIO: float = 0.45
     SIDE_VIEW_FRONTAL_RATIO: float = 1.00
     VIEW_STABILITY_SPREAD: float = 0.35
@@ -121,59 +116,51 @@ class PulldownConfig:
     FRAMING_FAIL_TOLERANCE: float = 0.70
 
     # --- ENGINEERING - top-position baseline ---
-    # stable top-position frames needed for a trunk baseline. People are usually
-    # still settling into the seat at frame 0.
+    # stable top-position frames needed for a trunk baseline (people are still
+    # settling into the seat at the start)
     BASELINE_MIN_FRAMES: int = 5
-    # Below this mean visibility the trunk rule says "cannot assess".
+    # below this the trunk rule says "cannot assess"
     TORSO_MIN_VISIBILITY: float = 0.5
     # below this on the head landmarks the facing direction is unknown, so the
-    # trunk excursion is reported unsigned
+    # lean has no direction
     FACING_MIN_VISIBILITY: float = 0.5
-    # share of a rep the ANALYSED arm must be usable on. One arm deliberately -
-    # ROM is a joint angle, and side-on the far arm is hidden for much of the
-    # pull, so requiring both reported "not assessed" on good side views.
-    # One arm, deliberately: range of motion is a joint angle rather than a
+    # share of a rep the ANALYSED arm must be usable. Only one arm, because
+    # side-on the far arm is hidden and requiring both rejected good side views
     ARM_MIN_USABLE_RATIO: float = 0.5
-    # share of a rep both arms must be usable on. Exported only, no rule uses it.
+    # share of a rep both arms must be usable (export only, no rule uses it)
     ARMS_MIN_BOTH_SIDES_RATIO: float = 0.5
 
     # --- TECHNIQUE (OPERATIONAL) - excessive torso movement ---
-    # not aiming for a vertical trunk - a seated pulldown has a small deliberate
-    # lean, and the bench often sets one. What these catch is the body swing used
-    # to move a weight the lats can't. Picked off the reference demonstration plus
-    # a margin for MediaPipe's error. Provisional.
-    # Picked off the reference demonstration (about 10-20 deg of trunk inclination
+    # not asking for a vertical trunk - a small lean is normal. This catches
+    # swinging the body to move a weight the lats can't. Based on the reference
+    # demo plus a margin for MediaPipe's error.
     # degrees of trunk movement from the top baseline that warn...
     TORSO_EXCURSION_WARN: float = 15.0
-    # ...and failed.
+    # ...and fail
     TORSO_EXCURSION_FAIL: float = 25.0
-    # absolute backstop: this far from vertical during the pull, whatever the
-    # baseline was, it isn't really the exercise any more
+    # absolute limit: this far from vertical it isn't really a pulldown any more
     TORSO_ABSOLUTE_FAIL: float = 45.0
-    # persistence: the movement must hold this many frames and cover this share
-    # of the pull, so jitter can't produce a finding
+    # has to hold this many frames and cover this share of the pull, so jitter
+    # can't cause a finding
     TORSO_MIN_FRAMES: int = 4
     TORSO_MIN_VIOLATION_RATIO: float = 0.20
 
     # --- TECHNIQUE (OPERATIONAL) - range of motion ---
-    # judged at both ends and reported as which end fell short, since "limited
-    # ROM" alone tells a beginner nothing. Not based on the bar reaching the
-    # chest - MediaPipe tracks the body, not the equipment. All provisional.
-    # Not based on the bar reaching the chest - MediaPipe tracks the body, not the
+    # checked at both ends and says which end fell short ("limited ROM" alone
+    # doesn't help a beginner). Not based on the bar reaching the chest, since
+    # MediaPipe tracks the body, not the equipment.
     # top: how far the elbow must open between reps
     ROM_TOP_EXTENSION_PASS: float = 150.0
     ROM_TOP_EXTENSION_WARN: float = 138.0
-    # Bottom: how far the elbow must close during the pull.
+    # bottom: how far the elbow must close during the pull
     ROM_BOTTOM_FLEXION_PASS: float = 100.0
     ROM_BOTTOM_FLEXION_WARN: float = 115.0
-    # total excursion in the rep, so something shallow at both ends without
-    # failing either single criterion still gets reported
+    # total range, so a rep a bit short at both ends still gets reported
     ROM_MIN_EXCURSION: float = 45.0
-    # supporting evidence only, never a pass condition: vertical wrist travel
-    # over trunk length, so a reader can check the angles against real movement
+    # evidence only, not a pass condition: vertical wrist travel / trunk length
     ROM_MIN_WRIST_TRAVEL: float = 0.35
 
-    # Free-form notes shown in the technical-details panel.
+    # notes shown in the technical details panel
     notes: dict[str, str] = field(
         default_factory=lambda: {
             "variant": (
@@ -202,13 +189,12 @@ class PulldownConfig:
 
     # --- ENGINEERING - which filter smooths the movement signal ---
     # "ema" (default), "butterworth" (Dill et al. 2024), "savgol" or
-    # "moving_average". docs/filter_selection.md has the measured trade-off.
+    # "moving_average" - see docs/filter_selection.md
     ANGLE_FILTER: str = "ema"
 
     # --- ENGINEERING - measurement-uncertainty policy ---
-    # False (default): a finding is annotated with the published error of the
-    # quantity behind it and marked "indicative" if its margin falls inside it.
-    # True also downgrades it a step. See exercises/common/uncertainty.py.
+    # False: findings inside the published error are marked "indicative".
+    # True: they are also downgraded a step. See exercises/common/uncertainty.py
     UNCERTAINTY_STRICT: bool = False
 
     def as_dict(self) -> dict:
@@ -217,11 +203,10 @@ class PulldownConfig:
 
 # --- Recording guidance ---
 
-# the camera view this exercise is analysed from
 RECOMMENDED_VIEW = "side or three-quarter"
 
-# shown before upload and on a rejection. Trunk movement is sagittal, so it
-# isn't visible from directly in front or behind.
+# full tips, shown with the retry advice after a rejection. Filmed from the
+# side because trunk lean can't be seen from the front or back
 RECORDING_TIPS: tuple[str, ...] = (
     "Film from the side, or at a three-quarter angle, roughly level with your chest.",
     "Keep your hips, shoulders, elbows and wrists visible for the whole set.",
@@ -230,9 +215,7 @@ RECORDING_TIPS: tuple[str, ...] = (
     "Keep the camera still, and record several controlled repetitions.",
 )
 
-# The three lines shown beside the camera diagram before upload. People skim
-# this panel, so it says only what changes whether the analysis can run; the
-# fuller RECORDING_TIPS above are kept for the retry advice after a rejection.
+# the three short lines next to the camera diagram before upload
 QUICK_TIPS: tuple[str, ...] = (
     "Film from the side, level with your chest.",
     "Keep hips, shoulders and both arms in frame.",
@@ -240,11 +223,9 @@ QUICK_TIPS: tuple[str, ...] = (
 )
 
 
-# --- Rule specifications. ---
-# Each rule declares what it reads, when that question is meaningful, which
-# views support it and how much evidence it needs; rules.py evaluates it.
+# --- Rule specifications (evaluated in rules.py) ---
 
-# Phase keys from exercises/common/metrics.py, renamed for the pulldown.
+# phase keys from exercises/common/metrics.py, renamed for the pulldown
 PHASE_TOP = "start"
 PHASE_PULL = "towards"
 PHASE_CONTRACTED = "extreme"
@@ -263,7 +244,7 @@ PHASE_LABELS: dict[str, str] = {
 
 
 def rule_specs(config: PulldownConfig) -> tuple[RuleSpec, ...]:
-    """Every pulldown rule, in the order the results page shows them."""
+    """All pulldown rules, in the order the results page shows them."""
     return (
         RuleSpec(
             name="Range of motion",
@@ -277,8 +258,8 @@ def rule_specs(config: PulldownConfig) -> tuple[RuleSpec, ...]:
             minimum_persistence_frames=1,
             min_violation_ratio=0.0,
             minimum_visibility=config.MIN_KEY_LANDMARK_VISIBILITY,
-            # Elbow flexion is visible from side, diagonal or front; the confidence
-            # layer still marks down a view it is unsure about.
+            # elbow flexion can be seen from any angle, reliability still drops
+            # for a view it's unsure about
             supported_views=ANY_VIEW,
             feedback_key="pulldown_rom",
             threshold_source=PROTOTYPE_THRESHOLD,
@@ -295,8 +276,7 @@ def rule_specs(config: PulldownConfig) -> tuple[RuleSpec, ...]:
             minimum_persistence_frames=config.TORSO_MIN_FRAMES,
             min_violation_ratio=config.TORSO_MIN_VIOLATION_RATIO,
             minimum_visibility=config.TORSO_MIN_VISIBILITY,
-            # Trunk lean is sagittal. From directly in front or behind a backward
-            # lean is invisible, so the rule reports "not assessed".
+            # a backward lean can't be seen from the front or back
             supported_views=SAGITTAL_VIEWS,
             feedback_key="pulldown_torso",
             threshold_source=PROTOTYPE_THRESHOLD,
@@ -304,8 +284,7 @@ def rule_specs(config: PulldownConfig) -> tuple[RuleSpec, ...]:
     )
 
 
-# What the application actually runs with.
 DEFAULT_CONFIG = PulldownConfig()
 
-# Exposed for the docs, the tests and the technical-details panel.
+# used by the docs, tests and technical details panel
 DEFAULT_RULES = rule_specs(DEFAULT_CONFIG)

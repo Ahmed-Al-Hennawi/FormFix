@@ -1,11 +1,10 @@
 """
-The results view of the /analyse page, all driven by one AnalysisResult so the
-same markup renders a real run and the labelled sample.
+Results view for /analyse. Everything comes from one AnalysisResult, so a real
+run and the sample look the same.
 
-Staged rather than shown at once: verdict, corrections and positives first,
-then the analysed video and a reference clip, then the per-finding and per-rep
-breakdown inside "See the full detail". Under FORMFIX_DEBUG that last section
-swaps in the full traceability chain.
+Order: analysed video, verdict, corrections and positives, reference clip, then
+the per-finding and per-rep detail in "See the full detail" (the full trace
+with FORMFIX_DEBUG).
 """
 
 from __future__ import annotations
@@ -32,7 +31,7 @@ PLAY_ICON = (
     'fill="currentColor" /></svg>'
 )
 
-# a beginner turns up asking about their form, not about their score
+# beginners care about their form, not a score
 VERDICT_EYEBROW = "Overall form"
 
 
@@ -40,8 +39,8 @@ VERDICT_EYEBROW = "Overall form"
 
 
 def verdict_block(result: AnalysisResult) -> str:
-    """The first thing on screen: a verdict in words plus one sentence saying what
-    it rests on. The ring stays, but nothing depends on reading a colour."""
+    """Verdict in words plus one sentence on what it's based on. There's a coloured
+    ring too, but nothing relies on reading the colour."""
     demo_tag = '<span class="ax-tag ax-tag--demo">Sample output</span>' if result.is_demo else ""
     facts = " &middot; ".join(
         part
@@ -54,8 +53,7 @@ def verdict_block(result: AnalysisResult) -> str:
     )
     headline = f'<p class="ax-score__headline">{esc(result.headline)}</p>' if result.headline else ""
 
-    # no check had reliable evidence, so leave it unscored - a 0 would read
-    # as "poor technique"
+    # nothing reliable to score - a 0 would look like "poor technique"
     if not result.score_available:
         ring = (
             '  <div class="ax-score__ring-wrap">'
@@ -105,9 +103,8 @@ def verdict_block(result: AnalysisResult) -> str:
 
 
 def _correction_card(index: int, item: Improvement) -> str:
-    """One correction: what happened, why it matters, what to try. Three lines and
-    no numbers - the measured values are one expander away, and on the card they
-    made it read as a report rather than something to act on."""
+    """One correction: what happened, why it matters, what to try. No numbers here,
+    they're in the expander."""
     why = f'<p class="ax-fix__why">{esc(item.why)}</p>' if item.why else ""
     return (
         f'<li class="ax-fix ax-fix--{esc(item.severity)}" data-animate="fade-up">'
@@ -124,8 +121,7 @@ def _correction_card(index: int, item: Improvement) -> str:
 
 
 def corrections_block(result: AnalysisResult) -> str:
-    """"What to fix", capped at the top few findings. The list arrives ordered by
-    priority, so the cut is by importance rather than by whichever rule ran first."""
+    """ "What to fix" - the top few findings, already sorted by priority."""
     visible = result.key_improvements
     if not visible:
         return (
@@ -156,10 +152,7 @@ def corrections_block(result: AnalysisResult) -> str:
 
 
 def positives_block(result: AnalysisResult) -> str:
-    """
-    What the set got right. Every line comes from a check that actually
-    passed, which is also why it tends to be short.
-    """
+    """What went well - only from checks that actually passed."""
     items = result.key_positives
     if not items:
         return ""
@@ -178,12 +171,11 @@ def positives_block(result: AnalysisResult) -> str:
 # evidence keys that aren't settings and are printed elsewhere
 _SETTING_EXCLUSIONS = frozenset({"reliability_evidence", "threshold_source"})
 
-# How many configured values to print before the panel becomes a debug dump.
+# max number of settings to show
 _MAX_SETTINGS = 8
 
 
 def _format_setting(key: str, value: Any) -> str:
-    """One of a rule's configured settings, in readable form."""
     name = key.replace("_", " ")
     if isinstance(value, float):
         return f"{name}: {value:.3g}"
@@ -193,8 +185,7 @@ def _format_setting(key: str, value: Any) -> str:
 
 
 def _settings_lines(item: Improvement) -> list[str]:
-    """The rule's configured thresholds and where they came from. Scalars only - the
-    evidence dict also carries nested records, and dumping those read as a log."""
+    """The rule's thresholds and where they came from (simple values only)."""
     lines: list[str] = []
     scalars = [
         (key, value)
@@ -214,10 +205,9 @@ def _settings_lines(item: Improvement) -> list[str]:
 
 def _detection_card(item: Improvement, minor: bool = False, technical: bool = False) -> str:
     """
-    One finding in the details panel. technical=False is what an athlete reads:
-    the mistake in one sentence and the one thing to try. technical=True
-    (FORMFIX_DEBUG) is the traceable record - landmarks, measurement, phase, rule,
-    evidence - in the order the analysis walked it.
+    One finding in the details panel. Normally just the mistake and what to try.
+    technical=True (FORMFIX_DEBUG) shows the full trace: landmarks, measurement,
+    phase, rule and evidence.
     """
     if not technical:
         lines = [
@@ -257,8 +247,7 @@ def _detection_card(item: Improvement, minor: bool = False, technical: bool = Fa
     if item.reliability:
         scope.append(f"{esc(item.reliability.lower())} evidence")
     if scope:
-        # scope entries are escaped as they are built, so the separator can stay
-        # an HTML entity here
+        # entries are already escaped, so the separator can be an HTML entity
         lines.append(
             '<p class="ax-ex__line"><span class="ax-ex__tag">Where</span>'
             + " &middot; ".join(scope)
@@ -285,8 +274,7 @@ def _detection_card(item: Improvement, minor: bool = False, technical: bool = Fa
 
 
 def detection_markup(result: AnalysisResult, technical: bool = False) -> str:
-    """Every finding, top ones first. This is the only place the smaller ones
-    appear; "What to fix" on the first screen shows the top few."""
+    """All findings, most important first (the smaller ones only appear here)."""
     if not result.improvements:
         return (
             '<p class="ax-empty-note">No check produced a finding in this set, so there is '
@@ -307,8 +295,7 @@ def detection_markup(result: AnalysisResult, technical: bool = False) -> str:
 
 
 def reps_block(result: AnalysisResult) -> str:
-    """One card per rep: what it passed, what it didn't, what wasn't
-    assessable on it."""
+    """One card per rep: passed, not passed and not assessed."""
     if not result.rep_results:
         return ""
 
@@ -316,8 +303,7 @@ def reps_block(result: AnalysisResult) -> str:
     for rep in result.rep_results:
         lines = []
         if rep.issues:
-            # escape each issue then join - escaping the joined string would turn the
-            # separator into a literal "&middot;"
+            # escape each issue before joining, or the separator gets escaped too
             lines.append(
                 '<p class="ax-rep__meta">'
                 + " &middot; ".join(esc(issue) for issue in rep.issues)
@@ -358,9 +344,7 @@ def reps_block(result: AnalysisResult) -> str:
 
 
 def checks_block(result: AnalysisResult) -> str:
-    """The measured checks behind the score, one row per rule with its evidence
-    level. "Depth, 3 of 4 reps, high reliability" says something different from the
-    same figure off a barely visible recording."""
+    """The checks behind the score, one row per rule with its reliability."""
     if not result.rows:
         return ""
 
@@ -392,10 +376,7 @@ def checks_block(result: AnalysisResult) -> str:
 
 
 def not_assessed_block(result: AnalysisResult) -> str:
-    """
-    What FormFix deliberately did not judge, with the reason. It gets its own
-    block so an unavailable measurement can't be mistaken for a failed one.
-    """
+    """What wasn't judged and why, in its own block so it doesn't look like a fail."""
     if not result.not_assessed:
         return ""
     rows = "".join(
@@ -419,10 +400,7 @@ def not_assessed_block(result: AnalysisResult) -> str:
 
 
 def reference_block(exercise: Exercise) -> str:
-    """
-    The card that opens the reference-technique lightbox. It sits under the
-    corrections, since watching how it should look is what you want next.
-    """
+    """Card that opens the reference video, placed under the corrections."""
     return (
         '<section class="ax-panel ax-panel--ref" data-animate="fade-up">'
         f'<h3 class="ax-panel__title">See correct {esc(exercise.name.lower())} form</h3>'
@@ -445,8 +423,8 @@ def reference_block(exercise: Exercise) -> str:
 
 
 def reference_modal(exercise: Exercise) -> str:
-    """The reference lightbox. scripts/analyse.js moves it to <body> on load so its
-    fixed positioning resolves against the viewport, not a Streamlit block."""
+    """The reference lightbox. analyse.js moves it to <body> so position: fixed
+    works against the viewport."""
     video = reference_video_url(exercise.id)
 
     if video:
@@ -490,8 +468,7 @@ def reference_modal(exercise: Exercise) -> str:
 # --- Recording quality ---
 
 
-# headline per estimated camera orientation. Named after what the camera
-# was; the advice underneath says what the exercise wants.
+# headline per detected camera angle
 _ORIENTATION_HEADLINES = {
     "frontal": "Analysed from a front-on camera",
     "side": "Analysed from a side-on camera",
@@ -501,10 +478,8 @@ _ORIENTATION_HEADLINES = {
 
 def recording_quality_block(result: AnalysisResult, exercise: Exercise) -> str:
     """
-    A note above the results when the recording was usable but not ideal. Only for
-    the "limited" state - the analysis did run, so this says what the recording
-    cost. The advice is the exercise's own, since a squat wants a side view and a
-    press a front one.
+    Note above the results when the recording was usable but not ideal ("limited").
+    The advice comes from the exercise, since each needs a different angle.
     """
     if result.recording_quality != "limited" or not result.warnings:
         return ""
@@ -534,11 +509,8 @@ def recording_quality_block(result: AnalysisResult, exercise: Exercise) -> str:
 
 
 def failure_markup(result: AnalysisResult, exercise: Exercise | None = None) -> str:
-    """
-    Shown when the recording could not be analysed: what failed, why, and what
-    to change. The upload controls on the left stay available for a retry.
-    """
-    # prefer the analyser's own suggestions, falling back to the standing tips
+    """Shown when the recording couldn't be analysed: what failed, why, and what to change."""
+    # analyser's suggestions first, otherwise the full recording tips
     suggestions = result.error_suggestions or (list(exercise.recording_tips) if exercise else [])
     tips = "".join(f'<li class="ax-retry__tip">{esc(tip)}</li>' for tip in suggestions)
     tips_block = (
@@ -567,9 +539,7 @@ def failure_markup(result: AnalysisResult, exercise: Exercise | None = None) -> 
 
 
 def markup(result: AnalysisResult) -> str:
-    """The immediately visible feedback: verdict, what to fix, what you did well,
-    then the measured checks. Those used to sit inside the details, but they are
-    the evidence for the blocks above them, so they moved up."""
+    """The main feedback: verdict, what to fix, what you did well, then the checks."""
     return (
         '<div class="ff-page ax-results" data-ax-results>'
         f"{verdict_block(result)}"
@@ -581,9 +551,8 @@ def markup(result: AnalysisResult) -> str:
 
 
 def _annotated_video_section(result: AnalysisResult) -> None:
-    """"Your analysed movement" - the rendered overlay clip. It goes first, because
-    seeing the tracked movement is what makes the sentences under it mean
-    anything."""
+    """ "Your analysed movement" - the overlay video. Goes first so the feedback
+    under it makes sense."""
     path = result.annotated_video
     if path is None or not path.is_file():
         return
@@ -599,8 +568,7 @@ def _annotated_video_section(result: AnalysisResult) -> None:
 
 
 def _technical_lines(result: AnalysisResult) -> list[str]:
-    """The run's own settings and limits, in the system's own vocabulary - so it
-    only appears under FORMFIX_DEBUG."""
+    """The run's settings and limits, only shown with FORMFIX_DEBUG."""
     lines = [
         f"**Analysis side:** {result.analysis_side or '-'} side used for movement analysis",
         f"**Repetitions:** {result.reps} complete"
@@ -631,8 +599,8 @@ def _technical_lines(result: AnalysisResult) -> list[str]:
 
 
 def _analysis_details(result: AnalysisResult, debug_mode: bool) -> None:
-    """The optional detail layer, in one collapsed expander: how each finding was
-    detected, how every rep scored, and what the recording couldn't support."""
+    """The collapsed detail expander: how each finding was detected, each rep, and
+    what couldn't be assessed."""
     with st.container(key="ff_ax_tech"):
         with st.expander("See the full detail - how FormFix measured every rep", expanded=False):
             html(
@@ -655,9 +623,7 @@ def _analysis_details(result: AnalysisResult, debug_mode: bool) -> None:
 
 
 def render(result: AnalysisResult, exercise: Exercise, debug_mode: bool = False) -> None:
-    """The whole results column: recording note, analysed movement, overall form,
-    what to fix, what you did well, the reference technique, then the full
-    detail."""
+    """The whole results column, in order."""
     if not result.success:
         html(failure_markup(result, exercise))
         return

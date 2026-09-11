@@ -1,10 +1,7 @@
 """
-Tests for the render-window trimmer.
-
-The behaviour that matters most here isn't the happy path - it's that every
-odd input still produces a window that renders something. A trim that returns
-an empty or backwards range would hand the user a zero-length video and read
-as a broken analysis, so most of these tests are about failing open.
+Tests for the render-window trimmer. Most of these check that odd inputs still
+give a window that renders something - an empty or backwards range would give
+the user a zero-length video that looks like a broken analysis.
 """
 
 from __future__ import annotations
@@ -34,7 +31,7 @@ def window(reps, frame_count=900, fps=FPS, **kw):
 
 
 def test_trims_to_the_set_with_one_second_of_padding():
-    # 30 s clip; the set runs from 10 s to 20 s.
+    # 30 s clip, set from 10 s to 20 s
     reps = [FakeRep(300, 450), FakeRep(450, 600)]
     result = window(reps)
 
@@ -62,7 +59,7 @@ def test_untrimmed_window_saves_nothing():
     assert full_video(900).seconds_saved(900, FPS) == 0.0
 
 
-# --- Failing open - every one of these must render the whole video ---
+# --- Fallbacks - all of these should render the whole video ---
 
 
 def test_no_reps_renders_everything():
@@ -82,7 +79,7 @@ def test_missing_fps_renders_everything():
 
 
 def test_unsegmented_reps_render_everything():
-    # -1 is the "never segmented" sentinel on the upper-body reps.
+    # -1 means "never segmented" on the upper-body reps
     result = window([FakeRep(-1, -1)])
     assert not result.trimmed
     assert "usable frame numbers" in result.reason
@@ -94,21 +91,21 @@ def test_rep_frames_beyond_the_video_render_everything():
 
 
 def test_set_filling_the_clip_is_left_alone():
-    # Nothing to cut: the reps already span the whole recording.
+    # nothing to cut, the reps already cover the whole video
     result = window([FakeRep(0, 899)])
     assert not result.trimmed
     assert "not enough setup footage" in result.reason
 
 
 def test_small_saving_is_not_worth_trimming():
-    # Only ~1 s of setup either side, under the 2 s threshold.
+    # only ~1 s either side, under the 2 s threshold
     reps = [FakeRep(45, 855)]
     result = window(reps)
     assert not result.trimmed
 
 
 def test_very_short_window_renders_everything():
-    # A one-frame "rep" with no padding would give a sub-second clip.
+    # a one-frame "rep" would give a sub-second clip
     result = window([FakeRep(400, 401)], padding_seconds=0.0)
     assert not result.trimmed
     assert "too short" in result.reason
@@ -118,7 +115,7 @@ def test_very_short_window_renders_everything():
 
 
 def test_padding_is_clamped_to_the_video():
-    # A set starting at frame 5 can't be padded to -25.
+    # a set starting at frame 5 can't be padded to -25
     result = window([FakeRep(5, 500)])
     assert result.start_frame == 0
 
@@ -159,7 +156,7 @@ def test_reps_with_unreadable_frames_are_skipped_not_fatal():
             return 500
 
     result = window([Broken(), FakeRep(300, 600)])
-    # The broken rep is ignored; the usable one still defines the window.
+    # the broken rep is ignored, the good one still sets the window
     assert result.trimmed
     assert result.start_frame == 270
 
@@ -197,7 +194,7 @@ def test_full_video_window_is_never_empty():
 
 @pytest.mark.parametrize("frames", [1, 2, 30, 900, 3600])
 def test_window_is_always_renderable(frames):
-    """Whatever comes in, the window must address at least one real frame."""
+    """Whatever the input, the window has to include at least one real frame."""
     for reps in ([], [FakeRep(0, 0)], [FakeRep(-1, -1)], [FakeRep(0, frames * 3)]):
         w = compute_render_window(reps, frames, FPS)
         assert 0 <= w.start_frame <= w.end_frame <= max(0, frames - 1)

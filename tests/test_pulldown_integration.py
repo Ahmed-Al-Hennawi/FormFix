@@ -1,8 +1,7 @@
 """
-End-to-end lat-pulldown pipeline on synthetic recordings. Only MediaPipe's
-output is faked; everything after it runs for real, including the
-annotated-video render to an actual MP4. The two groups that carry the
-evaluation are TestDetectsTheIntendedFault and TestFalsePositiveProtection.
+End-to-end lat pulldown pipeline on synthetic recordings. Only MediaPipe's
+output is faked, everything else runs for real, including rendering the MP4.
+The main ones are TestDetectsTheIntendedFault and TestFalsePositiveProtection.
 """
 
 from __future__ import annotations
@@ -101,8 +100,7 @@ class TestDetectsTheIntendedFault:
         assert "stopped early" in rule.explanation
 
     def test_a_finding_can_be_traced_to_its_evidence(self, tmp_path):
-        # Every flagged outcome has to name a measurement, a frame and a
-        # timestamp, or the UI has nothing to show behind the finding.
+        # every flagged outcome needs a measurement, frame and timestamp for the UI
         result = run(tmp_path, PulldownSpec(torso_gain_deg=28.0))
         rule = next(r for r in result.rule_results if r.rule_id == "pulldown_torso")
         for outcome in rule.per_rep:
@@ -134,8 +132,8 @@ class TestFalsePositiveProtection:
         assert statuses(result)["pulldown_torso"] is RuleStatus.PASS
 
     def test_a_lean_just_under_the_tolerance_is_not_flagged(self, tmp_path):
-        # Sitting just under the threshold is the classic way a frame-by-frame
-        # system invents findings.
+        # sitting just under the threshold is how a frame-by-frame system
+        # invents findings
         result = run(tmp_path, PulldownSpec(torso_gain_deg=12.0))
         assert statuses(result)["pulldown_torso"] is RuleStatus.PASS
 
@@ -145,7 +143,7 @@ class TestFalsePositiveProtection:
         assert statuses(left) == statuses(right)
 
     def test_a_higher_frame_rate_does_not_change_the_repetition_count(self, tmp_path):
-        # Timing comes from timestamps, not frame counts.
+        # timing comes from timestamps, not frame counts
         slow = run(tmp_path / "a", PulldownSpec(rep_seconds=2.4))
         fast = run(tmp_path / "b", PulldownSpec(rep_seconds=3.2))
         assert slow.summary.complete_reps == fast.summary.complete_reps == 3
@@ -170,8 +168,7 @@ class TestGracefulDegradation:
         assert torso.reliability.rank < Reliability.HIGH.rank
 
     def test_hidden_hips_cost_only_the_torso_check(self, tmp_path):
-        # A seated lifter's hips are routinely behind the bench or their own
-        # thigh, and that should cost the trunk measurement and nothing else.
+        # seated, the hips are often hidden - that should only cost the trunk check
         result = run(tmp_path, PulldownSpec(hip_visibility=0.15))
         assert statuses(result)["pulldown_rom"] is RuleStatus.PASS
         assert statuses(result)["pulldown_torso"] is RuleStatus.NOT_EVALUABLE

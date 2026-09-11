@@ -1,8 +1,7 @@
 """
 The /analyse page: upload on the left, analysis on the right, progress tracker
-across the top. A small state machine in st.session_state runs idle -> ready ->
-analysing -> complete. The stages and the result come from utils/analysis.py;
-nothing here knows about a particular exercise.
+on top. A small state machine in st.session_state goes idle -> ready ->
+analysing -> complete. Nothing here is exercise-specific.
 """
 
 from __future__ import annotations
@@ -42,8 +41,8 @@ STAGE = "ff_ax_stage"
 RESULT = "ff_ax_result"
 NONCE = "ff_ax_nonce"
 EXERCISE = "ff_ax_exercise"
-# completed analyses, keyed by (file hash, exercise), so an unrelated rerun
-# can't re-run the whole pipeline
+# finished analyses keyed by (file hash, exercise), so a rerun doesn't run the
+# whole pipeline again
 CACHE = "ff_ax_cache"
 FORCE = "ff_ax_force"
 SWEPT = "ff_ax_swept"
@@ -52,7 +51,7 @@ DEBUG_MODE = bool(os.environ.get("FORMFIX_DEBUG"))
 
 IDLE, READY, ANALYSING, COMPLETE = "idle", "ready", "analysing", "complete"
 
-try:  # Streamlit's flow-control signals are ordinary exceptions - never swallow them.
+try:  # st.rerun / st.stop are exceptions, so these must never be swallowed
     from streamlit.runtime.scriptrunner_utils.exceptions import (
         RerunException,
         StopException,
@@ -65,7 +64,7 @@ try:  # Streamlit's flow-control signals are ordinary exceptions - never swallow
 except ImportError:  # pragma: no cover - private path moved between versions
     _STREAMLIT_CONTROL_EXCEPTIONS = ()
 
-# The three stations of the progress tracker: (full label, short label).
+# progress tracker steps: (full label, short label)
 TRACKER_STEPS: tuple[tuple[str, str], ...] = (
     ("Upload Video", "Upload"),
     ("Analyse Form", "Analyse"),
@@ -84,25 +83,24 @@ def _init_state() -> None:
     st.session_state.setdefault(CACHE, {})
     st.session_state.setdefault(FORCE, False)
 
-    # only the runs this session's cache evicts get their temp dir removed, so
-    # one sweep per browser session keeps the leftovers bounded
+    # clean up old temp dirs once per browser session
     if not st.session_state.get(SWEPT):
         st.session_state[SWEPT] = True
         try:
             purge_stale_sessions()
-        except Exception:  # pragma: no cover - tidying is never load-bearing
+        except Exception:  # pragma: no cover - cleanup shouldn't break anything
             logger.exception("Could not sweep stale analysis directories")
 
 
 def _uploader_key() -> str:
-    """The file-uploader's widget key. It carries a nonce because giving the widget
-    a fresh identity is the only way "Remove video" can clear it."""
+    """Uploader widget key. Has a nonce because a new key is the only way "Remove
+    video" can clear it."""
     return f"ff_ax_video_{st.session_state[NONCE]}"
 
 
 def _release_stale_uploads() -> None:
-    """Free the bytes of an upload that "Remove video" replaced - the old key hangs
-    onto its UploadedFile and a phone clip is tens of megabytes."""
+    """Free the old upload after "Remove video" - the old key keeps the file in
+    memory and a phone clip is tens of MB."""
     current = _uploader_key()
     stale = [
         key
@@ -117,7 +115,7 @@ def _release_stale_uploads() -> None:
 
 
 def _reset(clear_upload: bool = False) -> None:
-    """Back to a clean slate. Used by "Remove video" and "Analyse again"."""
+    """Reset for "Remove video" and "Analyse again"."""
     st.session_state[STAGE] = IDLE
     st.session_state[RESULT] = None
     if clear_upload:
@@ -125,7 +123,7 @@ def _reset(clear_upload: bool = False) -> None:
 
 
 def _on_exercise_change() -> None:
-    """Drop any result when the exercise changes - it belongs to the old one."""
+    """Clear the result when the exercise changes."""
     if st.session_state.get(RESULT) is not None:
         st.session_state[RESULT] = None
         st.session_state[STAGE] = READY
@@ -179,10 +177,9 @@ def _header() -> None:
 
 
 def _tracker(stage: str) -> None:
-    """Upload Video - Analyse Form - Feedback. Each station is done, active or
-    waiting, and the connector animates while the analysis runs."""
+    """Upload Video - Analyse Form - Feedback. Each step is done, active or waiting."""
     index = {IDLE: 0, READY: 0, ANALYSING: 1, COMPLETE: 3}[stage]
-    # On the first station, "ready" means the upload is genuinely finished.
+    # "ready" means the upload is actually finished
     upload_done = stage in (READY, ANALYSING, COMPLETE)
 
     parts: list[str] = []
@@ -231,14 +228,10 @@ def _panel_head(number: str, title: str, note: str = "") -> str:
 
 
 def _recording_guidance(exercise) -> str:
-    """"How to record this" - an overhead plan of where to stand the camera, and
-    three lines beside it. Both come from the exercise's own config, so neither
-    can drift from the thresholds validation uses.
-
-    It is deliberately short. Testers told us the earlier five-line checklist was
-    too much to read before uploading, and filmed from the wrong side anyway; the
-    long version is still what a rejected video comes back with, where the reader
-    has a reason to work through it.
+    """
+    "How to record this": the camera diagram plus three short lines, both from the
+    exercise config. Kept short because testers didn't read the old five-line
+    checklist - the long version is only shown after a rejected video.
     """
     tips = exercise.quick_tips or exercise.recording_tips
     if not tips:
@@ -306,7 +299,7 @@ def _confirmation(uploaded) -> str:
 
 def _upload_column(stage: str, uploaded) -> None:
     with st.container(key="ff_ax_upload"):
-        # the note states the limits the analyser actually enforces
+        # shows the limits the analyser actually uses
         selected = get_exercise(st.session_state[EXERCISE])
         note = " · ".join(
             part for part in ("MP4 · MOV · AVI", selected.duration_label, "one set per clip") if part
@@ -326,8 +319,7 @@ def _upload_column(stage: str, uploaded) -> None:
         exercise_id = st.session_state[EXERCISE]
         exercise = get_exercise(exercise_id)
 
-        # guidance before the upload, not after - several checks aren't observable
-        # from the wrong camera position
+        # guidance goes before the upload since some checks need the right camera angle
         html(_recording_guidance(exercise))
 
         help_tips = exercise.quick_tips or exercise.recording_tips
@@ -347,8 +339,7 @@ def _upload_column(stage: str, uploaded) -> None:
                 '<p class="ff-page ax-hint">Drag &amp; drop or browse &middot; '
                 + " &middot; ".join(f".{ext}" for ext in SUPPORTED_VIDEO_TYPES)
                 + "</p>"
-                # people are uploading video of their own bodies, so say what happens to
-                # it before they do
+                # tell people what happens to their video before they upload it
                 '<p class="ff-page ax-hint ax-hint--privacy">Your video is automatically '
                 "deleted right after processing and is never stored.</p>"
             )
@@ -431,7 +422,7 @@ def _waiting_markup(stage: str) -> str:
 
 
 def _scan_markup(exercise) -> str:
-    """The 'system is working' visual - the FormFix landmark language, moving."""
+    """The animated 'working' visual."""
     return (
         '<div class="ff-page ax-scan">'
         '  <div class="ax-scan__stage">'
@@ -446,7 +437,7 @@ def _scan_markup(exercise) -> str:
 
 
 def _steps_markup(done: int, active: int | None, active_pct: int | None = None) -> str:
-    """The live stage list rendered underneath the scan visual."""
+    """Live stage list under the scan visual."""
     items = []
     for position, stage_def in enumerate(ANALYSIS_STAGES):
         label = stage_def.label
@@ -467,13 +458,13 @@ def _steps_markup(done: int, active: int | None, active_pct: int | None = None) 
 
 
 def _file_key(uploaded, exercise_id: str) -> str:
-    """Identify one upload+exercise combination, for the analysis cache."""
+    """Cache key for an upload + exercise."""
     digest = hashlib.md5(uploaded.getbuffer()).hexdigest()
     return f"{digest}:{exercise_id}"
 
 
 def _forget_result(result) -> None:
-    """Remove a cached run's rendered video directory from the temp space."""
+    """Delete a cached run's video folder from temp."""
     annotated = getattr(result, "annotated_video", None)
     if annotated is not None:
         shutil.rmtree(annotated.parent, ignore_errors=True)
@@ -481,9 +472,8 @@ def _forget_result(result) -> None:
 
 def _run_analysis(uploaded, exercise_id: str) -> None:
     """
-    Run the pipeline, reporting each stage as it happens. Results are cached on
-    (file hash, exercise) so an unrelated rerun never re-runs MediaPipe; "Analyse
-    again" drops that entry first.
+    Run the pipeline and show each stage. Results are cached on (file hash,
+    exercise) so a rerun doesn't run MediaPipe again.
     """
     exercise = get_exercise(exercise_id)
 
@@ -513,8 +503,7 @@ def _run_analysis(uploaded, exercise_id: str) -> None:
         index = STAGE_INDEX.get(stage_key)
         if index is None:  # "complete"
             index, fraction = len(ANALYSIS_STAGES), 1.0
-        # the pipeline revisits a stage (it validates before and after detection),
-        # but this is a progress bar, not a log, so it never goes backwards
+        # some stages come up twice, but the progress bar should never go backwards
         if index < last_paint["index"]:
             return
         pct = int(max(0.0, min(1.0, fraction)) * 100)
@@ -530,7 +519,7 @@ def _run_analysis(uploaded, exercise_id: str) -> None:
 
     report(ANALYSIS_STAGES[0].key, 0.0, "")
 
-    # developer mode also writes a JSON/CSV bundle to analysis_results/
+    # debug mode also writes a JSON/CSV export to analysis_results/
     export_root = None
     if DEBUG_MODE:
         from utils.paths import APP_ROOT
@@ -542,10 +531,9 @@ def _run_analysis(uploaded, exercise_id: str) -> None:
             uploaded, exercise_id=exercise_id, progress=report, export_root=export_root
         )
     except _STREAMLIT_CONTROL_EXCEPTIONS:
-        raise  # st.rerun() / st.stop() - Streamlit's own flow control
+        raise  # st.rerun() / st.stop()
     except Exception:
-        # foreseeable problems already come back as a failure result; this is the
-        # rest, and without it the page stays pinned to "analysing"
+        # anything unexpected - otherwise the page gets stuck on "analysing"
         logger.exception("Analysis failed unexpectedly")
         slot.empty()
         st.session_state[RESULT] = unexpected_failure(getattr(uploaded, "name", ""), exercise_id)
@@ -553,14 +541,14 @@ def _run_analysis(uploaded, exercise_id: str) -> None:
         st.rerun()
 
     if result.is_demo:
-        # no real analyser for this exercise yet, so walk the stages briefly
+        # no real analyser, so just step through the stages
         for position in range(len(ANALYSIS_STAGES)):
             slot.markdown(_steps_markup(position, position), unsafe_allow_html=True)
             time.sleep(0.3)
 
     slot.markdown(_steps_markup(len(ANALYSIS_STAGES), None), unsafe_allow_html=True)
 
-    # keep only the few most recent runs; an evicted one loses its video dir
+    # keep only the last few runs and delete the video folders of the rest
     if result.success and not result.is_demo:
         cache[key] = result
         while len(cache) > 3:
@@ -621,6 +609,6 @@ def render() -> None:
         with results_col:
             _results_column(stage, uploaded, exercise_id)
 
-    # The lightbox lives at page level; analyse.js moves it to <body>.
+    # analyse.js moves the lightbox to <body>
     html(f'<div class="ff-page">{analysis_results.reference_modal(get_exercise(exercise_id))}</div>')
     html('<div class="ff-page"><div class="ax-footer-space"></div></div>')

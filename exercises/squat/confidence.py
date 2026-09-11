@@ -1,7 +1,6 @@
 """
-The squat's adapter over the shared confidence engine. All it adds is what the
-engine can't know: which landmarks a squat metric needs, which frames a squat
-rule reads, and where the bands sit.
+Squat wrapper around the shared confidence code - adds which landmarks and
+frames each squat metric uses, and the band values.
 """
 
 from __future__ import annotations
@@ -41,7 +40,6 @@ __all__ = [
 
 
 def bands_for(config: SquatConfig) -> ReliabilityBands:
-    """Reshape the squat config's banding into what the engine expects."""
     return ReliabilityBands(
         high_visibility=config.RELIABILITY_HIGH_VISIBILITY,
         high_measurable_ratio=config.RELIABILITY_HIGH_MEASURABLE_RATIO,
@@ -86,5 +84,4 @@ def gather_evidence(
 
 
 def reliability_for(evidence: MetricEvidence, config: SquatConfig) -> Reliability:
-    """Squat evidence -> one of the four reliability levels."""
     return _reliability_for(evidence, bands_for(config))

@@ -3,10 +3,8 @@ Pulldown phase detection and rep counting:
 
     TOP (extended) -> PULLING -> BOTTOM (contracted) -> RETURNING -> TOP
 
-The state machine is the shared one in exercises/common/phases.py, run on the
-mean elbow angle. This module only supplies thresholds and renames the generic
-phases; the guards that make the counting trustworthy live in the shared
-module, and the knobs live in config.py.
+Uses the shared state machine (exercises/common/phases.py) on the mean elbow
+angle. This file only sets the thresholds and renames the phases.
 """
 
 from __future__ import annotations
@@ -23,7 +21,7 @@ from exercises.common.phases import (
 
 from .config import PulldownConfig
 
-# Generic phase -> what the pulldown calls it.
+# generic phase -> pulldown phase
 PHASE_NAMES: dict[MovementPhase, PulldownPhase] = {
     MovementPhase.REST: PulldownPhase.TOP,
     MovementPhase.TOWARDS: PulldownPhase.PULLING,
@@ -35,10 +33,9 @@ PHASE_NAMES: dict[MovementPhase, PulldownPhase] = {
 
 def resting_extension(elbow_angles: np.ndarray, config: PulldownConfig) -> float:
     """
-    The elbow angle this person rests at between pulls. A high percentile rather
-    than the maximum, so one over-extended frame can't set the reference, then
-    clamped. Every segmentation threshold is measured from this - it is not a
-    technique criterion, that is ROM_TOP_EXTENSION_PASS.
+    Resting elbow angle between pulls. A high percentile instead of the max,
+    then clamped, so one odd frame can't set it. Only used for rep detection,
+    not technique (that's ROM_TOP_EXTENSION_PASS).
     """
     finite = elbow_angles[np.isfinite(elbow_angles)]
     if finite.size < 5:
@@ -48,8 +45,7 @@ def resting_extension(elbow_angles: np.ndarray, config: PulldownConfig) -> float
 
 
 def detection_config(config: PulldownConfig, reference: float) -> RepDetectionConfig:
-    """The pulldown's thresholds in the shared machine's vocabulary. The four
-    hysteresis levels are fixed margins below reference."""
+    """The pulldown thresholds in the format the shared state machine expects."""
     return RepDetectionConfig(
         rest_level=reference - config.REST_MARGIN,
         start_level=reference - config.PULL_START_MARGIN,
@@ -71,13 +67,12 @@ def detect_reps(
     config: PulldownConfig,
     reference: float | None = None,
 ) -> RepDetectionResult:
-    """Run the state machine over a smoothed mean-elbow-angle series. reference is
-    the resting extension, estimated from the series if not supplied."""
+    """Run the state machine over the smoothed mean elbow angle. reference is
+    estimated from the series if not given."""
     if reference is None:
         reference = resting_extension(elbow_angles, config)
     return detect_repetitions(elbow_angles, timestamps, detection_config(config, reference))
 
 
 def named_phases(phases: list[MovementPhase]) -> list[PulldownPhase]:
-    """Rename the generic per-frame phases for the pulldown."""
     return [PHASE_NAMES.get(phase, PulldownPhase.UNKNOWN) for phase in phases]

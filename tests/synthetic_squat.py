@@ -1,9 +1,6 @@
 """
-Synthetic side-view squat.
-
-A 33-landmark pose track from a 2D linkage: fixed ankle, tilting shank,
-rotating thigh, leaning torso. Only the detector's output is replaced. Faults
-you can dial in:
+Fake side-view squat for testing: a 33-landmark pose track built from a simple
+2D stick model, replacing only the detector's output. Faults you can set:
 
     depth        how deep each rep goes (1.0 = full depth)
     torso_gain   degrees of forward torso lean at full depth
@@ -23,7 +20,7 @@ from analysis.models import NUM_LANDMARKS, FramePoseData
 WIDTH, HEIGHT = 720, 1280
 FPS = 30.0
 
-# Body segment lengths, normalised to frame height.
+# segment lengths, normalised to frame height
 SHANK = 0.16
 THIGH = 0.16
 TORSO = 0.24
@@ -46,11 +43,8 @@ class SyntheticSpec:
     noise: float = 0.0
     visibility: float = 0.95
     heel_visibility: float = 0.95
-    # Horizontal offset between the near and far sides of the body, in normalised
-    # x, which is what the camera-angle heuristic measures. On this 720x1280 frame
-    # an offset of s gives a frontality ratio of about s * 2.34: ~0.26
-    # reads as diagonal, ~0.45 as front-on.
-    # normalised x, which is what the camera-angle heuristic measures. Small
+    # x offset between the near and far side of the body. On this 720x1280 frame
+    # the frontality ratio is about offset * 2.34 (~0.26 diagonal, ~0.45 front-on)
     side_offset: float = 0.012
 
 
@@ -91,8 +85,8 @@ def skeleton_at(d: float, spec: SyntheticSpec) -> dict[int, tuple[float, float]]
     elbow = (shoulder[0] + s * 0.05, shoulder[1] + 0.10)
     wrist = (elbow[0] + s * 0.05, elbow[1] + 0.08)
 
-    # Side-on, the far side nearly overlaps the near side. A bigger offset
-    # stands in for a diagonal or front-on camera.
+    # side-on the two sides nearly overlap, a bigger offset fakes a diagonal or
+    # front-on camera
     off = spec.side_offset
 
     def far(p):
@@ -125,7 +119,7 @@ def _bottom_weight(d: float) -> float:
 
 
 def make_pose_data(spec: SyntheticSpec, seed: int = 0) -> FramePoseData:
-    """The FramePoseData the detector would have returned for this spec."""
+    """What the detector would have returned for this spec."""
     profile = depth_profile(spec)
     n = len(profile)
     rng = np.random.default_rng(seed)

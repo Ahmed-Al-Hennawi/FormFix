@@ -1,14 +1,13 @@
 /* ==========================================================================
    FormFix - /analyse page behaviour
 
-   Loaded after main.js, on the analysis page only. Three small jobs:
+   Loaded after main.js, only on the analysis page. Three jobs:
 
      * the reference-technique lightbox  (open / close / Escape / backdrop)
      * the score count-up                (0 -> the real score)
      * scrolling the results into view   (mobile, where they sit below)
 
-   Everything degrades: without this file the page still renders, the results
-   still read correctly, and the reference card simply does nothing.
+   Without this the page still works, the reference card just does nothing.
    ========================================================================== */
 
 (function () {
@@ -41,10 +40,8 @@
   /* ----------------------------------------------------------------------
      Reference lightbox
 
-     The modal is emitted inside a Streamlit block, which can establish a
-     containing block for fixed positioning. Moving it to <body> - the same
-     trick main.js uses for the atmosphere - guarantees it covers the viewport.
-     Only the newest copy survives a rerun.
+     Moved to <body> (like the background in main.js) so position: fixed covers
+     the viewport. Only the newest copy is kept after a rerun.
      ---------------------------------------------------------------------- */
   var modal = doc.querySelector("[data-ax-modal]");
 
@@ -113,7 +110,7 @@
     closeModal();
   });
 
-  /* Keep focus inside the dialog while it is open. */
+  /* keep focus inside the dialog while it's open */
   on(doc, "focusin", function (event) {
     if (!modal || modal.hidden) return;
     var panel = modal.querySelector(".ax-modal__panel");
@@ -126,11 +123,8 @@
   /* ----------------------------------------------------------------------
      Reveal safety net
 
-     main.js observes [data-animate] elements when it is installed. Anything
-     that arrives afterwards - a rerun that renders the results - would stay at
-     opacity 0 if that observer had already finished with the page. This second
-     observer only ever picks up what is still unrevealed, so the two can never
-     fight over the same element.
+     Results rendered after main.js has set up its observer would stay at
+     opacity 0, so this picks up anything still not revealed.
      ---------------------------------------------------------------------- */
   var pending = doc.querySelectorAll("[data-animate]:not(.is-inview)");
 
@@ -155,8 +149,7 @@
 
   /* ----------------------------------------------------------------------
      Score count-up
-     The ring is animated by CSS; the number is counted here so the two land
-     together.
+     The ring is animated in CSS, the number here, so they finish together.
      ---------------------------------------------------------------------- */
   Array.prototype.forEach.call(doc.querySelectorAll("[data-ax-count-to]"), function (el) {
     var target = Number(el.getAttribute("data-ax-count-to"));
@@ -180,7 +173,7 @@
         return;
       }
       var t = Math.min(1, (elapsed - delay) / duration);
-      // the same easing curve as --ease-out, approximated
+      // roughly the same curve as --ease-out
       var eased = 1 - Math.pow(1 - t, 3);
       el.textContent = String(Math.round(target * eased));
       if (t < 1) frame = requestAnimationFrame(step);
@@ -194,10 +187,8 @@
   /* ----------------------------------------------------------------------
      Bring the results into view
 
-     On a phone the results sit underneath the upload panel, so a completed
-     analysis would otherwise finish off-screen. Only scrolls when the results
-     really are below the fold, and never fights a user who has already
-     scrolled there.
+     On a phone the results are under the upload panel, so scroll to them when
+     they're ready - only if they're actually off-screen.
      ---------------------------------------------------------------------- */
   var results = doc.querySelector("[data-ax-results]");
 
@@ -216,7 +207,7 @@
   }
 
   if (!results) {
-    // A new run resets the one-shot scroll.
+    // a new run resets the one-time scroll
     window.FormFixAnalyseScrolled = false;
   }
 })();

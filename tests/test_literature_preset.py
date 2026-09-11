@@ -1,7 +1,6 @@
 """
-The literature-derived squat preset, which is offered for comparison rather
-than adopted. These check it only moves values a paper actually speaks to,
-leaves the defaults alone, and carries its provenance with it.
+Tests for the literature squat preset: it only changes values a paper actually
+covers, leaves the defaults alone, and includes where each value came from.
 """
 
 from __future__ import annotations
@@ -17,7 +16,7 @@ from exercises.squat.literature_config import (
     literature_config,
 )
 
-# Values a paper in the reviewed set actually speaks to.
+# values a reviewed paper actually covers
 TECHNIQUE_FIELDS = {
     "DEPTH_KNEE_ANGLE_PASS",
     "DEPTH_KNEE_ANGLE_WARN",
@@ -30,8 +29,8 @@ TECHNIQUE_FIELDS = {
 
 class TestItOnlyChangesWhatItCanCite:
     def test_no_engineering_threshold_moves(self):
-        # No paper says anything about EMA weights or hysteresis levels, so
-        # moving one under a citation borrows authority it doesn't have.
+        # no paper covers EMA weights or hysteresis, so changing those under a
+        # citation would be misleading
         for field in fields(DEFAULT_CONFIG):
             if field.name in TECHNIQUE_FIELDS or field.name == "notes":
                 continue
@@ -47,7 +46,7 @@ class TestItOnlyChangesWhatItCanCite:
             and getattr(LITERATURE_CONFIG, field.name) != getattr(DEFAULT_CONFIG, field.name)
         }
         for name in changed:
-            # A FAIL bar is covered by its paired WARN entry.
+            # a FAIL bar is covered by its WARN entry
             root = name.replace("_FAIL", "_WARN")
             assert name in PROVENANCE or root in PROVENANCE, name
 
@@ -67,8 +66,7 @@ class TestItOnlyChangesWhatItCanCite:
 
 class TestTheValuesThemselves:
     def test_it_demands_a_deeper_squat_than_the_operational_default(self):
-        # Kotiuk et al. measured a supervised parallel squat, and a lower
-        # interior knee angle means a deeper one.
+        # Kotiuk et al. measured a supervised parallel squat (lower angle = deeper)
         assert LITERATURE_CONFIG.DEPTH_KNEE_ANGLE_PASS < DEFAULT_CONFIG.DEPTH_KNEE_ANGLE_PASS
 
     def test_the_depth_bands_stay_ordered(self):

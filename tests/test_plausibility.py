@@ -1,13 +1,9 @@
 """
-Does the movement match the exercise the user selected?
+Does the movement match the exercise the user picked? Stops e.g. a bench press
+uploaded as "shoulder press" getting detailed press feedback.
 
-The failure this prevents is specific: somebody uploads a bench press, picks
-"shoulder press" from the dropdown because it is the closest option, and gets
-a detailed, confident critique of an overhead press they never performed.
-
-Most of these tests are about NOT rejecting. The gate is one-directional on
-purpose - a genuine squat filmed awkwardly must survive it, so every check
-looks for a contradiction rather than for a good match.
+Most tests here are about NOT rejecting - a real squat filmed awkwardly has to
+pass, so the checks only look for contradictions.
 """
 
 from __future__ import annotations
@@ -66,7 +62,7 @@ def test_standing_still_is_not_a_squat():
 
 
 def test_one_odd_rep_cannot_reject_a_squat():
-    # Three good reps, one where the knee angle was mis-measured.
+    # three good reps and one mis-measured one
     result = check_squat(squats(95, 92, 179, 90))
     assert result.plausible
 
@@ -86,15 +82,12 @@ def test_normal_arm_travel_does_not_reject_a_squat():
 
 
 def test_a_real_overhead_press_passes():
-    # Anthropometry puts a locked-out press near 1.5 shoulder widths.
+    # a locked-out press is around 1.5 shoulder widths
     assert check_press(arms(120, 118, 122), wrist_above_shoulder_at_top=1.45).plausible
 
 
 def test_a_bench_press_is_rejected():
-    """
-    The case this module exists for. Good elbow range, clean reps, but filmed
-    lying down the wrists never rise above the shoulder line.
-    """
+    """Good elbow range and clean reps, but the wrists never go above the shoulders."""
     result = check_press(arms(115, 118, 120), wrist_above_shoulder_at_top=0.05)
     assert not result.plausible
     assert "overhead" in result.message.lower()

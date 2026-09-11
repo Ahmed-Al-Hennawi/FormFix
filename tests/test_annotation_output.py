@@ -1,9 +1,7 @@
 """
-The annotated-video writer.
-
-Mostly here because cv2.VideoWriter fails silently: no parent directory, no
-error, it just throws away every write. Took an FFmpeg complaint about a
-missing input before I worked out what was happening.
+Tests for the annotated video writer. Mostly here because cv2.VideoWriter fails
+silently if the folder doesn't exist - it took an FFmpeg error about a missing
+input before I worked out what was happening.
 """
 
 from __future__ import annotations
@@ -32,7 +30,7 @@ class TestWriterGuards:
         assert probe_video(target).readable
 
     def test_an_unopenable_target_raises_instead_of_silently_doing_nothing(self, tmp_path):
-        # Parent is a regular file, so the writer can't open the target.
+        # parent is a file, so the writer can't open the target
         blocker = tmp_path / "blocker"
         blocker.write_text("not a directory", encoding="utf-8")
         with pytest.raises(AnalysisFailure) as caught:
@@ -95,9 +93,8 @@ class TestAnalysersCreateTheirOwnOutputDirectory:
 
 class TestOverlayShowsWhatTheAnalysisUsed:
     """
-    Interpolated frames still get measured, so they still need a skeleton.
-    Gating on the raw detector flag made the figure vanish on 21 frames of a
-    710-frame clip.
+    Interpolated frames are still measured, so they need a skeleton too. Using
+    the raw detector flag made it vanish on 21 frames of a 710-frame clip.
     """
 
     def _pose_with_an_interpolated_gap(self):
@@ -143,9 +140,8 @@ class TestOverlayShowsWhatTheAnalysisUsed:
 
 class TestPhaseCaptionMatchesTheRepetition:
     """
-    An abandoned partial rep leaves stale frame labels inside the span of the
-    real rep that follows. The rules read the segmentation and don't care, but
-    the overlay was captioning the start of a rep "RETURNING".
+    An abandoned partial rep left old labels inside the next real rep, so the
+    overlay captioned the start of a rep "RETURNING".
     """
 
     def _states_for(self, analyser_module, reps, detection, metrics, frames):
@@ -230,13 +226,10 @@ class TestPhaseCaptionMatchesTheRepetition:
 
 class TestTheOverlayDrawsOnlyWhatTheDetectorActuallySaw:
     """
-    Side-on, MediaPipe returns the occluded far limbs at confidence 0.2-0.6,
-    and those guesses jump hundreds of pixels between frames. The measurements
-    ignore them, so I had a thrashing skeleton beside perfectly calm numbers.
-
-    So the overlay demands higher confidence from an occluded limb and drops
-    anything that moved further in one frame than a joint can. Neither gate
-    applies to a frontal view or a limb the exercise measures.
+    Side-on, MediaPipe guesses the hidden far limbs at 0.2-0.6 confidence and
+    they jump hundreds of pixels between frames, so the skeleton thrashed while
+    the numbers were calm. The overlay now needs higher confidence for a hidden
+    limb and drops impossible jumps (not for front views or measured limbs).
     """
 
     FRAMES = 40
@@ -327,8 +320,7 @@ class TestTheOverlayDrawsOnlyWhatTheDetectorActuallySaw:
     def test_a_frontal_view_keeps_both_sides(self):
         from analysis.models import RIGHT_KNEE, RIGHT_WRIST
 
-        # No far side to suppress, so only the jump gate applies - and this
-        # fixture trips it on some frames, hence "> 0" not FRAMES.
+        # only the jump gate applies here, and it trips on some frames, hence "> 0"
         drawn = self._drawn("frontal")
         assert drawn[RIGHT_KNEE] > 0
         assert drawn[RIGHT_WRIST] > 0
@@ -341,8 +333,7 @@ class TestTheOverlayDrawsOnlyWhatTheDetectorActuallySaw:
     def test_a_limb_the_exercise_measures_is_never_suppressed(self):
         from analysis.models import RIGHT_KNEE, RIGHT_WRIST
 
-        # A shoulder press is measured from both arms, so its far arm has to
-        # stay drawn even side-on.
+        # the press uses both arms, so the far arm stays drawn even side-on
         drawn = self._drawn("side", focus=frozenset({RIGHT_KNEE, RIGHT_WRIST}))
         assert drawn[RIGHT_KNEE] > 0
         assert drawn[RIGHT_WRIST] > 0
@@ -358,13 +349,12 @@ class TestTheOverlayDrawsOnlyWhatTheDetectorActuallySaw:
         assert policy.accept_position(1, 0, 100.0, 100.0)
         for offset in range(1, MAX_CONSECUTIVE_JUMP_REJECTS + 1):
             assert not policy.accept_position(1, offset, 900.0, 900.0)
-        # After enough consecutive rejects it has to be allowed back, or a
-        # camera cut would suppress the landmark for the rest of the clip.
+        # after enough rejects it has to come back, or a camera cut would hide it
+        # for the rest of the clip
         assert policy.accept_position(1, MAX_CONSECUTIVE_JUMP_REJECTS + 1, 900.0, 900.0)
 
     def test_a_track_without_confidence_values_is_still_drawn_in_full(self):
-        # Synthetic fixtures carry no per-landmark confidence, and gating on
-        # it there would hide the entire skeleton.
+        # synthetic data has no confidence, so gating on it would hide everything
         import numpy as np
 
         from analysis.annotation import _draw_policy, _drawable_points

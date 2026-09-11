@@ -1,15 +1,9 @@
 """
-The drawing half of the annotated video. What goes on each frame is
-annotation.py's job; this only gets points, colours and states and paints them:
-the frame, a thin cyan skeleton, the focus chain heavier and glowing, joint
-highlights on whatever a finding was measured from, then the small labels.
+Drawing code for the annotated video. annotation.py decides what goes on each
+frame, this file just paints it through OverlayCanvas.
 
-Everything goes through OverlayCanvas, which composites with real per-stroke
-transparency and an optional bloom.
-
-Two traps: colours are BGR, not the CSS hex of the same palette (cyan #00F0FF
-is (255, 240, 0) here), and every size scales with the frame, so a 480p clip
-and a 4K export get the same visual weight.
+Watch out: colours are BGR, not the CSS hex (cyan #00F0FF is (255, 240, 0)
+here), and all sizes scale with the frame so 480p and 4K look the same.
 """
 
 from __future__ import annotations
@@ -44,7 +38,7 @@ from .models import (
     RIGHT_WRIST,
 )
 
-# --- Palette - the site's "Cyber Pulse" tokens, in OpenCV's BGR order ---
+# --- "Cyber Pulse" palette from the site, in BGR order ---
 
 CYAN = (255, 240, 0)  # #00F0FF - tracking, measurements, the skeleton
 LIME = (20, 255, 57)  # #39FF14 - inside the rule
@@ -53,7 +47,7 @@ RED = (118, 90, 255)  # #FF5A76 - failed check (site's --poor token)
 WHITE = (255, 255, 255)
 DEEP_SPACE = (43, 19, 11)  # #0B132B - label and HUD backgrounds
 
-# Status level -> colour, same vocabulary as the results page.
+# status level -> colour, same as the results page
 LEVEL_COLOURS: dict[str, tuple[int, int, int]] = {
     "pass": LIME,
     "warning": AMBER,
@@ -61,8 +55,8 @@ LEVEL_COLOURS: dict[str, tuple[int, int, int]] = {
     "info": CYAN,
 }
 
-# limb landmarks per side: the ones that vanish behind the torso in a side
-# view. Shoulder and hip stay out - they give the drawn torso its width.
+# limb landmarks per side that disappear behind the torso in a side view.
+# Shoulder and hip aren't included, they give the torso its width.
 SIDE_LIMB_LANDMARKS: dict[str, frozenset[int]] = {
     "left": frozenset(
         {LEFT_ELBOW, LEFT_WRIST, LEFT_KNEE, LEFT_ANKLE, LEFT_HEEL, LEFT_FOOT_INDEX, LEFT_EAR}
@@ -72,7 +66,7 @@ SIDE_LIMB_LANDMARKS: dict[str, frozenset[int]] = {
     ),
 }
 
-# the joints a beginner thinks about. Only these get the ringed treatment.
+# the joints a beginner thinks about - only these get rings
 KEY_JOINTS: frozenset[int] = frozenset(
     {
         LEFT_SHOULDER,
@@ -93,14 +87,13 @@ KEY_JOINTS: frozenset[int] = frozenset(
 # no face landmark feeds any exercise, so just one dim head marker
 HEAD_LANDMARK = NOSE
 
-# skeleton segments, same topology the analysis reads
 SEGMENTS: tuple[tuple[int, int], ...] = BODY_CONNECTIONS
 
 
 @dataclass(frozen=True)
 class JointAngle:
-    """One joint angle worth drawing. Recomputed at draw time from the same
-    smoothed coordinates the analysis used, so the two can't disagree."""
+    """A joint angle to draw, recomputed from the same smoothed coordinates as the
+    analysis so the two can't disagree."""
 
     label: str
     proximal: int
@@ -111,9 +104,8 @@ class JointAngle:
 
 @dataclass(frozen=True)
 class OverlayStyle:
-    """Every drawing size for one video. Tuned at a 720px short edge and clamped
-    both ways, so a low-res clip keeps readable hairlines and 4K doesn't get a
-    12px skeleton."""
+    """All drawing sizes for one video. Tuned at a 720px short edge and clamped so
+    low-res clips stay readable and 4K doesn't get a 12px skeleton."""
 
     width: int
     height: int
@@ -135,9 +127,8 @@ class OverlayStyle:
     @classmethod
     def for_frame(cls, width: int, height: int, body_pixels: float | None = None) -> OverlayStyle:
         """
-        Build the style for one video. body_pixels is the athlete's torso length in
-        pixels where we know it - frame size alone isn't enough, since the same 1080p
-        clip might hold someone filling the frame or standing six feet back.
+        body_pixels is the athlete's torso length if known. Frame size alone isn't
+        enough, the person might fill the frame or stand six feet back.
         """
         short_edge = max(min(int(width), int(height)), 1)
         scale = max(0.55, min(2.0, short_edge / 720.0))
@@ -172,15 +163,10 @@ class OverlayStyle:
 
 class OverlayCanvas:
     """
-    Alpha- and glow-aware drawing surface for one video.
-
-    OpenCV primitives are opaque, and the usual copy-draw-blend trick forces every
-    stroke to share one opacity. So there are two buffers: the colour being painted
-    and a coverage mask with each stroke's own alpha, composited once per frame. A
-    third collects the glowing elements and is blurred in.
-
-    All three are allocated once per video and only the box that was touched gets
-    cleared and composited, which is what makes this affordable at 1080p.
+    Drawing surface with per-stroke transparency and glow. OpenCV draws opaque
+    shapes, so I paint into a colour buffer plus an alpha mask and blend once per
+    frame, with a third buffer blurred in for the glow. Only the touched area is
+    cleared and blended, which keeps it fast at 1080p.
     """
 
     def __init__(self, width: int, height: int, style: OverlayStyle) -> None:
@@ -193,8 +179,6 @@ class OverlayCanvas:
         self._bounds: tuple[int, int, int, int] | None = None
         self._glow_used = False
         self.frame: np.ndarray | None = None
-
-    # --- frame lifecycle ---
 
     def begin(self, frame: np.ndarray) -> None:
         """Start a new frame, clearing only what the previous one touched."""
@@ -216,7 +200,7 @@ class OverlayCanvas:
         roi = self.frame[y0:y1, x0:x1]
 
         if self._glow_used:
-            # blur the bloom at quarter res: much cheaper, and a softer falloff
+            # blur the glow at quarter res - cheaper and softer
             glow = np.ascontiguousarray(self._glow[y0:y1, x0:x1])
             height, width = glow.shape[:2]
             small = cv2.resize(
@@ -236,8 +220,6 @@ class OverlayCanvas:
         foreground = cv2.multiply(painted, mask3, scale=1.0 / 255.0)
         background = cv2.multiply(np.ascontiguousarray(roi), cv2.bitwise_not(mask3), scale=1.0 / 255.0)
         roi[:] = cv2.add(foreground, background)
-
-    # --- internals ---
 
     def _touch(self, points, margin: int) -> None:
         """Grow the dirty rect so commit knows what to composite."""
@@ -415,9 +397,8 @@ def draw_connection(
     glow: float = 0.0,
     shadow: bool = True,
 ) -> None:
-    """One skeleton link; focus links are heavier and glow. The translucent dark
-    stroke underneath is because cyan on a pale wall or a white t-shirt is nearly
-    invisible."""
+    """One skeleton link. The dark stroke underneath is there because cyan on a
+    pale wall or white t-shirt is almost invisible."""
     thickness = style.link_focus if focus else style.link
     if shadow:
         canvas.line(start, end, DEEP_SPACE, thickness + max(2, style.ring_w), alpha=alpha * 0.34)
@@ -434,8 +415,7 @@ def draw_joint_node(
     alpha: float = 1.0,
     glow: float = 0.0,
 ) -> None:
-    """A tracking node: coloured ring around a white core. Same size for every
-    joint - colour and halo pick out the measured ones."""
+    """Coloured ring around a white core, same size for every joint."""
     radius = style.key_node_r
     canvas.circle(point, radius + style.ring_w, DEEP_SPACE, -1, alpha=alpha * 0.4)
     canvas.circle(point, radius, colour, style.ring_w, alpha=alpha, glow=glow if key else 0.0)
@@ -454,8 +434,7 @@ def draw_analysis_label(
     accent: bool = False,
     alpha: float = 0.92,
 ) -> tuple[int, int]:
-    """A small translucent chip, the only text allowed near the body. Returns
-    (width, height) so callers can stack chips."""
+    """Small translucent chip. Returns (width, height) so chips can be stacked."""
     scale = style.text if size is None else size
     tw, th = _text_size(value, style, scale)
     pad_x = max(4, int(round(7 * style.scale)))
@@ -502,8 +481,7 @@ def draw_joint_angle(
     arc: bool = True,
     value: float | None = None,
 ) -> None:
-    """The angle at one joint: a light arc between the two segments with the value
-    beside it. Undefined angles draw nothing."""
+    """Arc between the two segments with the angle value beside it."""
     angle = calculate_angle(proximal, vertex, distal) if value is None else value
     if angle is None or not math.isfinite(angle):
         return
@@ -516,8 +494,8 @@ def draw_joint_angle(
     if a_len < 1e-6 or b_len < 1e-6:
         return
 
-    # Keep the arc joint-sized. Scaled to the whole limb it sweeps right
-    # across the body on a nearly straight leg.
+    # keep the arc joint-sized, otherwise it sweeps across the body on a
+    # nearly straight leg
     radius = int(max(style.key_node_r * 2.0, min(a_len, b_len) * 0.26))
     radius = int(min(radius, 38 * style.scale, max(a_len, b_len) * 0.5))
     a_deg = math.degrees(math.atan2(a_vec[1], a_vec[0]))
@@ -534,8 +512,7 @@ def draw_joint_angle(
             alpha=0.55,
         )
 
-    # Label goes on the bisector just outside the arc, so it never sits on
-    # top of the limb it describes.
+    # put the label on the bisector just outside the arc so it's not on the limb
     mid = math.radians(a_deg + ((b_deg - a_deg + 540.0) % 360.0 - 180.0) / 2.0)
     offset = radius + int(round(10 * style.scale))
     anchor = (v[0] + math.cos(mid) * offset, v[1] + math.sin(mid) * offset)
@@ -543,8 +520,7 @@ def draw_joint_angle(
 
 
 def _draw_degrees(canvas: OverlayCanvas, number: str, centre, style: OverlayStyle, colour) -> None:
-    """The value plus a hand-drawn degree ring - OpenCV's Hershey fonts are ASCII
-    only, so the degree symbol has to be a circle."""
+    """OpenCV's Hershey fonts are ASCII only, so the degree sign is a drawn circle."""
     size = style.text
     tw, th = _text_size(number, style, size)
     ring_r = max(1, int(round(1.6 * style.scale)))
@@ -580,8 +556,7 @@ def highlight_issue_region(
     *,
     colour=AMBER,
 ) -> None:
-    """Ring the joints a finding was measured from. Only those - colouring the whole
-    skeleton would imply we judged body parts nothing measured."""
+    """Ring only the joints a finding was measured from, not the whole skeleton."""
     marked = {lm: points[lm] for lm in landmarks if lm in points}
     if not marked:
         return
@@ -599,8 +574,8 @@ def _draw_head(
     alphas: dict[int, float],
     style: OverlayStyle,
 ) -> None:
-    """One dim ring for the head. No rule reads the face, but a headless figure
-    looks like a diagram, not a person."""
+    """Dim ring for the head. No rule uses it, but without it the figure looks
+    like a diagram, not a person."""
     head = points.get(HEAD_LANDMARK)
     if head is None:
         return
@@ -609,7 +584,6 @@ def _draw_head(
     if left is not None and right is not None:
         neck = ((left[0] + right[0]) // 2, (left[1] + right[1]) // 2)
         canvas.line(head, neck, CYAN, style.link, alpha=alpha * 0.85)
-    # Drawn like any other node, just quieter, since no rule uses it.
     draw_joint_node(canvas, head, style, colour=CYAN, alpha=alpha)
 
 
@@ -624,13 +598,9 @@ def draw_formfix_pose(
     inside_rep: bool = False,
 ) -> None:
     """
-    The skeleton itself, in three states: joints a finding was measured from get
-    the warning colour, the chain this exercise measures is cyan and heavier, and
-    everything else is a thin hairline.
-
-    Left and right draw the same. Fading the camera-far side left half the body
-    hanging off the other like a ghost, and a confidence gradient is no use to a
-    beginner - occlusion is a yes/no call in annotation.MIN_FAR_SIDE_VISIBILITY.
+    The skeleton: flagged joints in the warning colour, the measured chain cyan
+    and heavier, everything else a thin line. Left and right are drawn the same -
+    fading the far side looked like a ghost.
     """
     for a, b in SEGMENTS:
         pa, pb = points.get(a), points.get(b)
@@ -668,8 +638,7 @@ def draw_formfix_pose(
 
 
 def draw_hud(canvas: OverlayCanvas, lines, style: OverlayStyle) -> None:
-    """Rep counter, phase and at most two live values as small chips. Kept short -
-    the clip is there to show where a finding came from, not to be a dashboard."""
+    """Rep counter, phase and at most two live values as small chips."""
     x = style.pad
     y = style.pad
     for text, colour, accent in lines[:4]:
@@ -678,15 +647,14 @@ def draw_hud(canvas: OverlayCanvas, lines, style: OverlayStyle) -> None:
 
 
 def draw_status_pill(canvas: OverlayCanvas, text: str, style: OverlayStyle, *, colour=AMBER) -> None:
-    """One-line finding, shown while its evidence is on screen. A pill rather than a
-    banner, since the body highlight already points at it."""
+    """One-line finding, shown while its evidence is on screen."""
     _, height = _text_size(text, style)
     y = canvas.height - style.pad - height - max(6, int(round(10 * style.scale)))
     draw_analysis_label(canvas, text, (style.pad, y), style, colour=colour, accent=True)
 
 
 def draw_watermark(canvas: OverlayCanvas, style: OverlayStyle, text: str = "FORMFIX") -> None:
-    """A quiet product mark in the top-right corner."""
+    """Small logo text in the top-right corner."""
     canvas.text(
         text,
         (
@@ -706,8 +674,7 @@ def draw_turning_point_marker(
     label: str,
     style: OverlayStyle,
 ) -> None:
-    """Dashed marker through the rep's turning point (bottom of a squat, lockout of
-    a press), with a label."""
+    """Dashed marker at the rep's turning point (squat bottom, press lockout)."""
     half = int(round(70 * style.scale))
     x, y = int(anchor[0]), int(anchor[1])
     dash = max(4, int(round(9 * style.scale)))

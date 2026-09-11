@@ -1,8 +1,7 @@
 """
-Section 4 - the exercise explorer. All three exercises are rendered into the
-DOM at once; main.js just changes which one is current and the CSS handles the
-crossfade. It has to be CSS, not a Python callback, because a Streamlit
-rerun resets the scroll position and throws you out of the section.
+Section 4 - the exercise explorer. All three exercises are in the DOM at once
+and main.js switches between them with a CSS crossfade. A Python callback
+would rerun Streamlit and jump the scroll position.
 """
 
 from __future__ import annotations
@@ -30,7 +29,7 @@ def _tabs() -> str:
 
 
 def _panels() -> str:
-    """Left-hand copy column: one panel per exercise, all but one hidden."""
+    """Left text column: one panel per exercise, all but one hidden."""
     panels = []
     for index, exercise in enumerate(EXERCISES):
         areas = "".join(f"<li>{area}</li>" for area in exercise.areas)
@@ -74,10 +73,10 @@ def _metrics() -> str:
 
 
 def _previews() -> str:
-    """One card per exercise, but the visible one is the *next* exercise."""
+    """One card per exercise - the visible one is the *next* exercise."""
     cards = []
     for index, exercise in enumerate(EXERCISES):
-        # We start on the squat, so index 1 is what's up next.
+        # starts on the squat, so index 1 is next
         hidden = "" if index == 1 % len(EXERCISES) else " hidden"
         cards.append(
             f'<span class="explorer__preview-item" data-index="{index}"{hidden}>'

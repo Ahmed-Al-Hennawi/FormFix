@@ -1,8 +1,7 @@
 """
-Video reading, probing and H.264 output. Nothing here trusts the reported
-metadata, frames are streamed rather than decoded into memory, and the output
-is re-encoded with FFmpeg because cv2 only gives mp4v, which most browsers
-won't play. If FFmpeg is missing the mp4v file comes back and the UI warns.
+Reading videos and writing the H.264 output. Metadata isn't trusted, frames
+are streamed instead of loaded into memory, and the output is re-encoded with
+FFmpeg because most browsers won't play cv2's mp4v.
 """
 
 from __future__ import annotations
@@ -24,7 +23,7 @@ from .models import AnalysisFailure, FailureCode, VideoMetadata
 
 logger = logging.getLogger(__name__)
 
-# used only when the container reports no usable FPS
+# only used when the file reports no usable FPS
 DEFAULT_FPS = 30.0
 
 # scratch space for uploads and rendered output
@@ -32,7 +31,6 @@ _WORK_ROOT = Path(tempfile.gettempdir()) / "formfix_analysis"
 
 
 def new_session_dir() -> Path:
-    """A unique scratch directory for one analysis run."""
     session = _WORK_ROOT / uuid.uuid4().hex[:12]
     session.mkdir(parents=True, exist_ok=True)
     return session
@@ -43,8 +41,8 @@ SESSION_TTL_SECONDS: float = 6 * 60 * 60
 
 
 def purge_stale_sessions(ttl_seconds: float = SESSION_TTL_SECONDS) -> int:
-    """Delete scratch dirs left by earlier runs - a closed tab or a restart leaves
-    rendered video in temp forever. Never raises."""
+    """Delete scratch dirs from earlier runs, since a closed tab or restart would
+    leave videos in temp forever. Never raises."""
     if not _WORK_ROOT.is_dir():
         return 0
     cutoff = time.time() - ttl_seconds
@@ -81,8 +79,7 @@ def cleanup_session_dir(session_dir: Path, keep: tuple[Path, ...] = ()) -> None:
 
 
 def probe_video(path: Path) -> VideoMetadata:
-    """Read the file's metadata, treating every value as suspect. A broken file
-    comes back with readable False instead of raising."""
+    """Read the file's metadata. A broken file returns readable=False instead of raising."""
     width = height = frame_count = 0
     fps = 0.0
     fourcc = ""
@@ -125,7 +122,6 @@ def probe_video(path: Path) -> VideoMetadata:
 
 @contextmanager
 def open_video(path: Path) -> Iterator[cv2.VideoCapture]:
-    """cv2.VideoCapture with guaranteed release."""
     capture = cv2.VideoCapture(str(path))
     try:
         yield capture
@@ -134,7 +130,6 @@ def open_video(path: Path) -> Iterator[cv2.VideoCapture]:
 
 
 def iter_frames(capture: cv2.VideoCapture) -> Iterator[tuple[int, np.ndarray]]:
-    """Yield (frame_index, BGR frame) in original order, streaming."""
     index = 0
     while True:
         ok, frame = capture.read()
@@ -149,10 +144,8 @@ def iter_frames(capture: cv2.VideoCapture) -> Iterator[tuple[int, np.ndarray]]:
 
 def _ffmpeg_executable() -> str | None:
     """
-    The FFmpeg binary to use: the system one when installed, otherwise the
-    static build shipped by the imageio-ffmpeg wheel. Streamlit Community
-    Cloud installs no apt packages, so the pip-provided binary is what runs
-    there; a local `brew install ffmpeg` still takes precedence.
+    System FFmpeg if installed, otherwise the one from imageio-ffmpeg (which is
+    what runs on Streamlit Community Cloud).
     """
     system = shutil.which("ffmpeg")
     if system:
@@ -173,7 +166,6 @@ def ffmpeg_available() -> bool:
 
 
 def _render_failure() -> AnalysisFailure:
-    """The failure raised when the annotated clip can't be written."""
     return AnalysisFailure(
         FailureCode.VIDEO_RENDER_ERROR,
         "The analysed video could not be written on this machine.",
@@ -184,10 +176,8 @@ def _render_failure() -> AnalysisFailure:
 @contextmanager
 def open_writer(path: Path, fps: float, size: tuple[int, int]) -> Iterator[cv2.VideoWriter]:
     """
-    cv2.VideoWriter for the mp4v intermediate, released on exit.
-
-    It doesn't create the parent folder and doesn't error when it can't open the
-    file - it just silently drops every write. Hence the mkdir and isOpened check.
+    cv2.VideoWriter for the mp4v file. It silently drops every write if it can't
+    open the file, hence the mkdir and isOpened check.
     """
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
@@ -207,9 +197,8 @@ def open_writer(path: Path, fps: float, size: tuple[int, int]) -> Iterator[cv2.V
 
 def convert_to_h264(source: Path, target: Path, timeout: int = 600) -> bool:
     """
-    Re-encode to H.264 so browsers can play it. False on failure, and the caller
-    keeps the mp4v rather than losing the run. +faststart puts the moov atom at
-    the front so playback can start early; -an drops the audio.
+    Re-encode to H.264 so browsers can play it. Returns False on failure (the
+    caller keeps the mp4v). +faststart lets playback start early, -an drops audio.
     """
     executable = _ffmpeg_executable()
     if executable is None:

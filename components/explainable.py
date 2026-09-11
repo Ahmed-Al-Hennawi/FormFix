@@ -1,7 +1,6 @@
 """
-Section 5 - explainable feedback: the explanation card, then the trace behind
-it. The worked example is quoted from the squat's real depth rule rather than
-invented - the three card lines are its own wording, and 115 degrees is the
+Section 5 - explainable feedback: the explanation card and the trace behind
+it. The example uses the real squat depth rule wording, and 115 degrees is the
 actual DEPTH_KNEE_ANGLE_WARN.
 """
 

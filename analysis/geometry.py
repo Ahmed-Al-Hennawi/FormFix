@@ -54,8 +54,7 @@ def distance(a: Point | None, b: Point | None) -> float:
 
 
 def horizontal_distance(a: Point | None, b: Point | None) -> float:
-    """|ax - bx| in pixels. Separate from distance so a straight-line distance
-    can't stand in for a frontal-plane one."""
+    """|ax - bx| in pixels, kept separate from distance on purpose."""
     if _is_bad(a) or _is_bad(b):
         return float("nan")
     return abs(a[0] - b[0])
@@ -69,7 +68,7 @@ def vertical_offset(a: Point | None, b: Point | None) -> float:
 
 
 def midpoint(a: Point | None, b: Point | None) -> Point | None:
-    """Midpoint of two points; None when either is missing."""
+    """None when either point is missing."""
     if _is_bad(a) or _is_bad(b):
         return None
     return ((a[0] + b[0]) / 2.0, (a[1] + b[1]) / 2.0)

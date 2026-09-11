@@ -1,7 +1,6 @@
 """
-The pulldown's wording. The aggregation is shared
-(exercises/common/feedback.py); the only pulldown-specific parts are the two
-tables below.
+Pulldown feedback wording. The logic is shared (exercises/common/feedback.py),
+this file just has the pulldown templates and which values to print.
 """
 
 from __future__ import annotations
@@ -53,8 +52,7 @@ __all__ = [
 
 POSITIVES_OPENING = "{n} full rep{s} completed"
 
-# feedback_key -> wording. Each entry has the beginner's three lines plus the
-# plain-language description shown in the "how did we detect this" panel.
+# feedback_key -> wording
 FEEDBACK_TEMPLATES: dict[str, FeedbackTemplate] = {
     "pulldown_rom": FeedbackTemplate(
         title="Movement range",
@@ -83,9 +81,7 @@ FEEDBACK_TEMPLATES: dict[str, FeedbackTemplate] = {
     ),
 }
 
-# Which measured values a finding prints, and in what units - the numbers the
-# rule compared against its threshold.
-# numbers the rule compared against its threshold, so the evidence a user
+# which measured values a finding prints, and their units
 EVIDENCE_FORMATS = {
     "bottom_elbow_angle": lambda v: f"elbow closed to {float(v):.0f} deg",
     "top_elbow_angle": lambda v: f"elbow extended to {float(v):.0f} deg",
@@ -95,7 +91,6 @@ EVIDENCE_FORMATS = {
 
 
 def template_for(rule: RuleResult) -> FeedbackTemplate:
-    """Look up a pulldown rule's wording by its declared feedback key."""
     return _template_for(rule, FEEDBACK_TEMPLATES)
 
 
@@ -105,7 +100,6 @@ def build_findings(rule_results: list[RuleResult]) -> list[FeedbackFinding]:
 
 
 def build_rep_summaries(reps: list, rule_results: list[RuleResult]) -> list[RepSummary]:
-    """One verdict per rep."""
     return _build_rep_summaries(reps, rule_results, FEEDBACK_TEMPLATES)
 
 
@@ -115,10 +109,8 @@ def build_overview(rule_results: list[RuleResult]) -> list[str]:
 
 
 def build_not_assessed(rule_results: list[RuleResult]) -> list[NotAssessedItem]:
-    """The checks we did not judge, with the reason for each."""
     return _build_not_assessed(rule_results, FEEDBACK_TEMPLATES)
 
 
 def build_summary(reps: list, partial_movements: int, rule_results: list[RuleResult]) -> SessionSummary:
-    """Everything the results page needs for the set as a whole."""
     return _build_summary(reps, partial_movements, rule_results, FEEDBACK_TEMPLATES, POSITIVES_OPENING)

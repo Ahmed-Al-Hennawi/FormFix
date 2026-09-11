@@ -70,7 +70,7 @@ class TestDepthRule:
         assert result.status is RuleStatus.WARNING
 
     def test_hip_below_knee_passes_despite_knee_angle(self):
-        # Hip below knee is the other way a rep can pass on depth.
+        # hip below knee is the other way to pass on depth
         result = rule_squat_depth(
             [make_rep(min_knee_angle=108.0, hip_above_knee_at_bottom=0.02)], CONFIG
         )
@@ -109,7 +109,7 @@ class TestTorsoLeanRule:
         assert result.status is RuleStatus.WARNING
 
     def test_baseline_delta_triggers(self):
-        # Under the absolute fail bar, but a big change from baseline.
+        # under the absolute limit, but a big change from baseline
         lean = CONFIG.TORSO_LEAN_FAIL - 2
         result = rule_torso_lean(
             [make_rep(max_torso_lean=lean)], lean - CONFIG.TORSO_LEAN_DELTA_FAIL - 1, CONFIG
@@ -131,8 +131,7 @@ class TestHeelLiftRule:
         assert result.status is RuleStatus.WARNING
 
     def test_unreliable_heels_never_judged(self):
-        # Unreliable landmarks give NOT_EVALUABLE either way, so neither a
-        # false pass nor a fail.
+        # unreliable landmarks give NOT_EVALUABLE, not a pass or fail
         result = rule_heel_lift([make_rep(max_heel_lift=0.12, heel_reliable=False)], CONFIG)
         assert result.status is RuleStatus.NOT_EVALUABLE
         result = rule_heel_lift([make_rep(max_heel_lift=0.0, heel_reliable=False)], CONFIG)
@@ -165,7 +164,7 @@ class TestExtensionRule:
         assert result.status is RuleStatus.WARNING
 
     def test_compares_to_own_baseline_not_180(self):
-        # Someone whose comfortable stance is 168 deg isn't penalised for it.
+        # someone who stands at 168 deg isn't penalised for it
         result = rule_extension([make_rep(end_knee_angle=160.0)], 168.0, CONFIG)
         assert result.status is RuleStatus.PASS
 

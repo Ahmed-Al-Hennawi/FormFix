@@ -1,7 +1,6 @@
 """
-Body-relative normalisation. Scales and shifts a synthetic body around the
-frame and checks the normalised numbers stay put, which is the whole point of
-normalising in the first place.
+Tests for normalisation: moving and resizing a body in the frame shouldn't
+change the normalised numbers.
 """
 
 from __future__ import annotations
@@ -12,7 +11,7 @@ from analysis.normalisation import body_scale, hip_centred, normalise, torso_ref
 
 
 def body(scale: float = 1.0, offset=(0.0, 0.0)):
-    """A rough upright body in pixels, at a given size and frame position."""
+    """Rough upright body in pixels at a given size and position."""
     ox, oy = offset
     return {
         "left_shoulder": (ox + 100 * scale, oy + 100 * scale),
