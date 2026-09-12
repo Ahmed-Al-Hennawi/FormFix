@@ -104,8 +104,13 @@ class JointAngle:
 
 @dataclass(frozen=True)
 class OverlayStyle:
-    """All drawing sizes for one video. Tuned at a 720px short edge and clamped so
-    low-res clips stay readable and 4K doesn't get a 12px skeleton."""
+    """
+    All drawing sizes for one video. Tuned at a 720px short edge and clamped so
+    low-res clips stay readable and 4K doesn't get a 12px skeleton.
+
+    The skeleton is deliberately thin: the person is the subject, the overlay is
+    there to show how FormFix followed them.
+    """
 
     width: int
     height: int
@@ -141,13 +146,14 @@ class OverlayStyle:
             width=int(width),
             height=int(height),
             scale=scale,
-            # same weight and radius everywhere - colour and glow pick out the joint
-            link=px(3.0, 2),
-            link_focus=px(3.0, 2),
-            node_r=px(6.0, 4),
-            key_node_r=px(6.0, 4),
-            core_r=px(2.4, 1),
-            ring_w=px(1.6),
+            # one weight and one radius everywhere: a skeleton that changes
+            # thickness as it moves reads as a bug, not as emphasis
+            link=px(2.6, 2),
+            link_focus=px(2.6, 2),
+            node_r=px(3.9, 3),
+            key_node_r=px(3.9, 3),
+            core_r=px(1.9, 1),
+            ring_w=px(1.0),
             text=0.46 * scale,
             text_small=0.38 * scale,
             text_weight=max(1, int(round(1.15 * scale))),
@@ -397,12 +403,14 @@ def draw_connection(
     glow: float = 0.0,
     shadow: bool = True,
 ) -> None:
-    """One skeleton link. The dark stroke underneath is there because cyan on a
-    pale wall or white t-shirt is almost invisible."""
+    """One skeleton link: a thin line over a thinner dark edge, because cyan on a
+    pale wall or a white t-shirt is almost invisible. No glow - it spread the
+    skeleton over the body and looked like a screensaver."""
+    del glow
     thickness = style.link_focus if focus else style.link
     if shadow:
-        canvas.line(start, end, DEEP_SPACE, thickness + max(2, style.ring_w), alpha=alpha * 0.34)
-    canvas.line(start, end, colour, thickness, alpha=alpha, glow=glow)
+        canvas.line(start, end, DEEP_SPACE, thickness + 2, alpha=alpha * 0.30)
+    canvas.line(start, end, colour, thickness, alpha=alpha)
 
 
 def draw_joint_node(
@@ -410,16 +418,15 @@ def draw_joint_node(
     point,
     style: OverlayStyle,
     *,
-    colour=CYAN,
+    colour=WHITE,
     key: bool = False,
     alpha: float = 1.0,
     glow: float = 0.0,
 ) -> None:
-    """Coloured ring around a white core, same size for every joint."""
-    radius = style.key_node_r
-    canvas.circle(point, radius + style.ring_w, DEEP_SPACE, -1, alpha=alpha * 0.4)
-    canvas.circle(point, radius, colour, style.ring_w, alpha=alpha, glow=glow if key else 0.0)
-    canvas.circle(point, style.core_r + 1, WHITE, -1, alpha=min(1.0, alpha + 0.1))
+    """A small filled dot with a thin dark edge, the same size at every joint."""
+    del key, glow
+    canvas.circle(point, style.node_r + 1, DEEP_SPACE, -1, alpha=alpha * 0.45)
+    canvas.circle(point, style.node_r, colour, -1, alpha=alpha)
 
 
 def draw_analysis_label(
@@ -574,17 +581,21 @@ def _draw_head(
     alphas: dict[int, float],
     style: OverlayStyle,
 ) -> None:
-    """Dim ring for the head. No rule uses it, but without it the figure looks
-    like a diagram, not a person."""
+    """
+    One faint dot for the head and a neck line to the shoulders. No face
+    landmarks: MediaPipe tracks eyes, ears and mouth, but drawing them puts a
+    mask over the person's face, which is the part of the overlay everybody
+    finds unpleasant.
+    """
     head = points.get(HEAD_LANDMARK)
     if head is None:
         return
-    alpha = 0.62 * alphas.get(HEAD_LANDMARK, 1.0)
+    alpha = 0.55 * alphas.get(HEAD_LANDMARK, 1.0)
     left, right = points.get(LEFT_SHOULDER), points.get(RIGHT_SHOULDER)
     if left is not None and right is not None:
         neck = ((left[0] + right[0]) // 2, (left[1] + right[1]) // 2)
-        canvas.line(head, neck, CYAN, style.link, alpha=alpha * 0.85)
-    draw_joint_node(canvas, head, style, colour=CYAN, alpha=alpha)
+        draw_connection(canvas, head, neck, style, colour=CYAN, alpha=alpha, shadow=False)
+    draw_joint_node(canvas, head, style, colour=WHITE, alpha=alpha)
 
 
 def draw_formfix_pose(
@@ -598,40 +609,28 @@ def draw_formfix_pose(
     inside_rep: bool = False,
 ) -> None:
     """
-    The skeleton: flagged joints in the warning colour, the measured chain cyan
-    and heavier, everything else a thin line. Left and right are drawn the same -
-    fading the far side looked like a ghost.
+    The skeleton. One style throughout: cyan links, white joints, the same weight
+    everywhere. The only thing that varies is opacity, so the side away from the
+    camera is quieter than the side the measurements come from.
+
+    Nothing here is coloured by whether the technique passed - a skeleton that
+    turns red mid-rep reads as an error in the software, and the verdict belongs
+    on the results page.
     """
+    del focus, flagged, inside_rep
     for a, b in SEGMENTS:
         pa, pb = points.get(a), points.get(b)
         if pa is None or pb is None:
             continue
-        is_focus = a in focus and b in focus
-        is_flagged = a in flagged and b in flagged
         alpha = min(alphas.get(a, 1.0), alphas.get(b, 1.0))
-        if is_flagged:
-            continue  # highlight_issue_region draws this one on top
-        if is_focus:
-            draw_connection(
-                canvas, pa, pb, style, colour=CYAN, focus=True, alpha=0.92 * alpha, glow=0.42
-            )
-        else:
-            draw_connection(canvas, pa, pb, style, colour=CYAN, alpha=0.86 * alpha)
+        draw_connection(canvas, pa, pb, style, colour=CYAN, alpha=0.88 * alpha)
 
     _draw_head(canvas, points, alphas, style)
 
     for landmark, point in points.items():
         if landmark == HEAD_LANDMARK:
             continue
-        alpha = alphas.get(landmark, 1.0)
-        key = landmark in focus and landmark in KEY_JOINTS
-        if landmark in flagged:
-            continue  # the highlight ring stands in for the node
-        if key:
-            colour = LIME if inside_rep else CYAN
-            draw_joint_node(canvas, point, style, colour=colour, key=True, alpha=alpha, glow=0.34)
-        else:
-            draw_joint_node(canvas, point, style, colour=CYAN, alpha=alpha * 0.9)
+        draw_joint_node(canvas, point, style, colour=WHITE, alpha=alphas.get(landmark, 1.0))
 
 
 # --- Heads-up display ---

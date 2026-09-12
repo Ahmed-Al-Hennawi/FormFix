@@ -22,9 +22,11 @@ and the rules would describe them wrongly.
 ## 2. Pipeline
 
 ```
-video -> check file -> MediaPipe pose -> check recording -> gap filling + EMA
+video -> check file -> MediaPipe pose -> check recording -> drop impossible
+ landmark jumps -> gap filling + EMA
  -> pick side -> measure every frame -> count reps (shared state machine)
- -> top-position baseline -> per-rep measurements -> rules (camera-gated)
+ -> top-position baseline (settled frames only) -> per-rep measurements
+ -> rules (camera-gated)
  -> reliability -> feedback -> annotated video -> JSON/CSV export
 ```
 
@@ -168,9 +170,10 @@ per measurement.
 
 A failed analysis never gives technique feedback.
 
-The annotated video only draws the upper body (shoulders, elbows, wrists, hips,
-head) - the legs are under the seat pad where tracking is worst. Joints are
-ringed while a finding is shown.
+The annotated video draws the whole skeleton, with the side away from the
+camera fainter - under the seat pad the legs are tracked worst, so this is
+where that shows. One style throughout: nothing changes colour when a rep is
+flagged.
 
 ---
 

@@ -40,6 +40,7 @@ from analysis.models import (
     VideoMetadata,
 )
 from analysis.normalisation import body_scale, normalise, torso_reference
+from exercises.common.metrics import settled_frames
 
 from .config import SquatConfig
 from .landmarks import OPPOSITE_SIDE, SIDE_CHAINS
@@ -182,17 +183,21 @@ def compute_frame_metrics(
         knee_offset = _median(knee_offsets)
 
         # heel vs toe of the same foot, so camera drift can't look like a lift.
-        # Positive = heel above toe
-        p_heel, p_toe = px(chain.heel), px(chain.foot_index)
-        foot_reliable = (
-            pose.visibility[f, chain.heel] >= config.HEEL_MIN_VISIBILITY
-            and pose.visibility[f, chain.foot_index] >= config.HEEL_MIN_VISIBILITY
-        )
-        heel_toe_offset = (
-            normalise(vertical_offset(p_toe, p_heel) * -1.0, lower_leg)
-            if foot_reliable
-            else float("nan")
-        )
+        # Positive = heel above toe. Both feet are measured because the camera-side
+        # foot is not always the side the angles are measured from, and feet are
+        # the landmarks MediaPipe tracks worst.
+        heel_rise_px: dict[str, float] = {}
+        for name, other in SIDE_CHAINS.items():
+            foot_reliable = (
+                pose.visibility[f, other.heel] >= config.HEEL_MIN_VISIBILITY
+                and pose.visibility[f, other.foot_index] >= config.HEEL_MIN_VISIBILITY
+            )
+            heel_rise_px[name] = (
+                vertical_offset(px(other.foot_index), px(other.heel)) * -1.0
+                if foot_reliable
+                else float("nan")
+            )
+        heel_toe_offset = normalise(heel_rise_px[side], lower_leg)
 
         left, right = per_side["left"], per_side["right"]
         both_valid = side_valid["left"] and side_valid["right"]
@@ -225,6 +230,8 @@ def compute_frame_metrics(
                 shin_inclination=selected["shin"],
                 hip_above_knee=hip_above_knee,
                 heel_toe_offset=heel_toe_offset,
+                left_heel_rise_px=heel_rise_px["left"],
+                right_heel_rise_px=heel_rise_px["right"],
                 landmark_confidence=confidence,
                 left_knee_angle=left["knee"],
                 right_knee_angle=right["knee"],
@@ -254,19 +261,36 @@ def standing_baseline(
     video: VideoMetadata,
     side: str,
     config: SquatConfig,
+    knee_signal: np.ndarray | None = None,
 ) -> dict[str, float]:
     """
     The person's own standing posture, measured instead of assuming 180 degrees.
-    Median over real standing frames, since people are still settling at frame 0.
+    Median over the standing frames where they were still, and preferably the last
+    couple of seconds before the first rep - by then they have finished setting up.
     """
     chain = SIDE_CHAINS[side]
     standing = [i for i, p in enumerate(phases) if p is Phase.STANDING and metrics[i].valid]
+
+    signal = (
+        np.asarray(knee_signal, dtype=np.float64)
+        if knee_signal is not None
+        else np.asarray([m.knee_angle for m in metrics], dtype=np.float64)
+    )
+    still = settled_frames(standing, signal, pose.timestamps, config.MOVEMENT_VELOCITY_THRESHOLD)
+    setup_frames = len(standing) - len(still)
+    if len(still) >= config.BASELINE_MIN_FRAMES:
+        standing = still
+
     if first_rep_start is not None:
         before_first = [i for i in standing if i < first_rep_start]
         if len(before_first) >= config.BASELINE_MIN_FRAMES:
-            standing = before_first
+            window = max(
+                config.BASELINE_MIN_FRAMES,
+                int(round(config.BASELINE_WINDOW_SECONDS * _effective_fps(pose.timestamps))),
+            )
+            standing = before_first[-window:]
     if len(standing) < config.BASELINE_MIN_FRAMES:
-        logger.warning("Few standing frames (%d) for the baseline", len(standing))
+        logger.warning("Few settled standing frames (%d) for the baseline", len(standing))
 
     heel_ys: list[float] = []
     lower_legs: list[float] = []
@@ -294,10 +318,40 @@ def standing_baseline(
         "shin_inclination": _median([metrics[i].shin_inclination for i in standing]),
         "stance_width": _median([metrics[i].stance_width for i in standing]),
         "heel_toe_offset": _median([metrics[i].heel_toe_offset for i in standing]),
+        "left_heel_rise_px": _median([metrics[i].left_heel_rise_px for i in standing]),
+        "right_heel_rise_px": _median([metrics[i].right_heel_rise_px for i in standing]),
         "heel_y": _median(heel_ys),
         "lower_leg_px": _median(lower_legs),
         "standing_frames": float(len(standing)),
+        "setup_frames_skipped": float(setup_frames),
     }
+
+
+def measurement_foot(
+    pose: FramePoseData,
+    metrics: list[FrameMetrics],
+    side: str,
+    config: SquatConfig,
+) -> str:
+    """
+    Which foot to judge heel contact from. The side the angles come from is chosen
+    on the hip/knee/ankle chain, which says nothing about the feet, and feet are
+    what MediaPipe tracks worst - so the foot with the most usable tracking is
+    used, with ties going to the analysed side.
+    """
+    del config  # the per-frame measurements are already visibility-gated
+    best, best_score = "", -1.0
+    for name, chain in SIDE_CHAINS.items():
+        measured = np.asarray([getattr(m, f"{name}_heel_rise_px") for m in metrics], dtype=np.float64)
+        coverage = float(np.isfinite(measured).mean()) if measured.size else 0.0
+        if coverage <= 0.0:
+            continue
+        visible = pose.visibility[:, [chain.heel, chain.foot_index]]
+        confidence = float(np.median(visible.min(axis=1))) if visible.size else 0.0
+        score = coverage * confidence + (1e-6 if name == side else 0.0)
+        if score > best_score:
+            best, best_score = name, score
+    return best
 
 
 def apply_heel_metric(
@@ -307,24 +361,40 @@ def apply_heel_metric(
     side: str,
     baseline: dict[str, float],
     config: SquatConfig,
-) -> None:
+) -> str:
     """
-    Heel rise compared to the person's own standing foot: heel-toe offset minus
-    the standing median. Measured within the foot so camera distance or drifting
-    across the frame can't look like a heel lift.
+    Heel rise against the person's own standing foot, in standing lower-leg
+    lengths. Returns which foot it used, or "" if neither was measurable.
+
+    Three things make this measurable at all from one camera:
+    heel against the toe of the same foot, so drifting across the frame or a
+    bumped camera is not a lift; the person's own settled standing offset as the
+    zero; and their standing lower-leg length as the scale. Dividing by each
+    frame's own lower leg inflated the ratio at the bottom of the rep, where the
+    shin is tilted and so shorter in the image.
     """
-    del pose, video, side  # not needed, the per-frame offsets already have it
-    reference = baseline.get("heel_toe_offset", float("nan"))
+    del video  # the per-frame values are already in pixels
+    scale = baseline.get("lower_leg_px", float("nan"))
+    if not np.isfinite(scale) or scale <= 0:
+        return ""
+    foot = measurement_foot(pose, metrics, side, config)
+    if not foot:
+        return ""
+    reference = baseline.get(f"{foot}_heel_rise_px", float("nan"))
     if not np.isfinite(reference):
-        return
+        return ""
+
+    attribute = f"{foot}_heel_rise_px"
     for m in metrics:
-        if not np.isfinite(m.heel_toe_offset):
+        rise = float(getattr(m, attribute))
+        if not np.isfinite(rise):
             continue
         m.heel_lift = _plausible(
-            m.heel_toe_offset - reference,
+            (rise - reference) / scale,
             -config.HEEL_LIFT_MAX_PLAUSIBLE,
             config.HEEL_LIFT_MAX_PLAUSIBLE,
         )
+    return foot
 
 
 # --- Per-repetition facts ---
@@ -337,10 +407,12 @@ def build_reps(
     pose: FramePoseData,
     side: str,
     config: SquatConfig,
+    heel_side: str | None = None,
 ) -> list[SquatRep]:
     """Turn rep boundaries into measured reps, each value taken from its own phase.
     Peaks are sustained maxima."""
     chain = SIDE_CHAINS[side]
+    foot = SIDE_CHAINS.get(heel_side or side, chain)
     other = SIDE_CHAINS[OPPOSITE_SIDE[side]]
     timestamps = pose.timestamps
     fps = _effective_fps(timestamps)
@@ -365,9 +437,11 @@ def build_reps(
         max_torso_frame = raw.start_frame + torso_offset if torso_offset >= 0 else -1
 
         heel_series = np.asarray([metrics[i].heel_lift for i in rep_frames], dtype=np.float64)
-        heel_vis = pose.visibility[raw.start_frame : raw.end_frame + 1, [chain.heel, chain.foot_index]]
+        heel_vis = pose.visibility[raw.start_frame : raw.end_frame + 1, [foot.heel, foot.foot_index]]
         heel_reliable = bool(heel_vis.size and float(np.mean(heel_vis)) >= config.HEEL_MIN_VISIBILITY)
-        sustained_lift, lift_offset = sustained_extreme(heel_series, config.HEEL_LIFT_MIN_FRAMES)
+        # in frames, but set in seconds, so 60 fps needs the same lift as 30 fps
+        heel_hold = max(config.HEEL_LIFT_MIN_FRAMES, int(round(config.HEEL_LIFT_MIN_SECONDS * fps)))
+        sustained_lift, lift_offset = sustained_extreme(heel_series, heel_hold)
         lift_frame = raw.start_frame + lift_offset if lift_offset >= 0 else -1
 
         asym_series = series(metrics, "knee_asymmetry", rep_frames)

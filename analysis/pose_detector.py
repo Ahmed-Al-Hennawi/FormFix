@@ -405,6 +405,10 @@ def detect_poses_inprocess(
                     continue
 
                 landmarks = tracker.select(poses, index)
+                if not landmarks:
+                    # the only person detected is not where the athlete was, so
+                    # leave the frame empty instead of tracking someone else
+                    continue
                 pose_found[index] = True
                 for li, lm in enumerate(landmarks[:NUM_LANDMARKS]):
                     xy[index, li, 0] = lm.x
@@ -426,10 +430,13 @@ def detect_poses_inprocess(
         )
 
     logger.info(
-        "Pose detection: %d/%d frames with a pose (%.0f%%)",
+        "Pose detection: %d/%d frames with a pose (%.0f%%), %d frame(s) skipped as "
+        "the wrong person, %d identity restart(s)",
         int(pose_found.sum()),
         frames_seen,
         100.0 * pose_found.sum() / frames_seen,
+        tracker.rejected_frames,
+        tracker.switches,
     )
 
     return FramePoseData(
@@ -454,6 +461,11 @@ MAX_IDENTITY_DRIFT_TORSOS = 1.6
 
 # frames the tracked person can be missing before restarting from height
 MAX_IDENTITY_GAP_FRAMES = 30
+
+# frames in a row the detections can be rejected before the track restarts. A
+# single detection nowhere near the athlete is usually someone in the background;
+# if it keeps happening the athlete has really moved and the track restarts.
+MAX_IDENTITY_REJECT_FRAMES = 3
 
 
 def _bbox_height(landmarks: list) -> float:
@@ -500,26 +512,34 @@ class _PersonTracker:
 
     def __init__(self) -> None:
         self.switches = 0
+        self.rejected_frames = 0
         self._last_centre: tuple[float, float] | None = None
         self._last_frame: int = -1
+        self._rejects = 0
 
     def select(self, poses: list, frame_index: int) -> list:
-        """The athlete's landmarks for this frame."""
+        """The athlete's landmarks for this frame, or [] if none of the detections
+        can be the athlete."""
         if not poses:
             return []
-        if len(poses) == 1:
-            self._remember(poses[0], frame_index)
-            return poses[0]
 
         stale = self._last_centre is None or frame_index - self._last_frame > MAX_IDENTITY_GAP_FRAMES
         if not stale:
             match = self._nearest(poses)
             if match is not None:
+                self._rejects = 0
                 self._remember(match, frame_index)
                 return match
-            # nobody near where the athlete was, so fall back to height and count it
+            # every detection is too far from where the athlete was. Taking one
+            # anyway is what threw the skeleton across the frame, so skip it and
+            # only restart the track if it keeps happening.
+            self._rejects += 1
+            self.rejected_frames += 1
+            if self._rejects <= MAX_IDENTITY_REJECT_FRAMES:
+                return []
             self.switches += 1
 
+        self._rejects = 0
         tallest = max(poses, key=_bbox_height)
         self._remember(tallest, frame_index)
         return tallest

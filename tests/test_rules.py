@@ -127,12 +127,12 @@ class TestHeelLiftRule:
         assert result.status is RuleStatus.PASS
 
     def test_lifted_heel_warns(self):
-        result = rule_heel_lift([make_rep(max_heel_lift=0.12)], CONFIG)
+        result = rule_heel_lift([make_rep(max_heel_lift=0.25)], CONFIG)
         assert result.status is RuleStatus.WARNING
 
     def test_unreliable_heels_never_judged(self):
         # unreliable landmarks give NOT_EVALUABLE, not a pass or fail
-        result = rule_heel_lift([make_rep(max_heel_lift=0.12, heel_reliable=False)], CONFIG)
+        result = rule_heel_lift([make_rep(max_heel_lift=0.25, heel_reliable=False)], CONFIG)
         assert result.status is RuleStatus.NOT_EVALUABLE
         result = rule_heel_lift([make_rep(max_heel_lift=0.0, heel_reliable=False)], CONFIG)
         assert result.status is RuleStatus.NOT_EVALUABLE
@@ -140,7 +140,7 @@ class TestHeelLiftRule:
     def test_mixed_reliability(self):
         reps = [
             make_rep(1, max_heel_lift=0.01),
-            make_rep(2, max_heel_lift=0.2, heel_reliable=False),
+            make_rep(2, max_heel_lift=0.25, heel_reliable=False),
         ]
         result = rule_heel_lift(reps, CONFIG)
         assert result.per_rep[0].status is RuleStatus.PASS

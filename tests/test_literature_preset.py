@@ -80,12 +80,13 @@ class TestTheValuesThemselves:
         "rule_id, field",
         [("heel_lift", "HEEL_LIFT_THRESHOLD")],
     )
-    def test_it_lifts_the_thresholds_that_sat_below_their_own_noise_floor(self, rule_id, field):
+    def test_it_keeps_the_thresholds_clear_of_their_own_noise_floor(self, rule_id, field):
         from exercises.common.uncertainty import band_for
 
         band = band_for("", rule_id=rule_id)
-        assert getattr(DEFAULT_CONFIG, field) < band.total, "the default should be below it"
-        assert getattr(LITERATURE_CONFIG, field) > band.total, "the preset should be above it"
+        assert getattr(LITERATURE_CONFIG, field) >= band.total, "the preset should clear it"
+        # the default used to sit inside the band and warned on planted heels
+        assert getattr(DEFAULT_CONFIG, field) >= band.total, "the default should clear it too"
 
     def test_every_warning_bar_stays_below_its_failure_bar(self):
         assert LITERATURE_CONFIG.TORSO_LEAN_WARN < LITERATURE_CONFIG.TORSO_LEAN_FAIL

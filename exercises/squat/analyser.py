@@ -19,9 +19,8 @@ from pathlib import Path
 
 import numpy as np
 
-from analysis import filters, pose_detector, smoothing, trimming, validation
+from analysis import filters, pose_detector, smoothing, stabilise, trimming, validation
 from analysis.annotation import (
-    LOWER_BODY_DRAWN,
     FrameState,
     JointAngle,
     OverlayEvent,
@@ -156,6 +155,14 @@ def _run(
 
     # --- 4. clean + smooth ---
     report("measure", 0.05, "Measuring movement")
+    # drop impossible landmark jumps before anything is filled in or smoothed -
+    # a low-pass filter would spread a spike instead of removing it
+    stabiliser = stabilise.reject_outliers(
+        pose,
+        video,
+        window=config.OUTLIER_WINDOW_FRAMES,
+        min_jump_torsos=config.OUTLIER_MIN_JUMP_TORSOS,
+    )
     interpolated = smoothing.interpolate_short_gaps(pose, config.MAX_SHORT_GAP_FRAMES)
     smoothing.ema_smooth(pose, config.EMA_ALPHA)
 
@@ -215,9 +222,12 @@ def _run(
         video,
         side,
         config,
+        knee_signal=knee_smoothed,
     )
-    metrics_mod.apply_heel_metric(pose, metrics, video, side, baseline, config)
-    reps = metrics_mod.build_reps(detection.reps, metrics, knee_smoothed, pose, side, config)
+    heel_foot = metrics_mod.apply_heel_metric(pose, metrics, video, side, baseline, config)
+    reps = metrics_mod.build_reps(
+        detection.reps, metrics, knee_smoothed, pose, side, config, heel_side=heel_foot
+    )
 
     # --- 8b. is this actually a squat? ---
     # check the user picked the right exercise before giving squat feedback
@@ -305,8 +315,6 @@ def _run(
             camera_orientation=checks.orientation.value,
             on_frame=lambda i, n: report("render", (i + 1) / max(n, 1), "Rendering analysed video"),
             angle_joints=_angle_joints(side),
-            # torso and legs only, no squat rule uses the arms
-            drawn_landmarks=LOWER_BODY_DRAWN,
             frame_range=(render_window.start_frame, render_window.end_frame),
         )
     except Exception as exc:
@@ -321,6 +329,8 @@ def _run(
     )
     # what the renderer actually wrote, for the technical panel
     debug["render_window"] = render_window.as_dict()
+    debug["outlier_rejection"] = stabiliser.as_dict()
+    debug["heel_measurement_foot"] = heel_foot or "none"
 
     result = SquatAnalysisResult(
         success=True,

@@ -52,7 +52,8 @@ figures (6° / 10° / 14°).
   finding smaller than the error as "indicative"
   ([measurement_uncertainty.md](measurement_uncertainty.md)).
 - **Found because of it:** my left/right threshold (12°) and heel threshold
-  (0.06) were below their own noise. I removed the squat left/right rule.
+  (0.06) were below their own noise. I removed the squat left/right rule, and
+  later raised the heel threshold to 0.16, clear of the band.
 
 ### Filtering - Dill et al. (2024)
 
@@ -63,8 +64,9 @@ They found moving averages lag at the top and bottom of a squat and chose a
 - **Extended:** I tested on my own criterion (depth bias per rep) and the
   ranking flips with the shape of the rep, so the filter became a setting and
   its bias goes into the depth error ([filter_selection.md](filter_selection.md)).
-  The skeleton on the result video is also display-smoothed with their 2 Hz
-  Butterworth.
+  The skeleton on the result video has its own display smoothing, using their
+  filter at a higher cut-off (3 Hz) after a running median, since it only has
+  to remove small jitter and a low cut-off flattened fast movement.
 
 ### Squat angle ranges - Rao et al. (2025), quoting Kotiuk et al. (2022)
 

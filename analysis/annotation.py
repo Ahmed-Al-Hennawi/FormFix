@@ -15,7 +15,7 @@ from typing import Any
 
 import numpy as np
 
-from . import filters
+from . import filters, stabilise
 from .models import (
     LEFT_ANKLE,
     LEFT_EAR,
@@ -59,7 +59,6 @@ from .overlay import (
     draw_joint_angle,
     draw_turning_point_marker,
     draw_watermark,
-    highlight_issue_region,
 )
 from .video_processor import convert_to_h264, iter_frames, open_video, open_writer
 
@@ -80,8 +79,8 @@ __all__ = [
     "render_annotated_video",
 ]
 
-# skeleton joints plus one head marker - eyes, ears and mouth are tracked but
-# no rule uses them
+# the whole skeleton plus one head marker - eyes, ears and mouth are tracked but
+# drawing them turns the face into a blob
 DRAWN_LANDMARKS: frozenset[int] = frozenset(
     {landmark for segment in SEGMENTS for landmark in segment} | {HEAD_LANDMARK}
 )
@@ -120,9 +119,16 @@ MIN_FAR_SIDE_VISIBILITY = 0.90
 # a knee behind the other leg still scores 0.8+. 0.12 is a bit under a thigh.
 FAR_OCCLUSION_TORSO_FRACTION = 0.12
 
-# a far limb that is occluded or unsure on this share of tracked frames is left
-# out of the whole video. Deciding it per frame made the far knee blink.
+# how visible the camera-far side is drawn. It is the same skeleton, just quieter,
+# so you can see which side the measurements came from. Hiding the far limbs
+# altogether looked worse than showing MediaPipe's guess at them.
+FAR_SIDE_ALPHA = 0.45
+
+# a far limb that spends this share of the clip behind the body is fainter still -
+# it is mostly the detector's guess. Decided once per clip, because deciding it
+# per frame made the far knee blink.
 FAR_HIDE_CLIP_FRACTION = 0.5
+FAR_FAINT_ALPHA = 0.22
 
 # far landmark -> its near twin, for the occlusion test
 _MIRROR_LANDMARK: dict[int, int] = {
@@ -156,10 +162,16 @@ _LEVEL_RANK: dict[str, int] = {"info": 0, "pass": 0, "warning": 1, "fail": 2}
 # --- Display-only smoothing ---
 # Only a copy of the coordinates is filtered, for drawing. The whole clip is
 # known by render time, so I can use a zero-phase filter (no lag at the turning
-# points), which the causal EMA in smoothing.py can't do. Settings are from
-# filters.BUTTERWORTH_2HZ (Dill et al., 2024).
-RENDER_SMOOTHING_CUTOFF_HZ = 2.0
+# points), which the causal EMA in smoothing.py can't do. Order is from
+# filters.BUTTERWORTH_2HZ (Dill et al., 2024), but the cut-off is higher than the
+# 2 Hz used for measurement: stabilise.py now removes the spikes, so the filter
+# only has to take out small jitter and a low cut-off would flatten fast movement.
+RENDER_SMOOTHING_CUTOFF_HZ = 3.0
 RENDER_SMOOTHING_ORDER = 4
+
+# running median applied before the low-pass. A median removes what is left of
+# the single-frame noise without lag; a low-pass on its own smears it.
+RENDER_MEDIAN_FRAMES = 3
 
 # --- What the skeleton is made of, per exercise ---
 # Drawing every landmark means drawing limbs no rule reads, in the parts the
@@ -384,38 +396,16 @@ def _draw_analysis_layer(
     focus: frozenset[int],
     angle_joints: Sequence[JointAngle],
 ) -> None:
-    """The body layer: skeleton, issue highlights, joint angles."""
-    flagged: set[int] = set()
-    level = "info"
-    for event in active:
-        marked = [lm for lm in event.highlight_landmarks if lm in points]
-        flagged.update(marked)
-        if event.level == "fail" or (event.level == "warning" and level != "fail"):
-            level = event.level
-    colour = LEVEL_COLOURS.get(level, AMBER)
+    """
+    The body layer. Only the skeleton: one FormFix style, the same on every frame
+    of every exercise. The findings are worded on the results page, so nothing on
+    the body changes colour when a rep is flagged.
+    """
+    draw_formfix_pose(canvas, points, alphas, style)
 
-    draw_formfix_pose(
-        canvas,
-        points,
-        alphas,
-        style,
-        focus=focus,
-        flagged=flagged,
-        inside_rep=state.inside_repetition,
-    )
-
-    for event in active:
-        highlight_issue_region(
-            canvas,
-            points,
-            event.highlight_landmarks,
-            style,
-            colour=LEVEL_COLOURS.get(event.level, AMBER),
-        )
-
-    # I took the angle read-outs and issue label off the frame, but angle_joints
-    # stays so each exercise still declares what it measures
-    _ = (angle_joints, colour)
+    # angle_joints and the events stay in the signature so each exercise still
+    # declares what it measured and when
+    _ = (state, active, focus, angle_joints)
 
 
 def _draw_angles(
@@ -554,6 +544,7 @@ class _DrawPolicy:
         trust_visibility  did the detector report per-landmark confidence at all
         far_limbs         limbs on the away-from-camera side, held to a higher bar
         max_jump_px       how far a landmark may move before it looks swapped
+        faint             far limbs drawn fainter for the whole clip
         hidden            limbs left out of the whole clip
     """
 
@@ -562,7 +553,8 @@ class _DrawPolicy:
     max_jump_px: float
     # horizontal gap under which a far limb counts as hidden (0 = off)
     occlusion_px: float = 0.0
-    hidden: frozenset[int] = frozenset()
+    # far limbs drawn fainter still, decided once for the whole clip
+    faint: frozenset[int] = frozenset()
     hold_frames: int = MAX_HOLD_FRAMES
     _last: dict[int, tuple[float, float, int]] = field(default_factory=dict)
     # landmark -> (currently drawn, frame the answer last changed)
@@ -704,22 +696,20 @@ def _draw_policy(
         max_jump_px=max_jump_px,
         occlusion_px=occlusion_px,
     )
-    policy.hidden = _clip_hidden_far_limbs(pose, video, policy)
-    if policy.hidden:
-        logger.info("Overlay hides %d far landmark(s) for the whole clip", len(policy.hidden))
+    policy.faint = _mostly_hidden_far_limbs(pose, video, policy)
+    if policy.faint:
+        logger.info("Overlay draws %d far landmark(s) faintly", len(policy.faint))
     return policy
 
 
-def _clip_hidden_far_limbs(
+def _mostly_hidden_far_limbs(
     pose: FramePoseData, video: VideoMetadata, policy: _DrawPolicy
 ) -> frozenset[int]:
     """
-    Which far-side limbs to leave out of the whole video. Deciding per frame made
-    limbs blink, so a limb that is behind the body for most of the clip is never
-    drawn and the rest are drawn normally.
-
-    I err towards hiding because of Dill et al. (2024): with the far arm behind
-    the torso, their reconstruction attached it to a jacket on a chair.
+    Far-side limbs that are behind the body for most of the clip. They are still
+    drawn - just faintly, because what MediaPipe reports for them is largely
+    extrapolation. Dill et al. (2024) hit the same thing: with the far arm behind
+    the torso their reconstruction attached it to a jacket on a chair.
     """
     if not policy.far_limbs or not policy.trust_visibility:
         return frozenset()
@@ -735,7 +725,6 @@ def _clip_hidden_far_limbs(
         xy = pose.xy[frame]
         visibility = pose.visibility[frame]
         for landmark in policy.far_limbs:
-            # untracked, hidden behind its twin, or too unsure - all mean don't draw
             if (
                 landmark >= len(valid)
                 or not valid[landmark]
@@ -755,8 +744,10 @@ def _render_coordinates(
 ) -> np.ndarray:
     """
     Smoothed copy of the coordinates, for drawing only - pose.xy is untouched.
-    A zero-phase Butterworth over each drawn landmark. The analysis EMA alone left
-    the figure looking like it was floating.
+    Running median first, then a zero-phase Butterworth over each drawn landmark.
+    The median is what stops a short run of frames flickering: the Butterworth
+    needs a stretch of about 17 frames to run at all, so on its own it left the
+    worst-tracked stretches unsmoothed.
     """
     xy = pose.xy.copy()
     fps = float(getattr(video, "fps", 0.0) or 30.0)
@@ -764,13 +755,22 @@ def _render_coordinates(
         if landmark >= xy.shape[1]:
             continue
         for axis in (0, 1):
+            series = stabilise.median_filter_track(xy[:, landmark, axis], RENDER_MEDIAN_FRAMES)
             xy[:, landmark, axis] = filters.butterworth_lowpass(
-                xy[:, landmark, axis],
+                series,
                 fps,
                 cutoff_hz=RENDER_SMOOTHING_CUTOFF_HZ,
                 order=RENDER_SMOOTHING_ORDER,
             )
     return xy
+
+
+def _draw_alpha(landmark: int, policy: _DrawPolicy) -> float:
+    """Near side solid, far side quieter, a far limb that is behind the body for
+    most of the clip quieter again."""
+    if landmark not in policy.far_limbs:
+        return 1.0
+    return FAR_FAINT_ALPHA if landmark in policy.faint else FAR_SIDE_ALPHA
 
 
 def _drawable_points(
@@ -793,7 +793,7 @@ def _drawable_points(
 
     fresh: dict[int, tuple[float, float]] = {}
     for landmark in range(xy.shape[0]):
-        if landmark not in wanted or landmark in policy.hidden or not valid[landmark]:
+        if landmark not in wanted or not valid[landmark]:
             continue
         x, y = xy[landmark]
         if not (np.isfinite(x) and np.isfinite(y)):
@@ -814,12 +814,12 @@ def _drawable_points(
         policy.forget_holds()
 
     for landmark in sorted(set(wanted)):
-        if landmark >= xy.shape[0] or landmark in policy.hidden:
+        if landmark >= xy.shape[0]:
             continue
         # a frame or two missing is the detector stuttering, so hold the point
         position = fresh.get(landmark) or policy.hold(landmark, frame_idx)
         if position is None:
             continue
         points[landmark] = (int(round(position[0])), int(round(position[1])))
-        alphas[landmark] = 1.0
+        alphas[landmark] = _draw_alpha(landmark, policy)
     return points, alphas

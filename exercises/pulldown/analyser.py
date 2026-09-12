@@ -19,9 +19,8 @@ from pathlib import Path
 
 import numpy as np
 
-from analysis import filters, pose_detector, smoothing, trimming, validation
+from analysis import filters, pose_detector, smoothing, stabilise, trimming, validation
 from analysis.annotation import (
-    UPPER_BODY_DRAWN,
     FrameState,
     HudLine,
     JointAngle,
@@ -186,6 +185,14 @@ def _run(
 
     # --- 4. clean + smooth ---
     report("measure", 0.05, "Measuring movement")
+    # drop impossible landmark jumps before anything is filled in or smoothed -
+    # a low-pass filter would spread a spike instead of removing it
+    stabiliser = stabilise.reject_outliers(
+        pose,
+        video,
+        window=config.OUTLIER_WINDOW_FRAMES,
+        min_jump_torsos=config.OUTLIER_MIN_JUMP_TORSOS,
+    )
     interpolated = smoothing.interpolate_short_gaps(pose, config.MAX_SHORT_GAP_FRAMES)
     smoothing.ema_smooth(pose, config.EMA_ALPHA)
 
@@ -256,6 +263,8 @@ def _run(
         detection.phases,
         detection.reps[0].start_frame if detection.reps else None,
         config,
+        elbow_signal=elbow_smoothed,
+        timestamps=pose.timestamps,
     )
     torso_mode = metrics_mod.apply_torso_excursion(metrics, baseline, config)
     reps = metrics_mod.build_reps(detection.reps, metrics, pose, side, torso_mode, config)
@@ -340,9 +349,6 @@ def _run(
             marker_label="CONTRACTED",
             # the ROM rule reads the elbow angle
             angle_joints=(JointAngle("Elbow", chain.shoulder, chain.elbow, chain.wrist),),
-            # upper body only - nothing below the hip is measured and the legs are
-            # under the seat pad where tracking is worst
-            drawn_landmarks=UPPER_BODY_DRAWN,
             frame_range=(render_window.start_frame, render_window.end_frame),
         )
     except Exception:
@@ -368,6 +374,7 @@ def _run(
     )
     # what the renderer actually wrote, for the technical panel
     debug["render_window"] = render_window.as_dict()
+    debug["outlier_rejection"] = stabiliser.as_dict()
 
     result = ExerciseAnalysisResult(
         success=True,

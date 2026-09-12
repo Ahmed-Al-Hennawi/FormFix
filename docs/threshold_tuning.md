@@ -140,15 +140,17 @@ two thresholds were below their own measurement noise:
 | Threshold | Value | Measurement error |
 | --- | --- | --- |
 | `KNEE_SYMMETRY_WARN` (squat, **removed**) | 12° | ±15.1° |
-| `HEEL_LIFT_THRESHOLD` | 0.06 | ±0.15 |
+| `HEEL_LIFT_THRESHOLD` (now 0.16) | 0.06 | ±0.15 |
 | depth warning band | 15° | ±11.6° (similar) |
 
 - I **removed** the squat evenness rule instead of raising it above 15°, since
   by then it would only catch differences you can already see. The measurement
   is still exported. The press keeps its symmetry rule because it's filmed
   front-on with both arms visible.
-- I **left the heel threshold** in the defaults (no labelled videos to justify
-  a change) and raised it in the literature preset instead.
+- I **left the heel threshold** alone at first (no labelled videos to justify
+  a change) and raised it in the literature preset instead. In September 2026 I
+  raised the default to **0.16** as well, after real clips confirmed the old bar
+  warned on planted heels; see §9.
 - The filter's own depth bias is added to the depth band:
   √(10.7² + 4.53²) = 11.6°.
 
@@ -164,7 +166,7 @@ papers, kept for **comparison**, not as a replacement:
 | `DEPTH_KNEE_ANGLE_PASS` | 100° | 81° | Kotiuk et al. (2022, via Rao et al., 2025): 113 ± 7° flexion = 67 ± 7° interior; upper end used |
 | `DEPTH_KNEE_ANGLE_WARN` | 115° | 101° | Dill et al. (2024): correct reps ~20° from faulty ones |
 | `TORSO_LEAN_FAIL` | 60° | 55° | Dill et al. (2024) "excessive forward bending" fault |
-| `HEEL_LIFT_THRESHOLD` | 0.06 | 0.16 | above the ±0.15 noise floor |
+| `HEEL_LIFT_THRESHOLD` | 0.16 | 0.16 | above the ±0.15 noise floor (the default now matches) |
 | `FULL_EXTENSION_TOLERANCE` | 12° | 20° | Simoes et al. (2024) beginner allowance |
 
 Engineering values aren't touched - no paper covers EMA weights, and changing
@@ -187,14 +189,37 @@ On three synthetic 105° squats the three policies disagree:
 
 ---
 
-## 9. What I can't claim
+## 9. What the labelled videos measured (September 2026)
 
-- **No threshold is validated on labelled real videos.** Synthetic tests show
-  the code works as specified, not that the values suit real people.
+Fourteen labelled clips, written up in
+[evaluation_results.md](evaluation_results.md). One threshold changed because of
+the literature (§7); the values below are what the clips actually measured, so
+the next change to a threshold has something behind it. **Nothing here was
+tuned to these clips** - two or three recordings of one person can't set a
+value.
+
+| Measurement | Clean clips | Faulty clips | Current bar |
+| --- | --- | --- | --- |
+| Pulldown elbow at the bottom | 52-55° | 73-74° | pass at ≤ 100° |
+| Pulldown trunk movement | 25-27° | 13-15° (short reps), 51° (lean instead of pull) | warn at 15° |
+| Squat knee angle at the bottom | 61-96° | - | pass at ≤ 100° |
+| Squat heel rise | not flagged | 0.160 (missed), 0.202-0.296 (caught) | warn at 0.16, held 15% of the rep |
+| Press elbow at the top | 160-168° | 100-113° | pass at ≥ 150° |
+
+Two of these are clearly in the wrong place: the pulldown range bar sits
+outside the range both classes produce, and the pulldown trunk bar is below
+what normal technique measures. I have left both alone and written down why.
+
+---
+
+## 10. What I can't claim
+
+- **No threshold is tuned to labelled real videos.** The clips in §9 measure
+  where the thresholds sit; they are too few to move them.
 - The real-video runs are verification only - the reference clips are
   animated montages, and no threshold was changed because of them.
-- **There is no accuracy figure** until the labelled videos in
-  [evaluation/README.md](../evaluation/README.md) are recorded and run.
+- **There is no accuracy figure**, and fourteen clips of one person could not
+  support one ([evaluation_results.md](evaluation_results.md)).
 - **Don't tune thresholds until every test video passes** - with a few videos
   that's overfitting.
 - The literature preset isn't validated either. A citation isn't a validation.

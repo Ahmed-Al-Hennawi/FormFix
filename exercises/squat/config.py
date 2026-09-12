@@ -74,6 +74,12 @@ class SquatConfig:
     # gaps up to this long get interpolated, longer ones stay missing
     MAX_SHORT_GAP_FRAMES: int = 5
 
+    # --- ENGINEERING - outlier rejection (analysis/stabilise.py) ---
+    # frames compared either side when testing one landmark for a tracking error
+    OUTLIER_WINDOW_FRAMES: int = 2
+    # smallest jump that can be called an error, in torso lengths
+    OUTLIER_MIN_JUMP_TORSOS: float = 0.12
+
     # --- ENGINEERING - anatomical plausibility gates ---
     # MediaPipe can be confident about a limb it's guessing. These bands are wide
     # and only catch tracking failures - anything outside becomes NaN, not a fault.
@@ -141,6 +147,12 @@ class SquatConfig:
     # --- ENGINEERING - standing baseline ---
     # stable standing frames needed for a baseline (median is used)
     BASELINE_MIN_FRAMES: int = 5
+    # the baseline is only taken from standing frames where the person is still
+    # (knee angle moving slower than MOVEMENT_VELOCITY_THRESHOLD). Walking in,
+    # picking up a weight or shuffling the feet is setup, not standing posture,
+    # and every rule is calibrated against this baseline.
+    # only the last few seconds of standing before the first rep are used
+    BASELINE_WINDOW_SECONDS: float = 2.0
 
     # --- TECHNIQUE (PROVISIONAL) - squat depth ---
     # knee angle at or below which a rep passes on depth
@@ -166,13 +178,21 @@ class SquatConfig:
     TORSO_LEAN_MIN_VIOLATION_RATIO: float = 0.15
 
     # --- TECHNIQUE (PROVISIONAL) - heel lift ---
-    # heel rise above the standing baseline / lower-leg length
-    HEEL_LIFT_THRESHOLD: float = 0.06
+    # Heel rise above the person's own standing foot, over their standing
+    # lower-leg length. The measurement band derived from Dill et al. (2023) for a
+    # normalised body length is 0.15, so the old 0.06 sat inside the noise and
+    # reported planted heels as lifting. This is now the same value as the
+    # literature preset - the first threshold in the project where the two agree
+    # (see docs/measurement_uncertainty.md).
+    HEEL_LIFT_THRESHOLD: float = 0.16
     HEEL_LIFT_MIN_FRAMES: int = 3
+    # and it has to hold this long, so the rule behaves the same at 30 and 60 fps
+    HEEL_LIFT_MIN_SECONDS: float = 0.2
     # below this the heel rule says "cannot assess" instead of guessing
     HEEL_MIN_VISIBILITY: float = 0.5
-    # share of the rep's measurable frames the lift must cover
-    HEEL_LIFT_MIN_VIOLATION_RATIO: float = 0.10
+    # share of the rep's measurable frames the lift must cover. A real lift holds
+    # through the bottom of the rep; noise flickers
+    HEEL_LIFT_MIN_VIOLATION_RATIO: float = 0.15
 
     # --- TECHNIQUE (PROVISIONAL) - return to standing / extension ---
     # a rep has to finish within this many degrees of the person's own standing

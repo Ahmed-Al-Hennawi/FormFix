@@ -86,8 +86,9 @@ remove them:
   reported as indicative.
 - Two thresholds were below their own noise: the squat left/right warning (12°
   vs ±15.1°) - that rule was **removed** - and heel lift (0.06 vs ±0.15), which
-  I kept in the defaults and raised in the literature preset. A heel finding is
-  a prompt to look, not a measurement.
+  is now 0.16, clear of the band. That means a small real heel lift is not
+  reported: 0.16 of a lower leg is about 6 cm. A heel finding is a prompt to
+  look, not a measurement.
 - The far leg from the side is never used for an angle.
 
 ## 7. Smoothing bias

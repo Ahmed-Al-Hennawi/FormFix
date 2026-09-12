@@ -128,14 +128,14 @@ def corrections_block(result: AnalysisResult) -> str:
             '<section class="ax-panel ax-panel--clear" data-animate="fade-up">'
             '<h3 class="ax-panel__title">Nothing to fix in this set</h3>'
             '<p class="ax-empty-note">None of the checks FormFix could measure found a '
-            "problem. Keep the same setup and add load gradually.</p>"
+            "problem. Keep the same setup and add weight slowly.</p>"
             "</section>"
         )
 
     more = len(result.further_improvements)
     note = (
-        f'<p class="ax-fixes__more">{more} smaller point{"" if more == 1 else "s"} '
-        "in the analysis details below.</p>"
+        f'<p class="ax-fixes__more">See {more} smaller point{"" if more == 1 else "s"} '
+        "in the details below.</p>"
         if more
         else ""
     )
@@ -484,9 +484,7 @@ def recording_quality_block(result: AnalysisResult, exercise: Exercise) -> str:
     if result.recording_quality != "limited" or not result.warnings:
         return ""
 
-    headline = _ORIENTATION_HEADLINES.get(
-        result.camera_orientation, "Analysed with some limitations"
-    )
+    headline = _ORIENTATION_HEADLINES.get(result.camera_orientation, "Analysed with some limitations")
     needed = (
         f"{esc(exercise.name)} is analysed from a {esc(exercise.camera_view.lower())} view."
         if exercise.camera_view

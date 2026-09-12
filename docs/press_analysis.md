@@ -20,7 +20,8 @@ rules would describe them wrongly.
 ## 2. Pipeline
 
 ```
-video -> check file -> MediaPipe pose -> check recording -> gap filling + EMA
+video -> check file -> MediaPipe pose -> check recording -> drop impossible
+ landmark jumps -> gap filling + EMA
  -> measure every frame -> count reps (shared state machine)
  -> per-rep measurements -> rules (camera-gated) -> reliability
  -> feedback -> annotated video -> JSON/CSV export
@@ -159,8 +160,9 @@ shoulder mobility, impingement, loading, injury risk, or anything medical.
 A check that couldn't be assessed is never scored as a fail - a side-on video
 with three good reps scores 100 on the one check it could do.
 
-The annotated video only draws the upper body. An alignment finding rings the
-arm it's about; symmetry and ROM findings ring both.
+The annotated video draws the whole skeleton in one style, with the side away
+from the camera fainter. Nothing changes colour when a rep is flagged - the
+findings are worded on the results page instead.
 
 ---
 

@@ -92,14 +92,17 @@ The derivations are written out in the code too. Two adjustments on top:
    it could report an asymmetry that was just noise. I **removed that rule**;
    the measurement is still exported. The press keeps its symmetry rule because
    it's filmed front-on with both arms visible.
-2. **The heel-lift threshold (0.06) is below the ±0.15 error** of the body
-   length it's divided by.
+2. **The heel-lift threshold (0.06) was below the ±0.15 error** of the body
+   length it's divided by, so it reported planted heels as lifting. It is now
+   **0.16**, clear of the band and the same value as the
+   [literature preset](../exercises/squat/literature_config.py) - the one
+   threshold where my default and the preset agree.
 
-I didn't change the heel threshold in the defaults, because there are no
-labelled videos to justify it. It's raised above the noise in the
-[literature preset](../exercises/squat/literature_config.py) so both can be
-compared. Tests in `test_uncertainty.py` flag it if someone tightens these
-thresholds further.
+That costs sensitivity, and I'd rather say so: 0.16 of a lower leg is roughly
+6 cm of heel rise, so a small genuine lift is not reported. From one 2D camera
+a smaller one can't be separated from the noise, and the old bar only appeared
+to find them. A heel finding stays a prompt to look, not a measurement. Tests
+in `test_uncertainty.py` fail if anyone puts it back inside the band.
 
 ## What it doesn't do
 

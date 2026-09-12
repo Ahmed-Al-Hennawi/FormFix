@@ -60,9 +60,9 @@ FEEDBACK_TEMPLATES: dict[str, FeedbackTemplate] = {
         rep_issue="Movement range was limited",
         overview="Range of motion",
         positive="Full range on every rep",
-        simple_issue="Your arms do not travel through the full range on {reps}.",
+        simple_issue="Your arms stop short of the full range on {reps}.",
         why="A fuller range works your back through more of the movement.",
-        simple_fix="Pull until your elbows are down by your sides, then let your arms "
+        simple_fix="Pull until your elbows are down by your sides. Let your arms "
         "straighten again before the next rep.",
         measures="how far your elbow opens and closes between the start and the pull",
         measured_from="your shoulder, elbow and wrist landmarks",
@@ -74,8 +74,8 @@ FEEDBACK_TEMPLATES: dict[str, FeedbackTemplate] = {
         overview="Torso movement",
         positive="Steady torso through the pull",
         simple_issue="Your upper body swings as you pull on {reps}.",
-        why="Keeping your torso still keeps the work in your back rather than your momentum.",
-        simple_fix="Sit tall and pull with your arms and back, keeping your chest still.",
+        why="Staying still keeps the work in your back instead of your momentum.",
+        simple_fix="Sit tall and pull with your back, keeping your chest still.",
         measures="how far your trunk moves away from the position it started the rep in",
         measured_from="your shoulder and hip landmarks",
     ),

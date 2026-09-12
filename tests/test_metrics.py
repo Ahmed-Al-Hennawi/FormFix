@@ -168,7 +168,7 @@ class TestBaseline:
         assert baseline["torso_lean"] < 15.0
         assert math.isfinite(baseline["lower_leg_px"])
 
-    def test_baseline_prefers_frames_before_the_first_repetition(self):
+    def test_baseline_uses_only_settled_frames_before_the_first_repetition(self):
         pose, video, metrics, detection, reps = analysed()
         baseline = standing_baseline(
             pose, metrics, detection.phases, reps[0].start_frame, video, "left", CONFIG
@@ -178,7 +178,10 @@ class TestBaseline:
             for i, p in enumerate(detection.phases)
             if p is Phase.STANDING and i < reps[0].start_frame and metrics[i].valid
         )
-        assert baseline["standing_frames"] == standing_before
+        # a subset: the frames where the knee was already moving are setup, not
+        # standing posture
+        assert CONFIG.BASELINE_MIN_FRAMES <= baseline["standing_frames"] <= standing_before
+        assert baseline["setup_frames_skipped"] > 0
 
 
 class TestFrameRateIndependence:

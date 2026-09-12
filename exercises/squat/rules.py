@@ -334,13 +334,17 @@ def rule_heel_lift(
     outcomes: list[RepRuleOutcome] = []
     for rep in reps:
         evidence = _persistence(spec, metrics, rep, "heel_lift", config.HEEL_LIFT_THRESHOLD)
+        # the lift has to be big enough AND held: a frame or two over the line is
+        # foot-tracking noise, which is what used to warn on planted heels. With no
+        # frame series at all (unit tests) the size on its own has to do.
+        held = (
+            evidence.triggers(spec.minimum_persistence_frames, spec.min_violation_ratio)
+            if spec is not None and evidence.has_evidence
+            else spec is None
+        )
         if not rep.heel_reliable or not math.isfinite(rep.max_heel_lift):
             status = RuleStatus.NOT_EVALUABLE
-        elif rep.max_heel_lift >= config.HEEL_LIFT_THRESHOLD and (
-            spec is None
-            or not evidence.has_evidence
-            or evidence.triggers(spec.minimum_persistence_frames, spec.min_violation_ratio)
-        ):
+        elif rep.max_heel_lift >= config.HEEL_LIFT_THRESHOLD and held:
             # only ever a warning - from 2D landmarks it's just worth checking
             status = RuleStatus.WARNING
         else:

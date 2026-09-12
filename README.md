@@ -90,7 +90,7 @@ A few things I designed on purpose:
 - **Wrong exercise check.** If you upload a bench press as a "shoulder press",
   it says so instead of giving you press feedback.
 - **The result video is trimmed** to just your set, with a smoothed skeleton
-  showing only the joints that exercise uses.
+  over your whole body and the side away from the camera drawn fainter.
 
 ---
 
@@ -106,16 +106,17 @@ streamlit_app/
 ├── scripts/            JS for the site + helper scripts (model download,
 │                       calibration, filter comparison, evaluation)
 ├── analysis/           shared computer vision: video, pose detection,
-│                       validation, smoothing, filters, geometry, overlay video
+│                       validation, outlier rejection, smoothing, filters,
+│                       geometry, overlay video
 ├── exercises/
 │   ├── common/         shared logic: rule spec, rep counting, reliability,
 │   │                   uncertainty, feedback, exercise check
 │   ├── squat/          5 rules
 │   ├── pulldown/       2 rules
 │   └── press/          3 rules
-├── tests/              600+ tests, with fake (synthetic) videos for each exercise
+├── tests/              700+ tests, with fake (synthetic) videos for each exercise
 ├── docs/               technical write-ups for the thesis
-├── evaluation/         the labelled-video evaluation harness
+├── evaluation/         the labelled-video evaluation harness and its results
 ├── wireframes/         every screen as an SVG, made by one script
 └── static/assets/      images, logo, reference clips, pose model
 ```
@@ -228,6 +229,7 @@ More detail in [docs/limitations.md](docs/limitations.md).
 | [Filter selection](docs/filter_selection.md) | which smoothing filter and why |
 | [Literature basis](docs/literature_basis.md) | what I took from each paper |
 | [Limitations](docs/limitations.md) | what FormFix can't do |
+| [Evaluation results](docs/evaluation_results.md) | what the labelled videos showed |
 | [Evaluation](evaluation/README.md) · [Real-video runs](evaluation/reference_clip_runs.md) | how to evaluate it, and the runs on real footage |
 | [Wireframes](wireframes/README.md) | every screen and state |
 

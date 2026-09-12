@@ -57,9 +57,11 @@ set, and FormFix said so instead of building a verdict from fragments.
 
 *Frames from this run: top position, the pull, the bottom position and the
 return. The amber rings on the shoulder and hip mark the landmarks the torso
-warning came from. This is the overlay as it was on 29 August - since then it
-has been simplified (no phase marker or angle labels, a steadier skeleton, and
-only the joints each exercise uses).*
+warning came from. This is the overlay as it was on 29 August. It has been
+simplified twice since: first the phase marker and angle labels went, then in
+September the rings and the colour changes went too, leaving one style - thin
+cyan links, small white joints, the whole skeleton, and the camera-far side
+drawn fainter.*
 
 The torso warning can be traced step by step: shoulder and hip landmarks →
 trunk angle → change from this person's own top position → 18.9° peak → held
@@ -101,7 +103,10 @@ and now have regression tests:
    `cv2.VideoWriter` silently dropped every frame. The folder is now created,
    and a writer that can't open raises an error (`TestWriterGuards`).
 
-## Still to do
+## Where this led
 
-None of this validates a *threshold*. That needs the nine labelled videos in
-[README.md](README.md), run through `scripts/evaluate_videos.py`.
+None of this validates a *threshold*. That needed the labelled videos in
+[README.md](README.md), which were recorded in September 2026 and run through
+`scripts/evaluate_videos.py` - the results are in [docs/evaluation_results.md](../docs/evaluation_results.md).
+They found two thresholds sitting in the wrong place, a heel lift missed by a
+persistence setting, and two recordings that got through a guard rail.

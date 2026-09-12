@@ -16,6 +16,7 @@ import numpy as np
 from analysis.models import LEFT_HIP, LEFT_SHOULDER, RIGHT_HIP, RIGHT_SHOULDER
 from analysis.pose_detector import (
     MAX_IDENTITY_GAP_FRAMES,
+    MAX_IDENTITY_REJECT_FRAMES,
     _PersonTracker,
     _primary_pose,
 )
@@ -107,11 +108,23 @@ def test_the_nearest_candidate_wins_not_the_tallest():
 # --- Losing and recovering the track ---
 
 
-def test_a_jump_across_the_room_counts_as_a_switch():
+def test_a_brief_jump_across_the_room_is_skipped_not_followed():
     t = _PersonTracker()
     t.select([person(0.2, 0.5)], 0)
-    # nobody near where the athlete was
-    t.select([person(0.85, 0.5), person(0.9, 0.52)], 1)
+    # nobody near where the athlete was, so the frame is left empty instead of
+    # throwing the skeleton across the room
+    assert t.select([person(0.85, 0.5), person(0.9, 0.52)], 1) == []
+    assert t.switches == 0
+    assert t.rejected_frames == 1
+
+
+def test_a_sustained_jump_restarts_the_track():
+    t = _PersonTracker()
+    t.select([person(0.2, 0.5)], 0)
+    for frame in range(1, MAX_IDENTITY_REJECT_FRAMES + 1):
+        assert t.select([person(0.85, 0.5)], frame) == []
+    # it kept happening, so the athlete really did move
+    assert t.select([person(0.85, 0.5)], MAX_IDENTITY_REJECT_FRAMES + 1)
     assert t.switches == 1
 
 

@@ -49,6 +49,12 @@ class PulldownConfig:
     # gaps up to this long get interpolated (equipment blocking is usually brief)
     MAX_SHORT_GAP_FRAMES: int = 5
 
+    # --- ENGINEERING - outlier rejection (analysis/stabilise.py) ---
+    # frames compared either side when testing one landmark for a tracking error
+    OUTLIER_WINDOW_FRAMES: int = 2
+    # smallest jump that can be called an error, in torso lengths
+    OUTLIER_MIN_JUMP_TORSOS: float = 0.12
+
     # --- ENGINEERING - anatomical plausibility gates ---
     # MediaPipe can be confident about an arm hidden behind the machine. Wide
     # bands - outside them is NaN, not a fault
@@ -119,6 +125,11 @@ class PulldownConfig:
     # stable top-position frames needed for a trunk baseline (people are still
     # settling into the seat at the start)
     BASELINE_MIN_FRAMES: int = 5
+    # the baseline only uses top frames where the arms are still - reaching up for
+    # the bar also labels as "top", and it used to set the trunk reference
+    BASELINE_MAX_VELOCITY: float = 20.0
+    # and only the last couple of seconds before the first rep
+    BASELINE_WINDOW_SECONDS: float = 2.0
     # below this the trunk rule says "cannot assess"
     TORSO_MIN_VISIBILITY: float = 0.5
     # below this on the head landmarks the facing direction is unknown, so the

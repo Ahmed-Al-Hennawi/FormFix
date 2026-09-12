@@ -18,9 +18,8 @@ from pathlib import Path
 
 import numpy as np
 
-from analysis import filters, pose_detector, smoothing, trimming, validation
+from analysis import filters, pose_detector, smoothing, stabilise, trimming, validation
 from analysis.annotation import (
-    UPPER_BODY_DRAWN,
     FrameState,
     HudLine,
     JointAngle,
@@ -189,6 +188,14 @@ def _run(
 
     # --- 4. clean + smooth ---
     report("measure", 0.05, "Measuring movement")
+    # drop impossible landmark jumps before anything is filled in or smoothed -
+    # a low-pass filter would spread a spike instead of removing it
+    stabiliser = stabilise.reject_outliers(
+        pose,
+        video,
+        window=config.OUTLIER_WINDOW_FRAMES,
+        min_jump_torsos=config.OUTLIER_MIN_JUMP_TORSOS,
+    )
     interpolated = smoothing.interpolate_short_gaps(pose, config.MAX_SHORT_GAP_FRAMES)
     smoothing.ema_smooth(pose, config.EMA_ALPHA)
 
@@ -334,8 +341,6 @@ def _run(
                 JointAngle("Left elbow", LEFT_SHOULDER, LEFT_ELBOW, LEFT_WRIST),
                 JointAngle("Right elbow", RIGHT_SHOULDER, RIGHT_ELBOW, RIGHT_WRIST),
             ),
-            # upper body only - the legs are behind the bench and no rule uses them
-            drawn_landmarks=UPPER_BODY_DRAWN,
             frame_range=(render_window.start_frame, render_window.end_frame),
         )
     except Exception:
@@ -357,6 +362,7 @@ def _run(
     )
     # what the renderer actually wrote, for the technical panel
     debug["render_window"] = render_window.as_dict()
+    debug["outlier_rejection"] = stabiliser.as_dict()
 
     result = ExerciseAnalysisResult(
         success=True,

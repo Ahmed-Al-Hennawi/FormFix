@@ -21,6 +21,7 @@ video
     (up to 4 people; follows the one nearest the camera)
  -> check the recording                   analysis/validation.py
     (coverage, landmarks, framing, camera angle, tracking)
+ -> drop impossible landmark jumps        analysis/stabilise.py
  -> fill short gaps + EMA smoothing       analysis/smoothing.py
  -> pick the more visible side            analysis/validation.py
  -> measure every frame                   exercises/squat/metrics.py
@@ -155,6 +156,14 @@ heel to its standing position in the image, so moving across the frame or a
 bumped camera looked like a heel lift (over 250% of a lower leg on real
 footage). Comparing heel to toe on the same foot fixed that.
 
+Three more things make the number usable. The zero point is the person's own
+settled standing offset, not frame 0, so shuffling into position doesn't set
+it. The scale is their standing lower-leg length, not the current frame's -
+dividing by the current frame inflated the ratio at the bottom of the rep,
+where the shin is tilted and shorter in the image. And it is measured on
+whichever foot MediaPipe actually tracked, since the side the angles come from
+is chosen on the hip, knee and ankle and says nothing about the feet.
+
 ---
 
 ## 7. Counting reps and phases
@@ -206,7 +215,7 @@ from) and evaluated in `rules.py`.
 | --- | --- | --- | --- | --- |
 | **Depth** | min knee angle, or hip reaching knee level | bottom | pass ≤ 100°, warn ≤ 115°, or hip within 0.12 of knee | ≥ 50% of the bottom window |
 | **Torso lean** | trunk angle | descent → ascent | warn ≥ 45°, fail ≥ 60° or ≥ 55° past your standing posture | ≥ 4 frames and ≥ 15% of the rep |
-| **Heel lift** | heel rise | descent → ascent | warn ≥ 0.06 (warning only) | ≥ 3 frames and ≥ 10% of the rep |
+| **Heel lift** | heel rise | descent → ascent | warn ≥ 0.16 (warning only) | ≥ 0.2 s and ≥ 15% of the rep |
 | **Return to standing** | finish angle vs your own standing angle | finish | pass within 12°, warn within 24° | - |
 | **Descent control** | descent time | descent | pass ≥ 0.45 s, warn ≥ 0.25 s | - |
 
@@ -308,12 +317,14 @@ If nothing could be assessed, there's no score at all.
 
 ## 13. The annotated video
 
-- Only the squat's joints are drawn: torso and both legs, no arms.
-- The skeleton has its own display smoothing (a 2 Hz Butterworth), separate
-  from the analysis, so it doesn't jitter.
-- A far-side limb that's hidden behind the body for most of the clip isn't
-  drawn at all, instead of flickering in and out.
-- While a finding is shown, the joints it was measured from are ringed.
+- The whole skeleton is drawn, not just the joints the squat uses.
+- The skeleton has its own display smoothing, separate from the analysis: a
+  running median to kill single-frame noise, then a zero-phase Butterworth, so
+  it doesn't jitter and doesn't lag behind the movement either.
+- The side away from the camera is drawn fainter, and fainter still if it is
+  behind the body for most of the clip - MediaPipe is largely guessing at it.
+- One style throughout: thin cyan links, small white joints, nothing changes
+  colour when a rep is flagged. The verdict belongs on the results page.
 - The video is trimmed from 1 s before the first rep to 1 s after the last,
   but frame numbers stay the same, so every timestamp matches your upload.
 

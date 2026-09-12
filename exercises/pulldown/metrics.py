@@ -45,6 +45,7 @@ from exercises.common.metrics import (
     raw_series,
     safe_max,
     series,
+    settled_frames,
     span_seconds,
 )
 from exercises.common.persistence import sustained_extreme
@@ -277,21 +278,34 @@ def top_baseline(
     phases: list[MovementPhase],
     first_rep_start: int | None,
     config: PulldownConfig,
+    elbow_signal: np.ndarray | None = None,
+    timestamps: np.ndarray | None = None,
 ) -> dict[str, float]:
     """The person's own posture at the top, so a reclined seat or tilted camera isn't
-    a fault. Median over real top frames, since people are still reaching for the
-    bar at the start."""
+    a fault. Median over the top frames where the arms had stopped moving, and
+    preferably the last couple of seconds before the first rep - reaching up for
+    the bar labels as "top" too, and it used to set the trunk reference."""
     top = [
         i
         for i, phase in enumerate(phases)
         if phase is MovementPhase.REST and i < len(metrics) and metrics[i].valid
     ]
+    if elbow_signal is not None and timestamps is not None:
+        still = settled_frames(top, elbow_signal, timestamps, config.BASELINE_MAX_VELOCITY)
+        if len(still) >= config.BASELINE_MIN_FRAMES:
+            top = still
     if first_rep_start is not None:
         before_first = [i for i in top if i < first_rep_start]
         if len(before_first) >= config.BASELINE_MIN_FRAMES:
-            top = before_first
+            window = config.BASELINE_MIN_FRAMES
+            if timestamps is not None:
+                window = max(
+                    window,
+                    int(round(config.BASELINE_WINDOW_SECONDS * effective_fps(timestamps))),
+                )
+            top = before_first[-window:]
     if len(top) < config.BASELINE_MIN_FRAMES:
-        logger.warning("Few top-position frames (%d) for the pulldown baseline", len(top))
+        logger.warning("Few settled top-position frames (%d) for the pulldown baseline", len(top))
 
     return {
         "torso_angle": median([metrics[i].torso_angle for i in top]),

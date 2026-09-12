@@ -46,6 +46,12 @@ class PressConfig:
     MIN_POSE_FRAME_RATIO: float = 0.5
     MAX_SHORT_GAP_FRAMES: int = 5
 
+    # --- ENGINEERING - outlier rejection (analysis/stabilise.py) ---
+    # frames compared either side when testing one landmark for a tracking error
+    OUTLIER_WINDOW_FRAMES: int = 2
+    # smallest jump that can be called an error, in torso lengths
+    OUTLIER_MIN_JUMP_TORSOS: float = 0.12
+
     # --- ENGINEERING - anatomical plausibility gates ---
     # a dumbbell in front of the wrist or an arm crossing the head makes MediaPipe
     # guess confidently. Outside these wide bands is NaN, not a fault

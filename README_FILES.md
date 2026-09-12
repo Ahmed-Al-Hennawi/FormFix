@@ -66,13 +66,14 @@ For how the whole system works, see [README.md](README.md).
 | `pose_detector.py` | MediaPipe wrapper; picks and follows the right person. |
 | `pose_worker.py` | Runs detection in a separate process so a MediaPipe crash can't kill the app. |
 | `validation.py` | Checks the recording can be analysed (coverage, framing, camera angle). |
+| `stabilise.py` | Drops landmark positions that can't be real movement, before anything is filled in or smoothed. |
 | `smoothing.py` | Fills short gaps and smooths the landmarks (EMA). |
 | `filters.py` | Butterworth, Savitzky-Golay and moving-average filters in NumPy. |
 | `geometry.py` | Angles, inclinations and distances. |
 | `normalisation.py` | Scales distances by body size. |
 | `trimming.py` | Finds the part of the video with the actual set. |
 | `annotation.py` | Decides what goes on each frame of the result video. |
-| `overlay.py` | Draws the skeleton and labels on the video. |
+| `overlay.py` | Draws the skeleton: one style, thin links, small joints, the far side fainter. |
 | `models.py` | The data classes passed between the steps. |
 | `export.py` | Saves JSON/CSV results in debug mode. |
 
@@ -124,7 +125,9 @@ for comparison) and `persistence.py` (re-exports the shared one).
 | `test_landmarks.py` | The squat landmark list. |
 | `test_person_selection.py` | Following the right person when others are in shot. |
 | `test_plausibility.py` | The wrong-exercise check. |
-| `test_occlusion.py` | Hiding the far-side limb in side views. |
+| `test_occlusion.py` | Spotting a far-side limb that's behind the body in a side view. |
+| `test_stabilise.py` | Outlier rejection: a tracking error goes, real movement stays. |
+| `test_setup_phase.py` | Setup before the set doesn't reach the baseline or the rules. |
 | `test_trimming.py` | Trimming the result video. |
 | `test_annotation_output.py` | Writing the result video. |
 | `test_exercise_registry.py` | The wiring between exercises and the UI. |
@@ -155,6 +158,7 @@ for comparison) and `persistence.py` (re-exports the shared one).
 | `filter_selection.md` | Which smoothing filter and why. |
 | `literature_basis.md` | What I took from each paper. |
 | `limitations.md` | What FormFix can't do. |
+| `evaluation_results.md` | What the labelled videos showed, and what it found. |
 | `FormFix_Overview.docx` | Short overview for non-technical readers. |
 | `FormFix_Technical_Documentation.docx` | Technical documentation for the report. |
 | `FormFix_Research_Provenance.docx` | What came from which paper, for the report. |
@@ -165,6 +169,8 @@ for comparison) and `persistence.py` (re-exports the shared one).
 | --- | --- |
 | `README.md` | Which videos to record and how to run the evaluation. |
 | `labels.example.csv` | Example list of labelled videos. |
+| `labels.csv` | The videos I recorded and what each one is. |
+| `results.csv`, `error_matrix.csv`, `summary.md` | Written by `scripts/evaluate_videos.py`. The write-up is `docs/evaluation_results.md`. |
 | `reference_clip_runs.md` | Results of running FormFix on the real reference clips. |
 | `figures/pulldown_annotated_frames.png` | Frames from the pulldown run. |
 

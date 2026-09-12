@@ -292,7 +292,12 @@ class FrameMetrics:
     hip_above_knee: float = float("nan")
     # heel height against the toe of the same foot, over lower-leg length
     heel_toe_offset: float = float("nan")
-    # same minus the standing baseline, NaN until the baseline exists
+    # same in pixels, per foot, NaN when that foot is not tracked well enough. The
+    # heel rule divides these by the standing lower-leg length rather than the
+    # frame's own, which shortens as the shin tilts
+    left_heel_rise_px: float = float("nan")
+    right_heel_rise_px: float = float("nan")
+    # heel rise above the standing baseline, over the standing lower leg
     heel_lift: float = float("nan")
     landmark_confidence: float = 0.0
 

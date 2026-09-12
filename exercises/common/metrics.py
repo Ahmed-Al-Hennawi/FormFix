@@ -1,10 +1,12 @@
 """
-Small measurement helpers shared by the three exercises. The important two:
+Small measurement helpers shared by the three exercises. The important three:
 
-    plausible    sanity check - MediaPipe can be confident about a limb it is
-                 guessing, giving an angle that is anatomically impossible
-    frames_for   phase scoping, so a rule only reads the part of the rep it
-                 is about
+    plausible       sanity check - MediaPipe can be confident about a limb it is
+                    guessing, giving an angle that is anatomically impossible
+    frames_for      phase scoping, so a rule only reads the part of the rep it
+                    is about
+    settled_frames  drops the setup out of a baseline - the frames where someone
+                    is walking in or picking up a weight look like rest
 """
 
 from __future__ import annotations
@@ -21,6 +23,41 @@ PHASE_RETURN = "return"
 PHASE_WORKING = "working"  # towards + extreme
 PHASE_MOVEMENT = "movement"  # whole rep
 PHASE_COMPLETION = "completion"  # the frame the rep finished on
+
+
+def velocity(signal: np.ndarray, timestamps: np.ndarray) -> np.ndarray:
+    """Rate of change of a series per second, NaN where it can't be measured."""
+    values = np.asarray(signal, dtype=np.float64)
+    out = np.full(values.size, np.nan, dtype=np.float64)
+    for i in range(1, values.size - 1):
+        span = float(timestamps[i + 1] - timestamps[i - 1])
+        if span <= 1e-9 or not (np.isfinite(values[i - 1]) and np.isfinite(values[i + 1])):
+            continue
+        out[i] = (values[i + 1] - values[i - 1]) / span
+    return out
+
+
+def settled_frames(
+    candidates: list[int],
+    signal: np.ndarray,
+    timestamps: np.ndarray,
+    max_velocity: float,
+) -> list[int]:
+    """
+    The candidate frames where the movement has actually stopped. Walking into
+    position, picking up a weight or reaching for the bar all label as rest, and a
+    baseline measured over them is the setup rather than the person's posture.
+    """
+    if max_velocity <= 0:
+        return list(candidates)
+    speed = velocity(signal, timestamps)
+    if not np.isfinite(speed).any():
+        return list(candidates)
+    return [
+        i
+        for i in candidates
+        if i < speed.size and np.isfinite(speed[i]) and abs(speed[i]) <= max_velocity
+    ]
 
 
 def frames_for(segmentation: RepetitionSegmentation, phase: str) -> range:

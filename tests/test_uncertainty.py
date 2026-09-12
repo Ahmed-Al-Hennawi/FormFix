@@ -210,9 +210,11 @@ class TestWhatTheLayerRevealsAboutTheThresholds:
     """If one of these thresholds is tightened, this should flag that it's now
     inside the measurement noise."""
 
-    def test_the_heel_lift_bar_sits_below_its_own_measurement_error(self):
+    def test_the_heel_lift_bar_clears_its_own_measurement_error(self):
+        # it used to sit inside the band, which is why planted heels were warned
+        # about; this fails again if anyone tightens it back below the noise
         band = band_for("", rule_id="heel_lift")
-        assert band.total > DEFAULT_CONFIG.HEEL_LIFT_THRESHOLD
+        assert band.total <= DEFAULT_CONFIG.HEEL_LIFT_THRESHOLD
 
     def test_the_depth_warning_band_is_comparable_to_its_measurement_error(self):
         band = band_for("", rule_id="squat_depth")

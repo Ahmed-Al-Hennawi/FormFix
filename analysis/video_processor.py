@@ -95,16 +95,29 @@ def probe_video(path: Path) -> VideoMetadata:
             if raw_fourcc:
                 fourcc = "".join(chr((raw_fourcc >> (8 * i)) & 0xFF) for i in range(4)).strip()
 
-            # some containers report zero or absurd values, so try a real read first
-            if frame_count <= 0 or fps <= 0 or fps > 240:
-                ok, _ = capture.read()
-                if ok and frame_count <= 0:
-                    pass
-                if fps <= 0 or fps > 240:
+            # the metadata isn't trusted, so read one real frame and take the
+            # size from it. Some OpenCV builds turn a phone clip the right way up
+            # but still report the unrotated width and height, and then every
+            # landmark is converted to pixels against the wrong frame size and
+            # the skeleton sits off the body.
+            ok, frame = capture.read()
+            if ok and frame is not None and frame.ndim >= 2:
+                decoded_h, decoded_w = int(frame.shape[0]), int(frame.shape[1])
+                if decoded_w > 0 and decoded_h > 0 and (decoded_w, decoded_h) != (width, height):
                     logger.warning(
-                        "Unusable FPS %.2f reported for %s; assuming %.0f", fps, path, DEFAULT_FPS
+                        "%s reports %dx%d but decodes %dx%d - using the decoded size",
+                        path.name,
+                        width,
+                        height,
+                        decoded_w,
+                        decoded_h,
                     )
-                    fps = DEFAULT_FPS if ok else 0.0
+                    width, height = decoded_w, decoded_h
+            if fps <= 0 or fps > 240:
+                logger.warning(
+                    "Unusable FPS %.2f reported for %s; assuming %.0f", fps, path, DEFAULT_FPS
+                )
+                fps = DEFAULT_FPS if ok else 0.0
     finally:
         capture.release()
 

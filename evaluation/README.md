@@ -64,5 +64,6 @@ Useful options: `--preset literature`, `--strict-uncertainty`,
   overfitting. If a threshold changes, write down why in
   `docs/threshold_tuning.md`.
 
-These videos haven't been recorded yet, so there's no accuracy figure for
-FormFix.
+The videos were recorded in September 2026 and the run is written up in
+[docs/evaluation_results.md](../docs/evaluation_results.md). There is still no accuracy figure: fourteen clips
+of one person in one session can't support one.

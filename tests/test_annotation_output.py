@@ -296,12 +296,26 @@ class TestTheOverlayDrawsOnlyWhatTheDetectorActuallySaw:
             counts.update(points.keys())
         return counts
 
-    def test_a_guessed_far_limb_is_not_drawn_in_a_side_view(self):
-        from analysis.models import RIGHT_KNEE, RIGHT_WRIST
+    def _opacity(self, orientation, side="left", focus=frozenset()):
+        """The opacity each landmark was drawn at, on the frames it appeared."""
+        from analysis.annotation import _draw_policy, _drawable_points
 
-        drawn = self._drawn("side")
-        assert drawn[RIGHT_KNEE] == 0
-        assert drawn[RIGHT_WRIST] == 0
+        pose, video = self._pose(), self._video()
+        policy = _draw_policy(pose, video, side, orientation, focus)
+        seen: dict[int, float] = {}
+        for frame in range(self.FRAMES):
+            _, alphas = _drawable_points(pose, frame, video, policy)
+            seen.update(alphas)
+        return seen
+
+    def test_a_guessed_far_limb_is_drawn_faintly_in_a_side_view(self):
+        from analysis.models import LEFT_KNEE, RIGHT_KNEE, RIGHT_WRIST
+
+        opacity = self._opacity("side")
+        # it is still drawn - hiding a limb outright looked worse than showing
+        # that FormFix is guessing at it
+        for landmark in (RIGHT_KNEE, RIGHT_WRIST):
+            assert opacity.get(landmark, 0.0) < opacity[LEFT_KNEE]
 
     def test_the_measured_near_side_is_untouched(self):
         from analysis.models import LEFT_HIP, LEFT_KNEE, LEFT_SHOULDER
