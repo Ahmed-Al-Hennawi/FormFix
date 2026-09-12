@@ -53,11 +53,8 @@ from .overlay import (
     JointAngle,
     OverlayCanvas,
     OverlayStyle,
-    draw_analysis_label,
     draw_formfix_pose,
     draw_hud,
-    draw_joint_angle,
-    draw_turning_point_marker,
     draw_watermark,
 )
 from .video_processor import convert_to_h264, iter_frames, open_video, open_writer
@@ -232,11 +229,6 @@ class OverlayEvent:
         return self.short_text or self.text.split(" - ")[0].strip()
 
 
-# rest phases. Matched on the string, not the enum, so one renderer works for
-# all three exercises
-NEUTRAL_PHASE_VALUES: frozenset[str] = frozenset({"standing", "top", "ready"})
-
-
 @dataclass(frozen=True)
 class HudLine:
     """One chip of the heads-up display."""
@@ -258,16 +250,6 @@ class FrameState:
     is_bottom_window: bool = False
     # extra chips from the exercise, drawn under the phase
     extra: tuple[HudLine, ...] = field(default_factory=tuple)
-
-    @property
-    def phase_label(self) -> str:
-        value = getattr(self.phase, "value", self.phase)
-        return str(value or "unknown")
-
-    @property
-    def inside_repetition(self) -> bool:
-        """True mid-rep. Measured joints go lime here and stay cyan at rest."""
-        return self.rep_number > 0 and self.phase_label not in NEUTRAL_PHASE_VALUES
 
 
 def render_annotated_video(
@@ -406,78 +388,6 @@ def _draw_analysis_layer(
     # angle_joints and the events stay in the signature so each exercise still
     # declares what it measured and when
     _ = (state, active, focus, angle_joints)
-
-
-def _draw_angles(
-    canvas: OverlayCanvas,
-    points: dict[int, tuple[int, int]],
-    style: OverlayStyle,
-    angle_joints: Sequence[JointAngle],
-    flagged: set[int],
-    flag_colour,
-    inside_rep: bool,
-) -> None:
-    """Draw joint angles on the joints: warning colour if a finding came from that
-    joint, lime mid-rep, cyan at rest."""
-    for spec in angle_joints:
-        proximal = points.get(spec.proximal)
-        vertex = points.get(spec.vertex)
-        distal = points.get(spec.distal)
-        if proximal is None or vertex is None or distal is None:
-            continue
-        colour = flag_colour if spec.vertex in flagged else (LIME if inside_rep else CYAN)
-        draw_joint_angle(canvas, proximal, vertex, distal, style, colour=colour, arc=spec.arc)
-
-
-def _label_issue_region(
-    canvas: OverlayCanvas,
-    points: dict[int, tuple[int, int]],
-    style: OverlayStyle,
-    active: Sequence[OverlayEvent],
-    colour,
-) -> None:
-    """Short label beside the highlighted joints - one at most, never over the face."""
-    for event in active:
-        marked = [points[lm] for lm in event.highlight_landmarks if lm in points]
-        if not marked:
-            continue
-        offset = int(round(18 * style.scale))
-        y = int(sum(point[1] for point in marked) / len(marked))
-        # right of the joints, or left if there isn't room
-        right = max(point[0] for point in marked) + offset
-        if right > canvas.width * 0.72:
-            anchor, align = (min(point[0] for point in marked) - offset, y), "right"
-        else:
-            anchor, align = (right, y), "left"
-        draw_analysis_label(
-            canvas,
-            event.label,
-            anchor,
-            style,
-            colour=colour,
-            size=style.text_small,
-            accent=True,
-            align=align,
-        )
-        return
-
-
-def _draw_marker(
-    canvas: OverlayCanvas,
-    points: dict[int, tuple[int, int]],
-    marker_landmarks: tuple[int, ...],
-    label: str,
-    style: OverlayStyle,
-) -> None:
-    """Turning-point marker, at whichever landmarks the exercise names."""
-    marked = [points[lm] for lm in marker_landmarks if lm in points]
-    if not marked:
-        return
-    anchor = (
-        int(sum(p[0] for p in marked) / len(marked)),
-        int(sum(p[1] for p in marked) / len(marked)),
-    )
-    draw_turning_point_marker(canvas, anchor, label, style)
 
 
 def _draw_readout(

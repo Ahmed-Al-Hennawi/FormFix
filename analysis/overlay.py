@@ -8,13 +8,11 @@ here), and all sizes scale with the frame so 480p and 4K look the same.
 
 from __future__ import annotations
 
-import math
 from dataclasses import dataclass
 
 import cv2
 import numpy as np
 
-from .geometry import calculate_angle
 from .models import (
     BODY_CONNECTIONS,
     LEFT_ANKLE,
@@ -477,104 +475,6 @@ def draw_analysis_label(
     return width, height
 
 
-def draw_joint_angle(
-    canvas: OverlayCanvas,
-    proximal,
-    vertex,
-    distal,
-    style: OverlayStyle,
-    *,
-    colour=CYAN,
-    arc: bool = True,
-    value: float | None = None,
-) -> None:
-    """Arc between the two segments with the angle value beside it."""
-    angle = calculate_angle(proximal, vertex, distal) if value is None else value
-    if angle is None or not math.isfinite(angle):
-        return
-
-    v = (float(vertex[0]), float(vertex[1]))
-    a_vec = (proximal[0] - v[0], proximal[1] - v[1])
-    b_vec = (distal[0] - v[0], distal[1] - v[1])
-    a_len = math.hypot(*a_vec)
-    b_len = math.hypot(*b_vec)
-    if a_len < 1e-6 or b_len < 1e-6:
-        return
-
-    # keep the arc joint-sized, otherwise it sweeps across the body on a
-    # nearly straight leg
-    radius = int(max(style.key_node_r * 2.0, min(a_len, b_len) * 0.26))
-    radius = int(min(radius, 38 * style.scale, max(a_len, b_len) * 0.5))
-    a_deg = math.degrees(math.atan2(a_vec[1], a_vec[0]))
-    b_deg = math.degrees(math.atan2(b_vec[1], b_vec[0]))
-    if arc and radius > style.key_node_r:
-        sweep = (b_deg - a_deg + 540.0) % 360.0 - 180.0
-        canvas.arc(
-            v,
-            radius,
-            a_deg,
-            a_deg + sweep,
-            colour,
-            max(1, style.ring_w - 1),
-            alpha=0.55,
-        )
-
-    # put the label on the bisector just outside the arc so it's not on the limb
-    mid = math.radians(a_deg + ((b_deg - a_deg + 540.0) % 360.0 - 180.0) / 2.0)
-    offset = radius + int(round(10 * style.scale))
-    anchor = (v[0] + math.cos(mid) * offset, v[1] + math.sin(mid) * offset)
-    _draw_degrees(canvas, f"{angle:.0f}", anchor, style, colour)
-
-
-def _draw_degrees(canvas: OverlayCanvas, number: str, centre, style: OverlayStyle, colour) -> None:
-    """OpenCV's Hershey fonts are ASCII only, so the degree sign is a drawn circle."""
-    size = style.text
-    tw, th = _text_size(number, style, size)
-    ring_r = max(1, int(round(1.6 * style.scale)))
-    pad_x = max(4, int(round(6 * style.scale)))
-    pad_y = max(3, int(round(4 * style.scale)))
-    gap = max(2, int(round(2.5 * style.scale)))
-    width = tw + gap + ring_r * 2 + pad_x * 2
-    height = th + pad_y * 2
-
-    x = int(max(0, min(centre[0] - width / 2, canvas.width - width)))
-    y = int(max(0, min(centre[1] - height / 2, canvas.height - height)))
-
-    canvas.rounded_rect((x, y), (width, height), DEEP_SPACE, style.radius, alpha=0.68)
-    canvas.rounded_rect(
-        (x, y), (width, height), colour, style.radius, alpha=0.34, thickness=max(1, style.ring_w - 1)
-    )
-    baseline = y + pad_y + th
-    canvas.text(number, (x + pad_x, baseline), colour, size, style.text_weight, alpha=0.96)
-    canvas.circle(
-        (x + pad_x + tw + gap + ring_r, y + pad_y + ring_r + max(1, int(style.scale))),
-        ring_r,
-        colour,
-        max(1, int(round(style.scale))),
-        alpha=0.96,
-    )
-
-
-def highlight_issue_region(
-    canvas: OverlayCanvas,
-    points: dict[int, tuple[int, int]],
-    landmarks,
-    style: OverlayStyle,
-    *,
-    colour=AMBER,
-) -> None:
-    """Ring only the joints a finding was measured from, not the whole skeleton."""
-    marked = {lm: points[lm] for lm in landmarks if lm in points}
-    if not marked:
-        return
-    for a, b in SEGMENTS:
-        if a in marked and b in marked:
-            canvas.line(marked[a], marked[b], colour, style.link_focus, alpha=0.95, glow=0.55)
-    ring = int(round(style.key_node_r * 1.9))
-    for point in marked.values():
-        canvas.circle(point, ring, colour, max(1, style.ring_w), alpha=0.9, glow=0.5)
-
-
 def _draw_head(
     canvas: OverlayCanvas,
     points: dict[int, tuple[int, int]],
@@ -645,13 +545,6 @@ def draw_hud(canvas: OverlayCanvas, lines, style: OverlayStyle) -> None:
         y += height + style.gap
 
 
-def draw_status_pill(canvas: OverlayCanvas, text: str, style: OverlayStyle, *, colour=AMBER) -> None:
-    """One-line finding, shown while its evidence is on screen."""
-    _, height = _text_size(text, style)
-    y = canvas.height - style.pad - height - max(6, int(round(10 * style.scale)))
-    draw_analysis_label(canvas, text, (style.pad, y), style, colour=colour, accent=True)
-
-
 def draw_watermark(canvas: OverlayCanvas, style: OverlayStyle, text: str = "FORMFIX") -> None:
     """Small logo text in the top-right corner."""
     canvas.text(
@@ -664,28 +557,4 @@ def draw_watermark(canvas: OverlayCanvas, style: OverlayStyle, text: str = "FORM
         style.text_small,
         max(1, style.text_weight),
         alpha=0.42,
-    )
-
-
-def draw_turning_point_marker(
-    canvas: OverlayCanvas,
-    anchor,
-    label: str,
-    style: OverlayStyle,
-) -> None:
-    """Dashed marker at the rep's turning point (squat bottom, press lockout)."""
-    half = int(round(70 * style.scale))
-    x, y = int(anchor[0]), int(anchor[1])
-    dash = max(4, int(round(9 * style.scale)))
-    thickness = max(1, style.ring_w - 1)
-    for start in range(x - half, x + half, dash * 2):
-        canvas.line((start, y), (min(start + dash, x + half), y), LIME, thickness, alpha=0.7)
-    draw_analysis_label(
-        canvas,
-        label,
-        (x + half + style.gap, y - int(round(9 * style.scale))),
-        style,
-        colour=LIME,
-        size=style.text_small,
-        alpha=0.9,
     )
