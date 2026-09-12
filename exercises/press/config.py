@@ -221,7 +221,7 @@ RECORDING_TIPS: tuple[str, ...] = (
 QUICK_TIPS: tuple[str, ...] = (
     "Film from the front, level with your chest.",
     "Keep both arms and the dumbbells in frame at the top.",
-    "Keep the camera still. A few controlled reps is enough.",
+    "Keep the camera still. A few controlled reps are enough.",
 )
 
 

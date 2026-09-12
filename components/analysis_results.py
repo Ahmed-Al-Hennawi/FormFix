@@ -472,7 +472,7 @@ def reference_modal(exercise: Exercise) -> str:
 _ORIENTATION_HEADLINES = {
     "frontal": "Analysed from a front-on camera",
     "side": "Analysed from a side-on camera",
-    "diagonal_side": "Analysis completed with a partial camera angle",
+    "diagonal_side": "Analysed from a partial camera angle",
 }
 
 
@@ -485,7 +485,7 @@ def recording_quality_block(result: AnalysisResult, exercise: Exercise) -> str:
         return ""
 
     headline = _ORIENTATION_HEADLINES.get(
-        result.camera_orientation, "Analysis completed with some limitations"
+        result.camera_orientation, "Analysed with some limitations"
     )
     needed = (
         f"{esc(exercise.name)} is analysed from a {esc(exercise.camera_view.lower())} view."
@@ -497,15 +497,19 @@ def recording_quality_block(result: AnalysisResult, exercise: Exercise) -> str:
         '<section class="ax-panel ax-panel--invalid" data-animate="fade-up">'
         '  <p class="eyebrow">Recording quality</p>'
         f'  <h3 class="ax-panel__title">{esc(headline)}</h3>'
-        f'  <p class="ax-video-note">FormFix could analyse this recording. {needed} '
-        "Keeping the whole movement in frame, with the camera still, gives the most "
-        "accurate measurements.</p>"
+        f'  <p class="ax-video-note">FormFix analysed this clip. {needed} '
+        "For the most accurate results, keep the whole movement in frame and the camera "
+        "still.</p>"
         f'  <ul class="ax-retry__tips">{notes}</ul>'
         "</section>"
     )
 
 
 # --- Validation failure ---
+
+
+# used only if the analyser did not supply its own title
+FAILURE_TITLE = "We couldn't analyse this recording"
 
 
 def failure_markup(result: AnalysisResult, exercise: Exercise | None = None) -> str:
@@ -525,11 +529,11 @@ def failure_markup(result: AnalysisResult, exercise: Exercise | None = None) -> 
         '<div class="ff-page ax-results" data-ax-results>'
         '<section class="ax-panel ax-panel--invalid" data-animate="fade-up">'
         '  <p class="eyebrow">Analysis not possible</p>'
-        f'  <h3 class="ax-invalid__title">{esc(result.error_title or "We couldn&rsquo;t analyse this recording")}</h3>'
+        f'  <h3 class="ax-invalid__title">{esc(result.error_title or FAILURE_TITLE)}</h3>'
         f'  <p class="ax-invalid__body">{esc(result.error_message)}</p>'
         f"  {tips_block}"
-        '  <p class="ax-invalid__note">Nothing was scored - FormFix never guesses when it '
-        "cannot see the movement clearly. Adjust the recording and upload again.</p>"
+        '  <p class="ax-invalid__note">Nothing was scored - FormFix does not guess when it '
+        "cannot see the movement clearly. Record again and upload.</p>"
         "</section>"
         "</div>"
     )

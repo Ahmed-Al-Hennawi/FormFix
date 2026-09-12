@@ -167,9 +167,9 @@ def _header() -> None:
               <p class="eyebrow">Analyse your form</p>
               <h1 class="display display--md ax-head__title">Upload a set.<br />Get an explanation.</h1>
               <p class="ax-head__lede">
-                Record a single set, drop the clip in, and FormFix will track your body
-                through the movement and explain what it sees. Each exercise has its own
-                camera view - the guidance below the exercise picker tells you which.
+                Record one set and upload the clip. FormFix tracks your body through the
+                movement and explains what it sees. Each exercise needs a different camera
+                angle - the guide below shows you which.
               </p>
             </header>
             </div>
@@ -340,8 +340,8 @@ def _upload_column(stage: str, uploaded) -> None:
                 + " &middot; ".join(f".{ext}" for ext in SUPPORTED_VIDEO_TYPES)
                 + "</p>"
                 # tell people what happens to their video before they upload it
-                '<p class="ff-page ax-hint ax-hint--privacy">Your video is automatically '
-                "deleted right after processing and is never stored.</p>"
+                '<p class="ff-page ax-hint ax-hint--privacy">Your video is never stored. '
+                "It is deleted right after processing.</p>"
             )
             return
 
@@ -393,17 +393,16 @@ def _waiting_markup(stage: str) -> str:
     eyebrow = "Ready to analyse" if ready else "Waiting for a video"
     title = "Press Analyse Form" if ready else "Your results will appear here"
     body = (
-        "Your clip is loaded. Start the analysis and FormFix will walk through the "
-        "movement frame by frame."
+        "Your clip is ready. FormFix will go through the movement frame by frame."
         if ready
-        else "Choose your exercise and upload a short clip of one set. Nothing is analysed "
-        "until you press Analyse Form."
+        else "Pick your exercise and upload one set. Nothing is analysed until you press "
+        "Analyse Form."
     )
 
     rows = (
-        ("Form score", "An overall score out of 100"),
-        ("What you did well", "The parts of the movement that looked right"),
-        ("What to improve", "Each issue, with a clear correction"),
+        ("Form score", "One score out of 100"),
+        ("What you did well", "The parts that looked right"),
+        ("What to improve", "Each issue, with a fix"),
     )
     preview = "".join(
         f'<li class="ax-preview__row"><span class="ax-preview__dot"></span>'
