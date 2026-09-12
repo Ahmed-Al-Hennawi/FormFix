@@ -1,0 +1,15 @@
+video,exercise,expected
+videos/LP01_correct.mp4,pulldown,correct
+videos/LP02_excessive_lean.mp4,pulldown,pulldown_torso
+videos/LP03_limited_rom.mp4,pulldown,pulldown_rom
+videos/LP04_front_view.mp4,pulldown,correct
+videos/SP01_correct.mp4,press,correct
+videos/SP02_asymmetric.mp4,press,press_symmetry
+videos/SP04_incomplete_rom.mp4,press,press_rom
+videos/SP05_side_view.mp4,press,correct
+videos/SQ01a_correct_weighted.mp4,squat,correct
+videos/SQ01b_correct_bodyweight.mp4,squat,correct
+videos/SQ02_to_parallel.mp4,squat,correct
+videos/SQ03_heel_lift.mp4,squat,heel_lift
+videos/SQ04_setup_heel_lift.mp4,squat,heel_lift
+videos/XX01_wrong_exercise.mp4,press,correct

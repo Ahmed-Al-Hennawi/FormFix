@@ -21,15 +21,11 @@ test_videos/
 # kept locally as the masters, not shipped.
 static/assets/videos/_source_hevc/
 
-# Labelled evaluation recordings and the harness output. The manifest
-# template and the instructions are tracked; the clips and the results a run
-# produces are not.
+# Labelled evaluation recordings. The clips stay on my machine; the manifest
+# and the results of the run are tracked, because the write-up in docs/ quotes
+# numbers from them.
 evaluation/*.mp4
 evaluation/*.mov
-evaluation/labels.csv
-evaluation/results.csv
-evaluation/error_matrix.csv
-evaluation/summary.md
 
 .pytest_cache/
 .ruff_cache/
