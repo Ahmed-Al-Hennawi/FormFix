@@ -1,13 +1,13 @@
 # Measurement uncertainty
 
-## Why I added this
+## Why this is here
 
-Every rule compares a measurement to a threshold. I'd already labelled the
-thresholds as provisional, but I was treating the **measurement** as exact -
-and it's actually the less certain side.
+Every rule compares a measurement to a threshold. The thresholds were already
+labelled provisional; this file extends the same treatment to the other side of
+the comparison, the **measurement** itself, which is the less certain of the two.
 
-MediaPipe's error on the things FormFix measures has been published, and it's
-big compared to some of my thresholds:
+MediaPipe's error on the quantities FormFix measures has been published, and it
+is large enough next to some thresholds to be worth building around:
 
 | Measurement | Published error | Where FormFix uses it |
 | --- | --- | --- |
@@ -19,13 +19,15 @@ big compared to some of my thresholds:
 Sources: Dill et al. (2024), *Sensors* 24(23):7772; Dill et al. (2023),
 *Curr Dir Biomed Eng* 9(1):563-566.
 
-So a rep measured at 108° can't really be told apart from one at 98°.
+A rep measured at 108° and one measured at 98° therefore sit inside the same
+error band.
 
 For comparison, Hancock et al. (2018, quoted in Dill et al.) give the smallest
 difference clinical tools can detect on a patient lying still: 6° with a
 digital inclinometer, 10° with a long-arm goniometer, 14° by eye. FormFix's
-10.7° is between a goniometer and a physio's eye - fine for a phone, but not
-good enough for 3° differences.
+10.7° sits between a goniometer and a physio's eye, which is a reasonable place
+for a single phone camera to land - and it sets the smallest difference the
+system should claim to see.
 
 Mercadal-Baudart et al. (2024) turn that into a rule: under **12°** error is
 "good" (better than by eye) and under **6°** is "very good". Against that:
@@ -34,8 +36,8 @@ Mercadal-Baudart et al. (2024) turn that into a rule: under **12°** error is
 | --- | --- | --- |
 | Trunk angle | ±6.5° | good |
 | Knee angle, near leg (depth) | ±10.7° (±11.6° with filter bias) | good |
-| Left/right knee difference | ±15.1° | **worse than by eye** |
-| Knee angle, far leg | ±25.1° | **worse than by eye** |
+| Left/right knee difference | ±15.1° | outside the band - no rule relies on it |
+| Knee angle, far leg | ±25.1° | outside the band - no rule relies on it |
 
 ## What FormFix does with it
 
@@ -86,30 +88,34 @@ The derivations are written out in the code too. Two adjustments on top:
   so the default depth band is √(10.7² + 4.53²) = 11.6°
   ([filter_selection.md](filter_selection.md)).
 
-## What it showed about my own thresholds
+## How this shaped the thresholds
 
-1. **The squat left/right warning (12°) was below its own error (±15.1°)**, so
-   it could report an asymmetry that was just noise. I **removed that rule**;
-   the measurement is still exported. The press keeps its symmetry rule because
-   it's filmed front-on with both arms visible.
-2. **The heel-lift threshold (0.06) was below the ±0.15 error** of the body
-   length it's divided by, so it reported planted heels as lifting. It is now
-   **0.16**, clear of the band and the same value as the
+Two thresholds sat inside their own error band, and putting the bands on paper
+is what made that visible:
+
+1. **The squat left/right warning (12°) sat below its own error (±15.1°)**, so
+   it could not separate a genuine asymmetry from noise. The rule was
+   **removed** and the measurement is still exported. The press keeps its
+   symmetry rule, because it is filmed front-on with both arms visible.
+2. **The heel-lift threshold (0.06) sat below the ±0.15 error** of the body
+   length it is divided by, so a planted heel could fall inside the flagging
+   band. It is now **0.16**, clear of the band and the same value as the
    [literature preset](../exercises/squat/literature_config.py) - the one
    threshold where my default and the preset agree.
 
-That costs sensitivity, and I'd rather say so: 0.16 of a lower leg is roughly
-6 cm of heel rise, so a small genuine lift is not reported. From one 2D camera
-a smaller one can't be separated from the noise, and the old bar only appeared
-to find them. A heel finding stays a prompt to look, not a measurement. Tests
-in `test_uncertainty.py` fail if anyone puts it back inside the band.
+This is a deliberate trade of sensitivity for confidence, and worth stating
+plainly: 0.16 of a lower leg is roughly 6 cm of heel rise, so a small genuine
+lift is not reported. From one 2D camera a lift that size cannot be separated
+from the noise, so the extra sensitivity of the old bar was apparent rather than
+real. A heel finding stays a prompt to look, not a measurement. Tests in
+`test_uncertainty.py` fail if the threshold is ever moved back inside the band.
 
-## What it doesn't do
+## Scope
 
-- It doesn't turn RMSE into a probability - the papers report RMSE, not a
-  distribution.
-- It doesn't apply to the two range-of-motion rules, because they combine
-  three criteria in different units, so there's no single margin.
-- It doesn't replace reliability. Reliability is "how much evidence is there
-  in this video"; uncertainty is "how small a difference can this tool see at
-  all". A perfectly visible knee angle is still ±10.7°.
+- The margins are error bands, not probabilities: the papers report RMSE rather
+  than a distribution, so the output stays in those terms.
+- It applies to single-margin rules. The two range-of-motion rules combine three
+  criteria in different units, so there is no single margin to compare against.
+- It sits alongside reliability rather than replacing it. Reliability asks how
+  much evidence a given video offers; uncertainty asks how small a difference
+  the tool can resolve at all. A perfectly visible knee angle is still ±10.7°.

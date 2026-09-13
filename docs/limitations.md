@@ -107,8 +107,6 @@ but fast, bouncy squats will get more "shallow" findings than slow ones.
 - **No user study,** so no claim that it improves anyone's technique (unlike
   Chae et al.'s 2023 trial). Friends testing the live app gave informal
   feedback, but that isn't a study.
-- **No labelled-video evaluation.** The script is ready
-  (`scripts/evaluate_videos.py`); the videos aren't recorded.
 - **Person selection is by position, not identity.** The first frame picks the
   biggest person, so someone closer to the camera at the start would be picked
   and followed. The detector also only looks for four people.

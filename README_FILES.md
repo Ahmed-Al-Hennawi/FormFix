@@ -159,9 +159,8 @@ for comparison) and `persistence.py` (re-exports the shared one).
 | `literature_basis.md` | What I took from each paper. |
 | `limitations.md` | What FormFix can't do. |
 | `evaluation_results.md` | What the labelled videos showed, and what it found. |
-| `FormFix_Overview.docx` | Short overview for non-technical readers. |
-| `FormFix_Technical_Documentation.docx` | Technical documentation for the report. |
-| `FormFix_Research_Provenance.docx` | What came from which paper, for the report. |
+| `technical_documentation.md` | Architecture, the pipeline stage by stage, and the implementation details. |
+| `research_provenance.md` | What came from which paper, what I changed, and what is my own. |
 
 ## `evaluation/`
 

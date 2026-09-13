@@ -1,8 +1,9 @@
 # Literature basis
 
 What I took from each paper I reviewed, what I did with it, and where FormFix
-does something the paper doesn't. `FormFix_Research_Provenance.docx` has the
-version written for the report; this one is linked to the code.
+does something the paper doesn't.
+[research_provenance.md](research_provenance.md) is the provenance record -
+what is cited, adapted or my own; this one is linked to the code.
 
 ## The papers
 
@@ -16,10 +17,7 @@ version written for the report; this one is linked to the code.
 | 7 | Dill et al. (2023), *Curr Dir Biomed Eng* 9(1):563-566 | Accuracy of MediaPipe Pose against motion capture |
 | 8 | Dill et al. (2024), *Sensors* 24(23):7772 | Stereo MediaPipe on 810 squat reps against motion capture |
 | 9 | Yadav et al. (2022), *Knowledge-Based Systems* 250:109097 | YogNet: yoga recognition with an angle-threshold correction table |
-| - | Jaiswal, Chauhan & Srivastava (2023), *RecSys '23* | Learns a physics model per exercise and compares your movement to it |
-
-Numbers 1-9 follow the files I was given (there's no paper 3). Jaiswal et al.
-was added later, so it has no number.
+| 10 | Jaiswal, Chauhan & Srivastava (2023), *RecSys '23* | Learns a physics model per exercise and compares your movement to it |
 
 ## What I took and what I did with it
 

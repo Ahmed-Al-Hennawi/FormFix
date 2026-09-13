@@ -210,7 +210,7 @@ hard way:
 - The thresholds are my own prototype values. They were tested on synthetic
   data, **not** validated on labelled real videos, so there is no accuracy
   figure yet.
-- No user study has been done, so I don't claim it improves anyone's technique.
+- No user study has been done.
 - It doesn't detect injury risk, back rounding or knee valgus - one camera
   can't support those.
 - One set of thresholds for everyone; bodies and flexibility differ.
@@ -223,15 +223,15 @@ More detail in [docs/limitations.md](docs/limitations.md).
 
 | Document | What's in it |
 | --- | --- |
+| [Technical documentation](docs/technical_documentation.md) | architecture, the pipeline and the implementation details |
 | [Squat](docs/squat_analysis.md) · [Lat pulldown](docs/pulldown_analysis.md) · [Shoulder press](docs/press_analysis.md) | how each analyser works |
 | [Thresholds](docs/threshold_tuning.md) | where every threshold came from and why it changed |
 | [Measurement uncertainty](docs/measurement_uncertainty.md) | MediaPipe's error and how it's used |
 | [Filter selection](docs/filter_selection.md) | which smoothing filter and why |
 | [Literature basis](docs/literature_basis.md) | what I took from each paper |
+| [Research provenance](docs/research_provenance.md) | what is cited, what I adapted, what is my own |
 | [Limitations](docs/limitations.md) | what FormFix can't do |
 | [Evaluation results](docs/evaluation_results.md) | what the labelled videos showed |
 | [Evaluation](evaluation/README.md) · [Real-video runs](evaluation/reference_clip_runs.md) | how to evaluate it, and the runs on real footage |
 | [Wireframes](wireframes/README.md) | every screen and state |
 
-The Word documents in `docs/` (overview, technical documentation, research
-provenance) are longer versions written for the report.

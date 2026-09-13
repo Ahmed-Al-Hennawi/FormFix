@@ -43,9 +43,16 @@ no threshold was changed because of them.
 
 ## What happened
 
-13 of 14 recordings were analysed. One was refused. Across 48 rule-by-video
-cells: **3 true positives, 2 false positives, 2 false negatives, 35 true
-negatives, 4 not assessed and 2 not analysed**.
+Given the small scale of this evaluation - 14 video clips recorded by a single
+participant in one session - an overall accuracy percentage was not calculated.
+The evaluation instead asks whether FormFix AI identifies the intended technique
+issue in each clip and produces appropriate feedback. Everything below is
+therefore preliminary technical validation of the system, not a measure of
+generalisable performance.
+
+13 of 14 recordings were analysed; one was refused. Across 48 rule-by-video
+cells the outcomes were 3 true positives, 2 false positives, 2 false negatives,
+35 true negatives, 4 not assessed and 2 not analysed. Rule by rule:
 
 | Rule | TP | FP | FN | TN | Not assessed |
 | --- | --- | --- | --- | --- | --- |
@@ -60,10 +67,6 @@ negatives, 4 not assessed and 2 not analysed**.
 | return_to_standing | 0 | 0 | 0 | 5 | 0 |
 | descent_control | 0 | 0 | 0 | 5 | 0 |
 
-There is no accuracy percentage here. Fourteen clips of one person in one
-session cannot support one, and most of the true negatives come from rules that
-had nothing to find.
-
 ## What worked
 
 - **No false finding on any of the three correct squats.** All five squat rules
@@ -76,11 +79,13 @@ had nothing to find.
   to.**
 - **The heel rule separated the clean squats from a real lift.** Silent on all
   three correct squats, fired on `SQ04`.
-- **Wrong camera angles were handled rather than ignored.** `SP05`, a press
-  filmed from the side, had symmetry and alignment marked "not assessed"
-  instead of guessed. `LP04` was marked as a limited recording.
 
-## What it found
+## What the clips surfaced
+
+Each item below is a clip behaving differently to its label, traced back to the
+measured value behind it. In every case the measurement itself holds up and the
+gap sits in a threshold or a gating rule - which is what a validation run at
+this scale is for.
 
 ### 1. The pulldown range bar cannot separate a full rep from a short one
 
@@ -142,9 +147,11 @@ measurements, two of its four repetitions reached only 108° and 112° of elbow
 extension against 160-165° on the others, so the finding is defensible; one arm
 lagging far enough also shortens the range.
 
-## What this does not show
+## Scope of these results
 
-- No accuracy rate, for the reasons above.
+- Performance is reported rule by rule and clip by clip rather than as a single
+  accuracy figure; at 14 clips from one session, an aggregate percentage would
+  imply a precision the sample cannot support.
 - `press_alignment` was never exercised by a positive case.
 - Every clip is one person, one phone, one session. Nothing here says how
   FormFix behaves on a different body, gym or camera.

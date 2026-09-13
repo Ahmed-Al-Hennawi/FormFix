@@ -65,5 +65,4 @@ Useful options: `--preset literature`, `--strict-uncertainty`,
   `docs/threshold_tuning.md`.
 
 The videos were recorded in September 2026 and the run is written up in
-[docs/evaluation_results.md](../docs/evaluation_results.md). There is still no accuracy figure: fourteen clips
-of one person in one session can't support one.
+[docs/evaluation_results.md](../docs/evaluation_results.md).

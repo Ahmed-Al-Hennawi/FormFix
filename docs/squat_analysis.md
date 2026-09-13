@@ -391,7 +391,5 @@ FORMFIX_TEST_VIDEO=path/to/side-view-squat.mp4 pytest   # adds a real-video test
 - The camera angle is estimated once per video.
 - A hard cut in the video can look like a very fast descent.
 - One set of thresholds for everyone.
-- Not yet tested on labelled real gym videos (different bodies, clothing,
-  lighting).
 
 See [limitations.md](limitations.md) for the full list.

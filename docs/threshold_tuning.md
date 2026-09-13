@@ -28,9 +28,9 @@ because no paper I reviewed gives one for these movements and camera angles.
 
 The rep counter originally used fixed angles (pulldown: rest 148°, start 140°,
 bottom 115°, end 143°). Testing with a synthetic person whose arms only
-straightened to 132° showed a loop: they never reached the "extended" level,
-so no rep was counted, so the range-of-motion rule meant to catch exactly that
-never ran.
+straightened to 132° exposed a circular dependency: they never reached the
+"extended" level, so no rep was counted, so the range-of-motion rule meant to
+catch exactly that never ran.
 
 So the levels are now **adaptive** - fixed margins below the person's own
 resting position. "Was this a rep?" is adaptive; "was the range enough?" uses
@@ -62,8 +62,9 @@ the fixed `ROM_*` values. Both are pinned by tests
 
 The camera bands are the same as the squat (0.45 / 1.00) since both want a side view.
 
-**None of these have been tested on labelled real videos yet** - the synthetic
-tests check the code, not whether the values suit real people.
+The synthetic tests pin the behaviour of the code rather than the fit of the
+values to real people. Where these bars sit against real footage is recorded in
+§9.
 
 ---
 
@@ -206,23 +207,30 @@ value.
 | Squat heel rise | not flagged | 0.160 (missed), 0.202-0.296 (caught) | warn at 0.16, held 15% of the rep |
 | Press elbow at the top | 160-168° | 100-113° | pass at ≥ 150° |
 
-Two of these are clearly in the wrong place: the pulldown range bar sits
-outside the range both classes produce, and the pulldown trunk bar is below
-what normal technique measures. I have left both alone and written down why.
+Two of the bars sit away from where the clips fall: the pulldown range bar is
+outside the range both classes produce, and the pulldown trunk bar is below what
+normal technique measures. Both have been left where they are and documented
+rather than moved on evidence this thin.
 
 ---
 
-## 10. What I can't claim
+## 10. What these values rest on
 
-- **No threshold is tuned to labelled real videos.** The clips in §9 measure
-  where the thresholds sit; they are too few to move them.
-- The real-video runs are verification only - the reference clips are
-  animated montages, and no threshold was changed because of them.
-- **There is no accuracy figure**, and fourteen clips of one person could not
-  support one ([evaluation_results.md](evaluation_results.md)).
-- **Don't tune thresholds until every test video passes** - with a few videos
-  that's overfitting.
-- The literature preset isn't validated either. A citation isn't a validation.
+Set out plainly, so the basis for each claim in the report is on the record:
+
+- **The thresholds come from the exercise definition, the reference clip,
+  published movement principles and testing - not from fitting to labelled real
+  videos.** The clips in §9 record where the bars sit; they are too few to move
+  them.
+- The real-video runs are verification. The reference clips are animated
+  montages, and no threshold was changed because of them.
+- Performance is reported rule by rule rather than as an accuracy figure;
+  fourteen clips from one person would not support one
+  ([evaluation_results.md](evaluation_results.md)).
+- **Thresholds are not tuned until every test video passes** - with a handful of
+  videos that is overfitting, not validation.
+- The literature preset is a cited comparison, not a validated configuration: a
+  citation is not a validation.
 - The uncertainty bands are RMSE used as a scale, not a probability.
-- The filter comparison used synthetic data (you need a known true value to
-  measure bias).
+- The filter comparison used synthetic data, since measuring bias needs a known
+  true value.
