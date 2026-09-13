@@ -51,8 +51,8 @@ therefore preliminary technical validation of the system, not a measure of
 generalisable performance.
 
 13 of 14 recordings were analysed; one was refused. Across 48 rule-by-video
-cells the outcomes were 3 true positives, 2 false positives, 2 false negatives,
-35 true negatives, 4 not assessed and 2 not analysed. Rule by rule:
+cells the outcomes were 3 true positives, 3 false positives, 2 false negatives,
+34 true negatives, 4 not assessed and 2 not analysed. Rule by rule:
 
 | Rule | TP | FP | FN | TN | Not assessed |
 | --- | --- | --- | --- | --- | --- |
@@ -60,7 +60,7 @@ cells the outcomes were 3 true positives, 2 false positives, 2 false negatives,
 | pulldown_torso | 0 | 1 | 0 | 2 | 0 |
 | press_symmetry | 1 | 0 | 0 | 2 | 2 |
 | press_alignment | 0 | 0 | 0 | 3 | 2 |
-| press_rom | 1 | 1 | 0 | 3 | 0 |
+| press_rom | 1 | 2 | 0 | 2 | 0 |
 | squat_depth | 0 | 0 | 0 | 5 | 0 |
 | torso_lean | 0 | 0 | 0 | 5 | 0 |
 | heel_lift | 1 | 0 | 1 | 3 | 0 |
@@ -135,8 +135,11 @@ would let this clip be judged.
 
 ### 6. Two guard rails let a recording through
 
-- `XX01` is a **bench press**, analysed as a shoulder press. It was accepted:
-  2 repetitions, score 100. The plausibility check has no test for lying down.
+- `XX01` is a **bench press**, analysed as a shoulder press. It was accepted
+  rather than refused: 1 repetition, score 50, with a `press_rom` warning. The
+  plausibility check has no test for lying down. That warning is the second
+  `press_rom` false positive, on a clip that should not have reached the rules
+  at all.
 - `SP05` is a press filmed from the side. Symmetry and alignment were correctly
   not assessed, and the one remaining check passed - so the result reads
   **100/100**. The score is the share of *evaluable* checks that passed, so
