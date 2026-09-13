@@ -10,7 +10,8 @@ back to a measured angle and a written rule.
 It's aimed at **beginners** who train on their own and don't have a coach to
 check their form.
 
-**Live app:** <https://formfix.streamlit.app>
+**Live app:** <https://formfix.streamlit.app>\
+**Repository:** <https://git.arts.ac.uk/a-alhennawi0520251/FormFix-Main-Project>
 
 > FormFix gives technique guidance from visible movement. It is not a
 > replacement for a coach, and it doesn't give medical advice.
